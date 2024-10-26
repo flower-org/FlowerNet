@@ -1,0 +1,3 @@
+rootProject.name = 'FlowerNet'
+include 'Socks5sServer'
+include 'DnsServer'

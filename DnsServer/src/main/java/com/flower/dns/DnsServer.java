@@ -1,5 +1,6 @@
 package com.flower.dns;
 
+import com.flower.utils.PkiUtil;
 import com.flower.utils.ServerUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
@@ -15,20 +16,17 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
 import java.net.InetAddress;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
 
 public class DnsServer {
     final static Logger LOGGER = LoggerFactory.getLogger(DnsServer.class);
 
     private static final InetAddress OTHER_DNS_TLS_SERVER_ADDRESS = ServerUtil.getByName("1.1.1.1");
     private static final int OTHER_DNS_TLS_SERVER_PORT = 853;
-    private static final TrustManagerFactory TRUST_MANAGER = ServerUtil.getFromCertificateResource("oneone_cert.pem");
+    private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("oneone_cert.pem");
 
     private static final int DNS_SERVER_PORT = 5300;
 
-    public static void main(String[] args) throws SSLException, InterruptedException, NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
+    public static void main(String[] args) throws SSLException, InterruptedException {
         // TODO: command line parameters
         int port = DNS_SERVER_PORT;
         if (args.length > 0) {

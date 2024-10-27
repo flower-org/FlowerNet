@@ -34,3 +34,8 @@ DNS via HTTPS (FYI only, unused)
     ]
 }
 ```
+
+---
+
+TODO: reuse connections and batch requests?
+TODO: empty responses?

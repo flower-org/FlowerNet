@@ -1,3 +1,5 @@
 rootProject.name = 'FlowerNet'
-include 'Socks5sServer'
 include 'DnsServer'
+include 'NetCore'
+include 'Socks5sServer'
+

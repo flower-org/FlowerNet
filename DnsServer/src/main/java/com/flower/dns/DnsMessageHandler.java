@@ -31,10 +31,17 @@ public class DnsMessageHandler extends SimpleChannelInboundHandler<DatagramDnsQu
 
         client.query(query,
                 tcpResponse -> {
-                    if (tcpResponse.count(DnsSection.QUESTION) > 0) {
+                    int questionCount = tcpResponse.count(DnsSection.QUESTION);
+                    int answerCount = tcpResponse.count(DnsSection.ANSWER);
+                    int authorityCount = tcpResponse.count(DnsSection.AUTHORITY);
+                    int additionalCount = tcpResponse.count(DnsSection.ADDITIONAL);
+                    if (questionCount > 0) {
                         DnsQuestion question = tcpResponse.recordAt(DnsSection.QUESTION, 0);
-                        LOGGER.info("{} | response: {}", tcpResponse.id(), question.name());
+                        LOGGER.info("{} | response: {} | q: {} ans: {} auth: {} add: {}",
+                                tcpResponse.id(), question.name(),
+                                questionCount, answerCount, authorityCount, additionalCount);
                     }
+
                     for (int i = 0, count = tcpResponse.count(DnsSection.ANSWER); i < count; i++) {
                         DnsRecord record = tcpResponse.recordAt(DnsSection.ANSWER, i);
                         if (record.type() == DnsRecordType.A) {
@@ -43,7 +50,7 @@ public class DnsMessageHandler extends SimpleChannelInboundHandler<DatagramDnsQu
                             LOGGER.info("{} | {}", tcpResponse.id(), NetUtil.bytesToIpAddress(ByteBufUtil.getBytes(raw.content())));
                         }
                     }
-
+                    
                     DatagramDnsResponse udpResponse = new DatagramDnsResponse(query.recipient(), query.sender(), query.id());
                     udpResponse.retain();
                     udpResponse.setCode(tcpResponse.code());

@@ -31,7 +31,9 @@ import java.net.InetAddress;
 import java.util.function.Consumer;
 
 public final class DnsOverTlsClient {
-    final static Logger LOGGER = LoggerFactory.getLogger(DnsOverTlsClient.class);
+    static final Logger LOGGER = LoggerFactory.getLogger(DnsOverTlsClient.class);
+
+    static final Long SSL_HANDSHAKE_TIMEOUT_MILLIS = 1000L;
 
     static final AttributeKey<Consumer<DefaultDnsResponse>> RESPONSE_CONSUMER_ATTR =
             AttributeKey.valueOf("response_consumer");
@@ -61,6 +63,7 @@ public final class DnsOverTlsClient {
                 protected void initChannel(SocketChannel ch) {
                     ChannelPipeline p = ch.pipeline();
                     SslHandler sslHandler = sslCtx.newHandler(ch.alloc());
+                    sslHandler.setHandshakeTimeoutMillis(SSL_HANDSHAKE_TIMEOUT_MILLIS);
                     sslHandler.handshakeFuture().addListener(
                         future -> {
                             if (!future.isSuccess()) {

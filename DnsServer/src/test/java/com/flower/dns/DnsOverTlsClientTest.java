@@ -1,5 +1,6 @@
 package com.flower.dns;
 
+import com.flower.utils.PkiUtil;
 import com.flower.utils.ServerUtil;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.dns.DefaultDnsQuery;
@@ -23,7 +24,7 @@ public final class DnsOverTlsClientTest {
     private static final int DNS_SERVER_PORT = 853;
 //    private static final TrustManagerFactory TRUST_MANAGER = ServerUtil.getTrustedCertificates();
 //    private static final TrustManagerFactory TRUST_MANAGER = ServerUtil.getUntrustingManager();
-    private static final TrustManagerFactory TRUST_MANAGER = ServerUtil.getFromCertificateResource("oneone_cert.pem");
+    private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("oneone_cert.pem");
 
     private static final String QUERY_DOMAIN = "www.example.com";
 

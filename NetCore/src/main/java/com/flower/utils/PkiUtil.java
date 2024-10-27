@@ -6,6 +6,8 @@ import org.bouncycastle.util.io.pem.PemReader;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
@@ -95,6 +97,20 @@ public class PkiUtil {
 
     // --------------------------------------------------
 
+    public static KeyManagerFactory getKeyManagerFromResources(String certResourceName, String keyResourceName, String keyPassword) {
+        try {
+            URL certResource = Resources.getResource(certResourceName);
+            InputStream cerStream = certResource.openStream();
+
+            URL keyResource = Resources.getResource(keyResourceName);
+            InputStream keyStream = keyResource.openStream();
+
+            return getKeyManagerFromPem(cerStream, keyStream, keyPassword);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static KeyManagerFactory getKeyManagerFromPem(InputStream certificateStream, InputStream keyStream, String keyPassword) {
         try {
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
@@ -144,7 +160,7 @@ public class PkiUtil {
             KeyStore pkcs11Store = loadPKCS11KeyStore(libraryPath, pin);
 
             KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-            keyManagerFactory.init(pkcs11Store, pin.toCharArray());
+            keyManagerFactory.init(pkcs11Store, null);
 
             return keyManagerFactory;
         } catch (NoSuchAlgorithmException | KeyStoreException | UnrecoverableKeyException e) {
@@ -184,16 +200,40 @@ public class PkiUtil {
     }
 
     public static String getCertificateAsPem(Certificate cert) throws CertificateEncodingException {
-        return "-----BEGIN CERTIFICATE-----\n" +
+        return cert.getEncoded() == null ? "Can't form PEM for certificate - Access Denied"
+                :
+               "-----BEGIN CERTIFICATE-----\n" +
                Base64.getMimeEncoder().encodeToString(cert.getEncoded()) +
                "\n" +
                "-----END CERTIFICATE-----\n";
     }
 
     public static String getKeyAsPem(Key key) {
-        return key.getEncoded() == null ? "Can't form PEM for key - Access Denied" : "-----BEGIN PRIVATE KEY-----\n" +
+        return key.getEncoded() == null ? "Can't form PEM for key - Access Denied"
+                :
+               "-----BEGIN PRIVATE KEY-----\n" +
                Base64.getMimeEncoder().encodeToString(key.getEncoded()) +
                "\n" +
                "-----END PRIVATE KEY-----\n";
+    }
+
+    public static String printSessionCertificates(SSLSession session) throws SSLPeerUnverifiedException {
+        StringBuilder builder = new StringBuilder();
+        builder.append("Local certificates:\n");
+        Certificate[] localCerts = session.getLocalCertificates();
+        if (localCerts != null) {
+            for (Certificate certificate : localCerts) {
+                builder.append(certificate).append("\n");
+            }
+        }
+        builder.append("Peer certificates:\n");
+        Certificate[] peerCerts = session.getPeerCertificates();
+        if (peerCerts != null) {
+            for (Certificate certificate : peerCerts) {
+                builder.append(certificate).append("\n");
+            }
+        }
+
+        return builder.toString();
     }
 }

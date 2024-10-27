@@ -15,16 +15,20 @@
  */
 package com.flower.securechat;
 
+import com.flower.utils.PkiUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 
@@ -35,11 +39,19 @@ public final class SecureChatClient {
 
     static final String HOST = System.getProperty("host", "127.0.0.1");
     static final int PORT = Integer.parseInt(System.getProperty("port", "8992"));
+    private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("test.crt");
+//    private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("ca.crt");
 
     public static void main(String[] args) throws Exception {
+        KeyManagerFactory keyManager = PkiUtil.getKeyManagerFromPKCS11("/usr/lib/libeToken.so", "Qwerty123");
+        //KeyManagerFactory keyManager = PkiUtil.getKeyManagerFromResources("test.crt", "test.key", "");
+
         // Configure SSL.
         final SslContext sslCtx = SslContextBuilder.forClient()
-            .trustManager(InsecureTrustManagerFactory.INSTANCE).build();
+            .keyManager(keyManager)
+            .clientAuth(ClientAuth.REQUIRE)
+            .trustManager(TRUST_MANAGER)
+            .build();
 
         EventLoopGroup group = new NioEventLoopGroup();
         try {

@@ -15,15 +15,21 @@
  */
 package com.flower.securechat;
 
+import com.flower.utils.PkiUtil;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
 
 /**
  * Simple SSL chat server modified from TelnetServer.
@@ -31,10 +37,21 @@ import io.netty.handler.ssl.util.SelfSignedCertificate;
 public final class SecureChatServer {
 
     static final int PORT = Integer.parseInt(System.getProperty("port", "8992"));
+//    private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("oneone_cert.pem");
+//    private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("my.pem");
+//    private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("test.crt");
+    private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("ca.crt");
 
     public static void main(String[] args) throws Exception {
+        KeyManagerFactory keyManager = PkiUtil.getKeyManagerFromResources("test.crt", "test.key", "");
+//        KeyManagerFactory keyManager = PkiUtil.getKeyManagerFromPKCS11("/usr/lib/libeToken.so", "Qwerty123");
+
         SelfSignedCertificate ssc = new SelfSignedCertificate();
-        SslContext sslCtx = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey())
+        SslContext sslCtx = SslContextBuilder
+//                .forServer(ssc.certificate(), ssc.privateKey())
+            .forServer(keyManager)
+            .trustManager(TRUST_MANAGER)
+            .clientAuth(ClientAuth.REQUIRE)
             .build();
 
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);

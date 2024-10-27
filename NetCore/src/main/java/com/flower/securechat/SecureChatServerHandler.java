@@ -15,6 +15,7 @@
  */
 package com.flower.securechat;
 
+import com.flower.utils.PkiUtil;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -48,6 +49,9 @@ public class SecureChatServerHandler extends SimpleChannelInboundHandler<String>
                                 "Your session is protected by " +
                                         ctx.pipeline().get(SslHandler.class).engine().getSession().getCipherSuite() +
                                         " cipher suite.\n");
+
+                        String sessionCertificatesStr = PkiUtil.printSessionCertificates(ctx.pipeline().get(SslHandler.class).engine().getSession());
+                        System.out.println(sessionCertificatesStr);
 
                         channels.add(ctx.channel());
                     }

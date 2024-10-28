@@ -7,8 +7,8 @@ public class ConcurrentEvictListWithFixedTimeout<T> extends ConcurrentEvictList<
         this.elementTimeout = elementTimeout;
     }
 
-    public ConcurrentEvictListWithFixedTimeout(boolean maintainCountReferences, long elementTimeout) {
-        super(maintainCountReferences);
+    public ConcurrentEvictListWithFixedTimeout(boolean maintainCountReferences, boolean enableListeners, long elementTimeout) {
+        super(maintainCountReferences, enableListeners);
         this.elementTimeout = elementTimeout;
     }
 

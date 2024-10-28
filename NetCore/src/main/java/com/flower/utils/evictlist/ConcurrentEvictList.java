@@ -1,6 +1,7 @@
 package com.flower.utils.evictlist;
 
 import javax.annotation.Nullable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -25,16 +26,20 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
     protected final AtomicInteger count;
     protected final AtomicInteger nonEvictedCount;
     protected final boolean maintainCountReferences;
+    protected final boolean enableListeners;
+    protected final ConcurrentHashMap<EvictionListener<T>, EvictionListener<T>> evictionListeners;
 
     public ConcurrentEvictList() {
-        this(false);
+        this(false, false);
     }
 
-    public ConcurrentEvictList(boolean maintainCountReferences) {
+    public ConcurrentEvictList(boolean maintainCountReferences, boolean enableListeners) {
         this.root = new AtomicReference<>();
         this.count = new AtomicInteger(0);
         this.nonEvictedCount = new AtomicInteger(0);
         this.maintainCountReferences = maintainCountReferences;
+        this.enableListeners = enableListeners;
+        this.evictionListeners = new ConcurrentHashMap<>();
     }
 
     /** Root can be returned while in evicted state, please check `isEvicted`.
@@ -152,18 +157,29 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
             //We end up getting either first non-evictable element or last element in the list, so we can safely evict everything before
             if (cursor != currentRoot) {
                 if (root.compareAndSet(currentRoot, cursor)) {
+                    // Successfully evicted up to our cursor
+                    // update count
                     if (maintainCountReferences) {
-                        // If eviction is successful, we update count
                         while (true) {
                             int currentCount = count.get();
                             if (count.compareAndSet(currentCount, currentCount - toEvictCount)) {
-                                // Successfully evicted up to our cursor
-                                return cursor;
+                                break;
                             }
                         }
-                    } else {
-                        return cursor;
                     }
+
+                    // notify listeners
+                    if (enableListeners) {
+                        MutableEvictLinkedNode<T> listenerCursor = currentRoot;
+                        while (listenerCursor != null && listenerCursor != cursor) {
+                            for (EvictionListener<T> evictionListener : evictionListeners.keySet()) {
+                                evictionListener.evicted(listenerCursor);
+                            }
+                            listenerCursor = listenerCursor.next();
+                        }
+                    }
+
+                    return cursor;
                 } else {
                     // Parallel eviction took precedence
                     return root.get();
@@ -257,6 +273,24 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
                 }
                 next = root;
             }
+        }
+    }
+
+    @Override
+    public void addListener(EvictionListener<T> listener) {
+        if (enableListeners) {
+            evictionListeners.put(listener, listener);
+        } else {
+            throw new IllegalStateException("Listeners disabled");
+        }
+    }
+
+    @Override
+    public void removeListener(EvictionListener<T> listener) {
+        if (enableListeners) {
+            evictionListeners.remove(listener);
+        } else {
+            throw new IllegalStateException("Listeners disabled");
         }
     }
 }

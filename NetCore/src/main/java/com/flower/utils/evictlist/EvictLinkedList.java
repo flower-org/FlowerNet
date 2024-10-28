@@ -12,4 +12,7 @@ public interface EvictLinkedList<T> {
     void markEvictable(EvictLinkedNode<T> element);
 
     EvictListElementPicker<T> getElementPicker();
+
+    void addListener(EvictionListener<T> listener);
+    void removeListener(EvictionListener<T> listener);
 }

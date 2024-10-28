@@ -51,6 +51,33 @@ public class ConcurrentEvictListTest {
     }
 
     @Test
+    public void evictListBasicTest2() {
+        EvictLinkedList<String> evictList = new ConcurrentEvictList<>(false, true);
+
+        StringBuilder builder = new StringBuilder();
+        evictList.addListener(element -> builder.append(element.value()));
+
+        assertNull(evictList.root());
+        assertEquals(0, evictList.count());
+
+        EvictLinkedNode<String> elem1 = evictList.addElement("Hello");
+        EvictLinkedNode<String> elem2 = evictList.addElement(" world");
+        EvictLinkedNode<String> elem3 = evictList.addElement("!");
+        EvictLinkedNode<String> elem4 = evictList.addElement("{Retained root}");
+
+        evictList.markEvictable(elem1);
+        evictList.markEvictable(elem2);
+        evictList.markEvictable(elem3);
+        evictList.markEvictable(elem4);
+
+        evictList.root();
+        assertEquals(1, evictList.count());
+        assertEquals(0, evictList.nonEvictedCount());
+
+        assertEquals("Hello world!", builder.toString());
+    }
+
+    @Test
     public void evictListMultiThreadedTest() throws InterruptedException {
         EvictLinkedList<UUID> evictList = new ConcurrentEvictList<>();
         Random random = new Random();

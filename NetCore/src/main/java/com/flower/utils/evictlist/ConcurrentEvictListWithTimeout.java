@@ -5,8 +5,8 @@ public class ConcurrentEvictListWithTimeout<T> extends ConcurrentEvictList<T> {
         super();
     }
 
-    public ConcurrentEvictListWithTimeout(boolean maintainCountReferences) {
-        super(maintainCountReferences);
+    public ConcurrentEvictListWithTimeout(boolean maintainCountReferences, boolean enableListeners) {
+        super(maintainCountReferences, enableListeners);
     }
 
     public EvictLinkedNode<T> addElement(T value, long timeout) {

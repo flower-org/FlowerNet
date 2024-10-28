@@ -21,13 +21,20 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
     protected final AtomicReference<MutableEvictLinkedNode<T>> root;
+    // TODO: we might want to avoid overhead on maintaining counts, and fall back to naive O(N) counting
     protected final AtomicInteger count;
     protected final AtomicInteger nonEvictedCount;
+    protected final boolean maintainCountReferences;
 
     public ConcurrentEvictList() {
+        this(false);
+    }
+
+    public ConcurrentEvictList(boolean maintainCountReferences) {
         this.root = new AtomicReference<>();
         this.count = new AtomicInteger(0);
         this.nonEvictedCount = new AtomicInteger(0);
+        this.maintainCountReferences = maintainCountReferences;
     }
 
     /** Root can be returned while in evicted state, please check `isEvicted`.
@@ -41,21 +48,28 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
     /** Total element count, including evicted */
     @Override
     public int count() {
-        return count.get();
+        if (maintainCountReferences) {
+            return count.get();
+        } else {
+            return naiveCount(true);
+        }
     }
 
     /** Healthy (non-evicted) element count */
     @Override
     public int nonEvictedCount() {
-        return nonEvictedCount.get();
+        if (maintainCountReferences) {
+            return nonEvictedCount.get();
+        } else {
+            return naiveCount(false);
+        }
     }
 
-    /** This method should be used by subclasses which rely on eviction mechanisms different from directly calling `markEvictable` */
-    protected int naiveNonEvictedCount() {
+    protected int naiveCount(boolean includeEvicted) {
         int count = 0;
         MutableEvictLinkedNode<T> cursor = root.get();
         while (cursor != null) {
-            if (!cursor.isEvicted()) {
+            if (includeEvicted || !cursor.isEvicted()) {
                 count++;
             }
             cursor = cursor.next();
@@ -81,8 +95,10 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
             if (currentRoot == null) {
                 if (root.compareAndSet(null, newElement)) {
                     // Initialized root
-                    count.incrementAndGet();
-                    nonEvictedCount.incrementAndGet();
+                    if (maintainCountReferences) {
+                        count.incrementAndGet();
+                        nonEvictedCount.incrementAndGet();
+                    }
                     return newElement;
                 } else {
                     currentRoot = root.get();
@@ -96,8 +112,10 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
                         next = last.next();
                     }
                     if (last.setNext(newElement)) {
-                        count.incrementAndGet();
-                        nonEvictedCount.incrementAndGet();
+                        if (maintainCountReferences) {
+                            count.incrementAndGet();
+                            nonEvictedCount.incrementAndGet();
+                        }
                         return newElement;
                     }
                 }
@@ -111,7 +129,9 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
     public void markEvictable(EvictLinkedNode<T> element) {
         // Check for eviction and evict
         if (((MutableEvictLinkedNode<T>)element).markForEviction()) {
-            nonEvictedCount.decrementAndGet();
+            if (maintainCountReferences) {
+                nonEvictedCount.decrementAndGet();
+            }
         }
     }
 
@@ -132,13 +152,17 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
             //We end up getting either first non-evictable element or last element in the list, so we can safely evict everything before
             if (cursor != currentRoot) {
                 if (root.compareAndSet(currentRoot, cursor)) {
-                    // If eviction is successful, we update count
-                    while (true) {
-                        int currentCount = count.get();
-                        if (count.compareAndSet(currentCount, currentCount - toEvictCount)) {
-                            // Successfully evicted up to our cursor
-                            return cursor;
+                    if (maintainCountReferences) {
+                        // If eviction is successful, we update count
+                        while (true) {
+                            int currentCount = count.get();
+                            if (count.compareAndSet(currentCount, currentCount - toEvictCount)) {
+                                // Successfully evicted up to our cursor
+                                return cursor;
+                            }
                         }
+                    } else {
+                        return cursor;
                     }
                 } else {
                     // Parallel eviction took precedence
@@ -184,6 +208,7 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
                 if (currentRoot == null) {
                     return null;
                 }
+                // The call to root() runs eviction in ConcurrentEvictList, so right after that we can check whether all elements are evicted
                 if (list.count() == 1 && currentRoot.isEvicted()) {
                     return null;
                 }

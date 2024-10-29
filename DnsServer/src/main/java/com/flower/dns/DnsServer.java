@@ -1,5 +1,6 @@
 package com.flower.dns;
 
+import com.flower.dns.dotclient.DnsOverTlsClient;
 import com.flower.utils.PkiUtil;
 import com.flower.utils.ServerUtil;
 import io.netty.bootstrap.Bootstrap;

@@ -23,7 +23,6 @@ import io.netty.handler.codec.dns.TcpDnsResponseDecoder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.util.AttributeKey;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,9 +40,6 @@ public final class DnsOverTlsClient {
     static final Long CALLBACK_EXPIRATION_TIMEOUT = 2500L;
     static final int MAX_PARALLEL_CHANNELS = 3;
     static final int MAX_QUERY_RETRY_COUNT = 2;
-
-    static final AttributeKey<EvictLinkedNode<Channel>> CHANNEL_RECORD_ATTR =
-            AttributeKey.valueOf("response_consumer");
 
     private final InetAddress dnsServerAddress;
     private final int dnsServerPort;
@@ -106,14 +102,6 @@ public final class DnsOverTlsClient {
                                 ctx.close();
                             }
                         }
-/*
-                        @Override
-                        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-                            if (ctx.channel().hasAttr(CHANNEL_RECORD_ATTR)) {
-                                channelPool.channelInactive(ctx.channel().attr(CHANNEL_RECORD_ATTR).get());
-                            }
-                            super.channelInactive(ctx);
-                        }*/
                     });
                 }
             });
@@ -126,29 +114,28 @@ public final class DnsOverTlsClient {
     }
 
     public void query(DnsQuery query, int retry) {
-        if (retry > MAX_QUERY_RETRY_COUNT) { return; }
+        if (retry > MAX_QUERY_RETRY_COUNT) {
+            LOGGER.info("{} | DoT Server request failed after retry# {}", query.id(), retry);
+            return;
+        }
 
         channelPool.getChannel().addListener(channelFuture -> {
             if (channelFuture.isSuccess()) {
                 EvictLinkedNode<Channel> channelRecord = (EvictLinkedNode<Channel>)channelFuture.get();
                 final Channel ch = channelRecord.value();
-                ch.attr(CHANNEL_RECORD_ATTR).set(channelRecord);
-
                 ch.writeAndFlush(query)
                     .addListener(
                         writeFuture -> {
                             if (!writeFuture.isSuccess()) {
-                                LOGGER.info("{} | WRITE FUTURE UNSUCCESS retry# {}", query.id(), retry);
                                 channelPool.returnFailedChannel(channelRecord);
                                 query(query, retry + 1);
                             } else {
-                                LOGGER.info("{} | WRITE FUTURE SUCCESS", query.id());
                                 channelPool.returnChannel(channelRecord);
                             }
                         }
                     );
             } else {
-                LOGGER.info("{} | FAILED TO GET CHANNEL", query.id());
+                LOGGER.info("{} | DoT Server request failed to get channel", query.id());
             }
         });
     }

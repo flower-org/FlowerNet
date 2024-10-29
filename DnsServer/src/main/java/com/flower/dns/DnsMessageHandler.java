@@ -68,7 +68,7 @@ public class DnsMessageHandler extends SimpleChannelInboundHandler<DatagramDnsQu
         int additionalCount = tcpResponse.count(DnsSection.ADDITIONAL);
         if (questionCount > 0) {
             DnsQuestion question = tcpResponse.recordAt(DnsSection.QUESTION, 0);
-            LOGGER.info("{} | response: {} | q: {} ans: {} auth: {} add: {}",
+            LOGGER.info("{} | response to: {} | q: {} ans: {} auth: {} add: {}",
                     tcpResponse.id(), question.name(),
                     questionCount, answerCount, authorityCount, additionalCount);
         }

@@ -26,15 +26,23 @@ public class DnsServer {
     private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("oneone_cert.pem");
 
     private static final int DNS_SERVER_PORT = 5300;
+    private static final boolean DONT_USE_CACHE = false;
 
     public static void main(String[] args) throws SSLException, InterruptedException {
-        // TODO: command line parameters
+        // TODO: config / command line parameters
         int port = DNS_SERVER_PORT;
         if (args.length > 0) {
             port = Integer.parseInt(args[0]);
         }
+        boolean useCache = DONT_USE_CACHE;
+        if (args.length > 1) {
+            useCache = Boolean.parseBoolean(args[1]);
+        }
 
-        final DnsOverTlsClient client = new DnsOverTlsClient(OTHER_DNS_TLS_SERVER_ADDRESS, OTHER_DNS_TLS_SERVER_PORT, TRUST_MANAGER);
+        final DnsOverTlsClient client = new DnsOverTlsClient(OTHER_DNS_TLS_SERVER_ADDRESS,
+                                                             OTHER_DNS_TLS_SERVER_PORT,
+                                                             TRUST_MANAGER,
+                                                             useCache);
         final NioEventLoopGroup group = new NioEventLoopGroup();
 
         try {

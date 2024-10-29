@@ -117,8 +117,6 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
                         }
                     }
                     return newElement;
-                } else {
-                    currentRoot = root.get();
                 }
             } else {
                 MutableEvictLinkedNode<T> last = currentRoot;

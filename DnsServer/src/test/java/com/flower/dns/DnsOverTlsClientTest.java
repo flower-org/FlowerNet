@@ -30,7 +30,7 @@ public final class DnsOverTlsClientTest {
     private static final String QUERY_DOMAIN = "www.example.com";
 
     public static void main(String[] args) throws Exception {
-        DnsOverTlsClient client = new DnsOverTlsClient(DNS_SERVER_ADDRESS, DNS_SERVER_PORT, TRUST_MANAGER);
+        DnsOverTlsClient client = new DnsOverTlsClient(DNS_SERVER_ADDRESS, DNS_SERVER_PORT, TRUST_MANAGER, false);
 
         int randomID = new Random().nextInt(60000 - 1000) + 1000;
         DnsQuery query = new DefaultDnsQuery(randomID, DnsOpCode.QUERY)

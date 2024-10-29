@@ -18,6 +18,8 @@ import io.netty.channel.SimpleChannelInboundHandler;
 
 import io.netty.handler.codec.dns.DefaultDnsResponse;
 import io.netty.handler.codec.dns.DnsQuery;
+import io.netty.handler.codec.dns.DnsQuestion;
+import io.netty.handler.codec.dns.DnsSection;
 import io.netty.handler.codec.dns.TcpDnsQueryEncoder;
 import io.netty.handler.codec.dns.TcpDnsResponseDecoder;
 import io.netty.handler.ssl.SslContext;
@@ -31,9 +33,12 @@ import javax.annotation.Nullable;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
 import java.net.InetAddress;
+import java.util.Iterator;
 import java.util.function.Consumer;
 
-public final class DnsOverTlsClient {
+import static com.google.common.base.Preconditions.checkNotNull;
+
+public class DnsOverTlsClient {
     static final Logger LOGGER = LoggerFactory.getLogger(DnsOverTlsClient.class);
 
     static final Long SSL_HANDSHAKE_TIMEOUT_MILLIS = 1000L;
@@ -48,9 +53,12 @@ public final class DnsOverTlsClient {
     private final Bootstrap bootstrap;
 
     private final ChannelPool channelPool;
-    private final EvictLinkedList<Pair<Integer, Consumer<DefaultDnsResponse>>> callbacks;
+    private final EvictLinkedList<Pair<Integer, Pair<DnsQuestion, Consumer<DefaultDnsResponse>>>> callbacks;
 
-    public DnsOverTlsClient(InetAddress dnsServerAddress, int dnsServerPort, TrustManagerFactory trustManager) throws SSLException {
+    private final boolean useCache;
+    @Nullable private final AnswerCache cache;
+
+    public DnsOverTlsClient(InetAddress dnsServerAddress, int dnsServerPort, TrustManagerFactory trustManager, boolean useCache) throws SSLException {
         this.dnsServerAddress = dnsServerAddress;
         this.dnsServerPort = dnsServerPort;
         this.callbacks = new ConcurrentEvictListWithFixedTimeout<>(CALLBACK_EXPIRATION_TIMEOUT);
@@ -106,14 +114,28 @@ public final class DnsOverTlsClient {
                 }
             });
         this.channelPool = new AggressiveChannelPool(bootstrap, dnsServerAddress, dnsServerPort, MAX_PARALLEL_CHANNELS);
+
+        this.useCache = useCache;
+        if (useCache) { cache = new AnswerCache(); }
+                else  { cache = null; }
     }
 
     public void query(DnsQuery query, Consumer<DefaultDnsResponse> dnsResponseConsumer) {
-        callbacks.addElement(Pair.of(query.id(), dnsResponseConsumer));
+        DnsQuestion qQuestion = query.recordAt(DnsSection.QUESTION, 0);
+        if (useCache) {
+            DefaultDnsResponse response = checkNotNull(cache).getResponseIfPresent(qQuestion);
+            if (response != null) {
+                LOGGER.info("{} | Cache hit!", query.id());
+                dnsResponseConsumer.accept(response);
+                return;
+            }
+        }
+
+        callbacks.addElement(Pair.of(query.id(), Pair.of(qQuestion, dnsResponseConsumer)));
         query(query, 0);
     }
 
-    public void query(DnsQuery query, int retry) {
+    protected void query(DnsQuery query, int retry) {
         if (retry > MAX_QUERY_RETRY_COUNT) {
             LOGGER.info("{} | DoT Server request failed after retry# {}", query.id(), retry);
             return;
@@ -144,21 +166,26 @@ public final class DnsOverTlsClient {
         group.shutdownGracefully();
     }
 
-    private void handleQueryResp(DefaultDnsResponse msg) {
-        Consumer<DefaultDnsResponse> responseListener = findCallback(msg.id());
-        if (responseListener != null) {
+    protected void handleQueryResp(DefaultDnsResponse msg) {
+        Pair<DnsQuestion, Consumer<DefaultDnsResponse>> pair = findCallback(msg.id());
+        if (pair != null) {
+            Consumer<DefaultDnsResponse> responseListener = pair.getValue();
             responseListener.accept(msg);
+            if (useCache) {
+                DnsQuestion question = pair.getKey();
+                checkNotNull(cache).putResponse(question, msg);
+            }
         }
     }
 
-    private @Nullable Consumer<DefaultDnsResponse> findCallback(int queryId) {
-        EvictLinkedNode<Pair<Integer, Consumer<DefaultDnsResponse>>> cursor = callbacks.root();
-        while (cursor != null) {
+    protected @Nullable Pair<DnsQuestion, Consumer<DefaultDnsResponse>> findCallback(int queryId) {
+        Iterator<EvictLinkedNode<Pair<Integer, Pair<DnsQuestion, Consumer<DefaultDnsResponse>>>>> iterator = callbacks.iterator();
+        while (iterator.hasNext()) {
+            EvictLinkedNode<Pair<Integer, Pair<DnsQuestion, Consumer<DefaultDnsResponse>>>> cursor = iterator.next();
             if (cursor.value().getKey() == queryId) {
                 callbacks.markEvictable(cursor);
                 return cursor.value().getValue();
             }
-            cursor = cursor.next();
         }
         return null;
     }

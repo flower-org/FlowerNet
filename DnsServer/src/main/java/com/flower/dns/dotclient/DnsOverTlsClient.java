@@ -1,9 +1,11 @@
-package com.flower.dns;
+package com.flower.dns.dotclient;
 
+import com.flower.utils.evictlist.ConcurrentEvictListWithFixedTimeout;
+import com.flower.utils.evictlist.EvictLinkedList;
+import com.flower.utils.evictlist.EvictLinkedNode;
 import io.netty.bootstrap.Bootstrap;
 
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelHandlerContext;
@@ -22,9 +24,11 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AttributeKey;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
 import java.net.InetAddress;
@@ -34,8 +38,11 @@ public final class DnsOverTlsClient {
     static final Logger LOGGER = LoggerFactory.getLogger(DnsOverTlsClient.class);
 
     static final Long SSL_HANDSHAKE_TIMEOUT_MILLIS = 1000L;
+    static final Long CALLBACK_EXPIRATION_TIMEOUT = 2500L;
+    static final int MAX_PARALLEL_CHANNELS = 3;
+    static final int MAX_QUERY_RETRY_COUNT = 2;
 
-    static final AttributeKey<Consumer<DefaultDnsResponse>> RESPONSE_CONSUMER_ATTR =
+    static final AttributeKey<EvictLinkedNode<Channel>> CHANNEL_RECORD_ATTR =
             AttributeKey.valueOf("response_consumer");
 
     private final InetAddress dnsServerAddress;
@@ -44,9 +51,13 @@ public final class DnsOverTlsClient {
     private final EventLoopGroup group;
     private final Bootstrap bootstrap;
 
+    private final ChannelPool channelPool;
+    private final EvictLinkedList<Pair<Integer, Consumer<DefaultDnsResponse>>> callbacks;
+
     public DnsOverTlsClient(InetAddress dnsServerAddress, int dnsServerPort, TrustManagerFactory trustManager) throws SSLException {
         this.dnsServerAddress = dnsServerAddress;
         this.dnsServerPort = dnsServerPort;
+        this.callbacks = new ConcurrentEvictListWithFixedTimeout<>(CALLBACK_EXPIRATION_TIMEOUT);
 
         // Configure SSL.
         final SslContext sslCtx = SslContextBuilder
@@ -90,21 +101,55 @@ public final class DnsOverTlsClient {
                         @Override
                         protected void channelRead0(ChannelHandlerContext ctx, DefaultDnsResponse msg) {
                             try {
-                                handleQueryResp(msg, ctx.channel());
+                                handleQueryResp(msg);
                             } finally {
                                 ctx.close();
                             }
                         }
+/*
+                        @Override
+                        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+                            if (ctx.channel().hasAttr(CHANNEL_RECORD_ATTR)) {
+                                channelPool.channelInactive(ctx.channel().attr(CHANNEL_RECORD_ATTR).get());
+                            }
+                            super.channelInactive(ctx);
+                        }*/
                     });
                 }
             });
+        this.channelPool = new AggressiveChannelPool(bootstrap, dnsServerAddress, dnsServerPort, MAX_PARALLEL_CHANNELS);
     }
 
     public void query(DnsQuery query, Consumer<DefaultDnsResponse> dnsResponseConsumer) {
-        bootstrap.connect(dnsServerAddress, dnsServerPort).addListener((ChannelFutureListener) channelFuture -> {
-            final Channel ch = channelFuture.channel();
-            ch.attr(RESPONSE_CONSUMER_ATTR).set(dnsResponseConsumer);
-            ch.writeAndFlush(query);
+        callbacks.addElement(Pair.of(query.id(), dnsResponseConsumer));
+        query(query, 0);
+    }
+
+    public void query(DnsQuery query, int retry) {
+        if (retry > MAX_QUERY_RETRY_COUNT) { return; }
+
+        channelPool.getChannel().addListener(channelFuture -> {
+            if (channelFuture.isSuccess()) {
+                EvictLinkedNode<Channel> channelRecord = (EvictLinkedNode<Channel>)channelFuture.get();
+                final Channel ch = channelRecord.value();
+                ch.attr(CHANNEL_RECORD_ATTR).set(channelRecord);
+
+                ch.writeAndFlush(query)
+                    .addListener(
+                        writeFuture -> {
+                            if (!writeFuture.isSuccess()) {
+                                LOGGER.info("{} | WRITE FUTURE UNSUCCESS retry# {}", query.id(), retry);
+                                channelPool.returnFailedChannel(channelRecord);
+                                query(query, retry + 1);
+                            } else {
+                                LOGGER.info("{} | WRITE FUTURE SUCCESS", query.id());
+                                channelPool.returnChannel(channelRecord);
+                            }
+                        }
+                    );
+            } else {
+                LOGGER.info("{} | FAILED TO GET CHANNEL", query.id());
+            }
         });
     }
 
@@ -112,8 +157,22 @@ public final class DnsOverTlsClient {
         group.shutdownGracefully();
     }
 
-    private void handleQueryResp(DefaultDnsResponse msg, Channel channel) {
-        Consumer<DefaultDnsResponse> responseListener = channel.attr(RESPONSE_CONSUMER_ATTR).get();
-        responseListener.accept(msg);
+    private void handleQueryResp(DefaultDnsResponse msg) {
+        Consumer<DefaultDnsResponse> responseListener = findCallback(msg.id());
+        if (responseListener != null) {
+            responseListener.accept(msg);
+        }
+    }
+
+    private @Nullable Consumer<DefaultDnsResponse> findCallback(int queryId) {
+        EvictLinkedNode<Pair<Integer, Consumer<DefaultDnsResponse>>> cursor = callbacks.root();
+        while (cursor != null) {
+            if (cursor.value().getKey() == queryId) {
+                callbacks.markEvictable(cursor);
+                return cursor.value().getValue();
+            }
+            cursor = cursor.next();
+        }
+        return null;
     }
 }

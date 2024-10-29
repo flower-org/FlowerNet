@@ -106,6 +106,14 @@ public final class DnsOverTlsClient {
                                 ctx.close();
                             }
                         }
+/*
+                        @Override
+                        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+                            if (ctx.channel().hasAttr(CHANNEL_RECORD_ATTR)) {
+                                channelPool.channelInactive(ctx.channel().attr(CHANNEL_RECORD_ATTR).get());
+                            }
+                            super.channelInactive(ctx);
+                        }*/
                     });
                 }
             });

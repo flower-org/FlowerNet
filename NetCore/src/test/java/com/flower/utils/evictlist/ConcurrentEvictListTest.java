@@ -32,6 +32,10 @@ public class ConcurrentEvictListTest {
         assertEquals(3, evictList.count());
         assertEquals("!", evictList.root().next().next().value());
 
+        StringBuilder builder = new StringBuilder();
+        evictList.iterator().forEachRemaining(node -> builder.append(node.value()));
+        assertEquals("Hello world!", builder.toString());
+
         evictList.markEvictable(elem1);
         assertEquals(3, evictList.count());
         assertEquals(2, evictList.nonEvictedCount());
@@ -63,8 +67,8 @@ public class ConcurrentEvictListTest {
             }
 
             @Override
-            public void evicted(Iterator<EvictLinkedNode<String>> iterator) {
-                iterator.forEachRemaining(element -> builder.append(element.value()));
+            public void evicted(Iterator<EvictLinkedNode<String>> evictedIterator) {
+                evictedIterator.forEachRemaining(element -> builder.append(element.value()));
             }
         });
 

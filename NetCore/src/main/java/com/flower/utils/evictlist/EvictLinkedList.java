@@ -1,10 +1,12 @@
 package com.flower.utils.evictlist;
 
 import javax.annotation.Nullable;
+import java.util.Iterator;
 
 public interface EvictLinkedList<T> {
     @Nullable
     EvictLinkedNode<T> root();
+    Iterator<EvictLinkedNode<T>> iterator();
     int count();
     int nonEvictedCount();
 

@@ -51,6 +51,11 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
         return runEvictionAndGetNewRoot();
     }
 
+    @Override
+    public Iterator<EvictLinkedNode<T>> iterator() {
+        return new EvictLinkedNodeIterator<>(root(), null);
+    }
+
     /** Total element count, including evicted */
     @Override
     public int count() {
@@ -153,11 +158,11 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
         }
     }
 
-    protected static class EvictIterator<T> implements Iterator<EvictLinkedNode<T>> {
+    protected static class EvictLinkedNodeIterator<T> implements Iterator<EvictLinkedNode<T>> {
         @Nullable EvictLinkedNode<T> cursor;
         @Nullable final EvictLinkedNode<T> nonInclusiveEnd;
 
-        protected EvictIterator(EvictLinkedNode<T> start, @Nullable EvictLinkedNode<T> nonInclusiveEnd) {
+        protected EvictLinkedNodeIterator(@Nullable EvictLinkedNode<T> start, @Nullable EvictLinkedNode<T> nonInclusiveEnd) {
             this.cursor = start;
             this.nonInclusiveEnd = nonInclusiveEnd;
         }
@@ -211,9 +216,9 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
 
                     // notify listeners
                     if (enableListeners) {
-                        EvictIterator<T> evictIterator = new EvictIterator<>(currentRoot, cursor);
+                        EvictLinkedNodeIterator<T> evictLinkedNodeIterator = new EvictLinkedNodeIterator<>(currentRoot, cursor);
                         for (EvictionListener<T> evictionListener : evictionListeners.keySet()) {
-                            evictionListener.evicted(evictIterator);
+                            evictionListener.evicted(evictLinkedNodeIterator);
                         }
                     }
 

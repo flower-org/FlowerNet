@@ -3,6 +3,7 @@ package com.flower.utils.evictlist;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -55,7 +56,17 @@ public class ConcurrentEvictListTest {
         EvictLinkedList<String> evictList = new ConcurrentEvictList<>(false, true);
 
         StringBuilder builder = new StringBuilder();
-        evictList.addListener(element -> builder.append(element.value()));
+        evictList.addListener(new EvictionListener<>() {
+            @Override
+            public void added(EvictLinkedNode<String> element) {
+                //System.out.println("Added: " + element.value());
+            }
+
+            @Override
+            public void evicted(Iterator<EvictLinkedNode<String>> iterator) {
+                iterator.forEachRemaining(element -> builder.append(element.value()));
+            }
+        });
 
         assertNull(evictList.root());
         assertEquals(0, evictList.count());

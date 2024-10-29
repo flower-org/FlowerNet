@@ -1,5 +1,8 @@
 package com.flower.utils.evictlist;
 
+import java.util.Iterator;
+
 public interface EvictionListener<T> {
-    void evicted(EvictLinkedNode<T> element);
+    void added(EvictLinkedNode<T> element);
+    void evicted(Iterator<EvictLinkedNode<T>> iterator);
 }

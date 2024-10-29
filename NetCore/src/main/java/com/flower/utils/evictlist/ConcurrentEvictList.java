@@ -1,6 +1,7 @@
 package com.flower.utils.evictlist;
 
 import javax.annotation.Nullable;
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -104,6 +105,12 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
                         count.incrementAndGet();
                         nonEvictedCount.incrementAndGet();
                     }
+                    // notify listeners
+                    if (enableListeners) {
+                        for (EvictionListener<T> evictionListener : evictionListeners.keySet()) {
+                            evictionListener.added(newElement);
+                        }
+                    }
                     return newElement;
                 } else {
                     currentRoot = root.get();
@@ -120,6 +127,12 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
                         if (maintainCountReferences) {
                             count.incrementAndGet();
                             nonEvictedCount.incrementAndGet();
+                        }
+                        // notify listeners
+                        if (enableListeners) {
+                            for (EvictionListener<T> evictionListener : evictionListeners.keySet()) {
+                                evictionListener.added(newElement);
+                            }
                         }
                         return newElement;
                     }
@@ -139,6 +152,34 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
             }
         }
     }
+
+    protected static class EvictIterator<T> implements Iterator<EvictLinkedNode<T>> {
+        @Nullable EvictLinkedNode<T> cursor;
+        @Nullable final EvictLinkedNode<T> nonInclusiveEnd;
+
+        protected EvictIterator(EvictLinkedNode<T> start, @Nullable EvictLinkedNode<T> nonInclusiveEnd) {
+            this.cursor = start;
+            this.nonInclusiveEnd = nonInclusiveEnd;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return cursor != null && cursor != nonInclusiveEnd;
+        }
+
+        @Override
+        public @Nullable EvictLinkedNode<T> next() {
+            if (!hasNext()) {
+                return null;
+            } else {
+                EvictLinkedNode<T> next = cursor;
+                // cursor is not null since we checked it in hasNext
+                cursor = checkNotNull(cursor).next();
+                return next;
+            }
+        }
+    };
+
 
     /** Same as `root()` */
     public @Nullable MutableEvictLinkedNode<T> runEvictionAndGetNewRoot() {
@@ -170,12 +211,9 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
 
                     // notify listeners
                     if (enableListeners) {
-                        MutableEvictLinkedNode<T> listenerCursor = currentRoot;
-                        while (listenerCursor != null && listenerCursor != cursor) {
-                            for (EvictionListener<T> evictionListener : evictionListeners.keySet()) {
-                                evictionListener.evicted(listenerCursor);
-                            }
-                            listenerCursor = listenerCursor.next();
+                        EvictIterator<T> evictIterator = new EvictIterator<>(currentRoot, cursor);
+                        for (EvictionListener<T> evictionListener : evictionListeners.keySet()) {
+                            evictionListener.evicted(evictIterator);
                         }
                     }
 
@@ -194,7 +232,7 @@ public class ConcurrentEvictList<T> implements EvictLinkedList<T> {
         }
     }
 
-    public EvictListElementPicker<T> getElementPicker() {
+    public EvictListElementPicker<T> newElementPicker() {
         return new ConcurrentEvictListEvictListElementPicker<>(this);
     }
 

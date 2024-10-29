@@ -9,8 +9,8 @@ public class ConcurrentEvictListWithTimeout<T> extends ConcurrentEvictList<T> {
         super(maintainCountReferences, enableListeners);
     }
 
-    public EvictLinkedNode<T> addElement(T value, long timeout) {
-        MutableEvictLinkedNode<T> newElement = new TimeoutMutableEvictNode<>(value, timeout);
+    public EvictLinkedNode<T> addElement(T value, long elementTimeoutMs) {
+        MutableEvictLinkedNode<T> newElement = new TimeoutMutableEvictNode<>(value, elementTimeoutMs);
         return addElement(newElement);
     }
 

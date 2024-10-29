@@ -14,7 +14,7 @@ public class ConcurrentEvictListEvictListElementPickerTest {
     @Test
     public void testSingle() {
         EvictLinkedList<String> list = new ConcurrentEvictList<>();
-        EvictListElementPicker<String> picker = list.getElementPicker();
+        EvictListElementPicker<String> picker = list.newElementPicker();
 
         assertNull(picker.getNonEvictedValue());
         assertNull(picker.getNonEvictedValue());
@@ -72,7 +72,7 @@ public class ConcurrentEvictListEvictListElementPickerTest {
 
         HashMap<Integer, AtomicInteger> stats = new HashMap<>();
         EvictLinkedList<Integer> list = new ConcurrentEvictList<>();
-        EvictListElementPicker<Integer> picker = list.getElementPicker();
+        EvictListElementPicker<Integer> picker = list.newElementPicker();
 
         for (int i = 0; i < elementCount; i++) {
             list.addElement(i);
@@ -81,7 +81,7 @@ public class ConcurrentEvictListEvictListElementPickerTest {
 
         List<Thread> threads = new ArrayList<>();
         for (int i = 0; i < threadCount; i++) {
-            threads.add(new Thread(() -> runElementPicker(picker, iterationCount, stats)));
+            threads.add(new Thread(() -> runNewElementPicker(picker, iterationCount, stats)));
         }
         for (Thread thread : threads) {
             thread.start();
@@ -96,8 +96,8 @@ public class ConcurrentEvictListEvictListElementPickerTest {
         }
     }
 
-    public static void runElementPicker(EvictListElementPicker<Integer> picker, int iterationCount,
-                                        HashMap<Integer, AtomicInteger> stats) {
+    public static void runNewElementPicker(EvictListElementPicker<Integer> picker, int iterationCount,
+                                           HashMap<Integer, AtomicInteger> stats) {
         for (int j = 0; j < iterationCount; j++) {
             Integer value = picker.getNonEvictedValue();
             stats.get(value).incrementAndGet();

@@ -10,7 +10,7 @@ public class MutableEvictNode<T> implements MutableEvictLinkedNode<T> {
     protected AtomicBoolean markedForEviction;
     protected final T value;
 
-    protected MutableEvictNode(T value) {
+    public MutableEvictNode(T value) {
         this.nextElement = new AtomicReference<>();
         this.value = value;
         this.markedForEviction = new AtomicBoolean(false);

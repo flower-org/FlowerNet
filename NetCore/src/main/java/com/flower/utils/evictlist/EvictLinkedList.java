@@ -11,7 +11,7 @@ public interface EvictLinkedList<T> {
     EvictLinkedNode<T> addElement(T element);
     void markEvictable(EvictLinkedNode<T> element);
 
-    EvictListElementPicker<T> getElementPicker();
+    EvictListElementPicker<T> newElementPicker();
 
     void addListener(EvictionListener<T> listener);
     void removeListener(EvictionListener<T> listener);

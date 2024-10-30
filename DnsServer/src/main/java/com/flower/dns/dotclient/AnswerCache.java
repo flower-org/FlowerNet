@@ -15,9 +15,9 @@ public class AnswerCache {
     public static final Long MAXIMUM_CACHE_SIZE = 10_000L;
     public static final Long CACHE_ENTRY_TIMEOUT_AFTER_ACCESS_MS = 1000L*60L*10L; // 10 minutes
 
-    public final Cache<DnsQuestionWrapper, DefaultDnsResponse> cache;
+    protected final Cache<DnsQuestionWrapper, DefaultDnsResponse> cache;
 
-    static class DnsQuestionWrapper {
+    protected static class DnsQuestionWrapper {
         final DnsRecord question;
 
         DnsQuestionWrapper(DnsRecord question) {

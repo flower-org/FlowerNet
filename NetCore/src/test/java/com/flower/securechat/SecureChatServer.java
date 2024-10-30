@@ -27,7 +27,6 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 
-import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
 
 /**
@@ -39,16 +38,18 @@ public final class SecureChatServer {
 //    private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("oneone_cert.pem");
 //    private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("my.pem");
 //    private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("test.crt");
-    private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("ca.crt");
+//    private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("ca.crt");
+    private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("pkcs11_ca.crt");
 
     public static void main(String[] args) throws Exception {
-        KeyManagerFactory keyManager = PkiUtil.getKeyManagerFromResources("test.crt", "test.key", "");
+//        KeyManagerFactory keyManager = PkiUtil.getKeyManagerFromResources("MY_REQ.crt", "MY_REQ.key", "");
+//        KeyManagerFactory keyManager = PkiUtil.getKeyManagerFromResources("test.crt", "test.key", "");
 //        KeyManagerFactory keyManager = PkiUtil.getKeyManagerFromPKCS11("/usr/lib/libeToken.so", "Qwerty123");
 
         SelfSignedCertificate ssc = new SelfSignedCertificate();
         SslContext sslCtx = SslContextBuilder
-//                .forServer(ssc.certificate(), ssc.privateKey())
-            .forServer(keyManager)
+              .forServer(ssc.certificate(), ssc.privateKey())
+//            .forServer(keyManager)
             .trustManager(TRUST_MANAGER)
             .clientAuth(ClientAuth.REQUIRE)
             .build();

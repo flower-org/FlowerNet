@@ -1,6 +1,7 @@
 package com.flower.utils;
 
 import com.google.common.io.Resources;
+import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
 
@@ -11,6 +12,8 @@ import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -23,6 +26,7 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.Provider;
+import java.security.PublicKey;
 import java.security.Security;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
@@ -51,24 +55,57 @@ public class PkiUtil {
     }
 
     public static TrustManagerFactory getTrustManagerForCertificateResource(String resourceName) {
+        return getTrustManagerForCertificateStream(getStreamFromResource(resourceName));
+    }
+
+    public static InputStream getStreamFromResource(String resourceName) {
         try {
             URL resource = Resources.getResource(resourceName);
-            InputStream stream = resource.openStream();
-            return getTrustManagerForCertificateStream(stream);
+            return resource.openStream();
         } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static TrustManagerFactory getTrustManagerFromPKCS11(String libraryPath, String pin) {
+        KeyStore pkcs11Store = loadPKCS11KeyStore(libraryPath, pin);
+        return getTrustManagerForKeyStore(pkcs11Store);
+    }
+
+    public static X509Certificate getCertificateFromResource(String resourceName) {
+        try {
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            return getCertificateFromStream(getStreamFromResource(resourceName));
+        } catch (CertificateException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static X509Certificate getCertificateFromStream(InputStream certificateStream) {
+        try {
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            return (X509Certificate) cf.generateCertificate(certificateStream);
+        } catch (CertificateException e) {
             throw new RuntimeException(e);
         }
     }
 
     public static TrustManagerFactory getTrustManagerForCertificateStream(InputStream certificateStream) {
         try {
-            CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            X509Certificate cert = (X509Certificate) cf.generateCertificate(certificateStream);
+            X509Certificate cert = getCertificateFromStream(certificateStream);
 
             KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
             keyStore.load(null, null);
             keyStore.setCertificateEntry("trustedCert", cert);
 
+            return getTrustManagerForKeyStore(keyStore);
+        } catch (NoSuchAlgorithmException | KeyStoreException | IOException | CertificateException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static TrustManagerFactory getTrustManagerForKeyStore(KeyStore keyStore) {
+        try {
             TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(keyStore);
 
@@ -86,7 +123,7 @@ public class PkiUtil {
             }
 
             return trustManagerFactory;
-        } catch (NoSuchAlgorithmException | KeyStoreException | IOException | CertificateException e) {
+        } catch (NoSuchAlgorithmException | KeyStoreException e) {
             throw new RuntimeException(e);
         }
     }
@@ -98,17 +135,9 @@ public class PkiUtil {
     // --------------------------------------------------
 
     public static KeyManagerFactory getKeyManagerFromResources(String certResourceName, String keyResourceName, String keyPassword) {
-        try {
-            URL certResource = Resources.getResource(certResourceName);
-            InputStream cerStream = certResource.openStream();
-
-            URL keyResource = Resources.getResource(keyResourceName);
-            InputStream keyStream = keyResource.openStream();
-
-            return getKeyManagerFromPem(cerStream, keyStream, keyPassword);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        InputStream cerStream = getStreamFromResource(certResourceName);
+        InputStream keyStream = getStreamFromResource(keyResourceName);
+        return getKeyManagerFromPem(cerStream, keyStream, keyPassword);
     }
 
     public static KeyManagerFactory getKeyManagerFromPem(InputStream certificateStream, InputStream keyStream, String keyPassword) {
@@ -137,15 +166,24 @@ public class PkiUtil {
         }
     }
 
+    public static Provider loadPKCS11Provider(String libraryPath) {
+        // Has to start with `--` to indicate inline config
+        String config = String.format("--name = SmartCard\nlibrary = %s\n", libraryPath);
+
+        Provider pkcs11Provider = Security.getProvider("SunPKCS11");
+        pkcs11Provider = pkcs11Provider.configure(config);
+        Security.addProvider(pkcs11Provider);
+
+        return pkcs11Provider;
+    }
+
     public static KeyStore loadPKCS11KeyStore(String libraryPath, String pin) {
+        Provider pkcs11Provider = loadPKCS11Provider(libraryPath);
+        return loadPKCS11KeyStore(pkcs11Provider, pin);
+    }
+
+    public static KeyStore loadPKCS11KeyStore(Provider pkcs11Provider, String pin) {
         try {
-            // Has to start with `--` to indicate inline config
-            String config = String.format("--name = SmartCard\nlibrary = %s\n", libraryPath);
-
-            Provider pkcs11Provider = Security.getProvider("SunPKCS11");
-            pkcs11Provider = pkcs11Provider.configure(config);
-            Security.addProvider(pkcs11Provider);
-
             KeyStore pkcs11Store = KeyStore.getInstance("PKCS11", pkcs11Provider);
             pkcs11Store.load(null, pin.toCharArray());
 
@@ -217,7 +255,7 @@ public class PkiUtil {
                "-----END PRIVATE KEY-----\n";
     }
 
-    public static String printSessionCertificates(SSLSession session) throws SSLPeerUnverifiedException {
+    public static String printSessionCertificates(SSLSession session) {
         StringBuilder builder = new StringBuilder();
         builder.append("Local certificates:\n");
         Certificate[] localCerts = session.getLocalCertificates();
@@ -226,14 +264,34 @@ public class PkiUtil {
                 builder.append(certificate).append("\n");
             }
         }
-        builder.append("Peer certificates:\n");
-        Certificate[] peerCerts = session.getPeerCertificates();
-        if (peerCerts != null) {
-            for (Certificate certificate : peerCerts) {
-                builder.append(certificate).append("\n");
+        try {
+            Certificate[] peerCerts = session.getPeerCertificates();
+            builder.append("Peer certificates:\n");
+            if (peerCerts != null) {
+                for (Certificate certificate : peerCerts) {
+                    builder.append(certificate).append("\n");
+                }
             }
+        } catch (SSLPeerUnverifiedException e) {
+            // One-way SSL
         }
 
         return builder.toString();
+    }
+
+    public static void saveCertificateToPemFile(X509Certificate certificate, File saveToFile) throws IOException {
+        JcaPEMWriter pemWriter = new JcaPEMWriter(new FileWriter(saveToFile));
+        pemWriter.writeObject(certificate);
+    }
+
+    /** @return true if cer1 was signed by caCer */
+    public static boolean verifyCertificateSignature(X509Certificate cer1, X509Certificate caCer) {
+        PublicKey caPublicKey = caCer.getPublicKey();
+        try {
+            cer1.verify(caPublicKey);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

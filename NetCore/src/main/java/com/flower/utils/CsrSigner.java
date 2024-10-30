@@ -73,7 +73,7 @@ public class CsrSigner {
                             X509Certificate caCert) {
         try {
             Date notBefore = new Date();
-            Date notAfter = new Date(System.currentTimeMillis() + (365L * 24 * 60 * 60 * 1000)); //1 year
+            Date notAfter = new Date(System.currentTimeMillis() + (365L * 24 * 60 * 60 * 1000 * 10)); //10 years
 
             BigInteger serialNumber = new BigInteger(64, new SecureRandom());
 

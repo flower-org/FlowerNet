@@ -90,18 +90,30 @@ public class PkiUtil {
         }
     }
 
-    public static TrustManagerFactory getTrustManagerForCertificateStream(InputStream certificateStream) {
+    public static KeyStore loadTrustStore(X509Certificate cert) {
         try {
-            X509Certificate cert = getCertificateFromStream(certificateStream);
-
             KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
             keyStore.load(null, null);
             keyStore.setCertificateEntry("trustedCert", cert);
-
-            return getTrustManagerForKeyStore(keyStore);
+            return keyStore;
         } catch (NoSuchAlgorithmException | KeyStoreException | IOException | CertificateException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static KeyStore loadTrustStore(InputStream certificateStream) {
+        X509Certificate cert = getCertificateFromStream(certificateStream);
+        return loadTrustStore(cert);
+    }
+
+    public static KeyStore loadTrustStore(String resourceName) {
+        X509Certificate cert = getCertificateFromStream(getStreamFromResource(resourceName));
+        return loadTrustStore(cert);
+    }
+
+    public static TrustManagerFactory getTrustManagerForCertificateStream(InputStream certificateStream) {
+        KeyStore keyStore = loadTrustStore(certificateStream);
+        return getTrustManagerForKeyStore(keyStore);
     }
 
     public static TrustManagerFactory getTrustManagerForKeyStore(KeyStore keyStore) {

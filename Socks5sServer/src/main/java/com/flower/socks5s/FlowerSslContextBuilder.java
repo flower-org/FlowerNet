@@ -16,8 +16,8 @@ public class FlowerSslContextBuilder {
     public static SslContext buildSslContext() throws SSLException {
         return io.netty.handler.ssl.SslContextBuilder
                 .forServer(SERVER_KEY_MANAGER)
-                .trustManager(TRUST_MANAGER)
-                .clientAuth(ClientAuth.REQUIRE)
+//                .trustManager(TRUST_MANAGER)
+//                .clientAuth(ClientAuth.REQUIRE)
                 .build();
     }
 }

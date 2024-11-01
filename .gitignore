@@ -21,5 +21,4 @@ gradle*
 
 generated
 *.log
-/ChatServer/build.gradle
 socks5s_server.key

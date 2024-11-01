@@ -33,7 +33,7 @@ public final class SocksServer {
         if (args.length > 0) {
             IS_SOCKS5_OVER_TLS = Boolean.parseBoolean(args[0]);
         }
-        if (args.length > 0) {
+        if (args.length > 1) {
             PORT = Integer.parseInt(args[1]);
         }
 
@@ -42,7 +42,7 @@ public final class SocksServer {
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
-            LOGGER.info("Starting on port {}", PORT);
+            LOGGER.info("Starting on port {} TLS: {}", PORT, IS_SOCKS5_OVER_TLS);
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
              .channel(NioServerSocketChannel.class)

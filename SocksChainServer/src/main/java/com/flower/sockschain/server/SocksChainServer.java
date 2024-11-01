@@ -35,10 +35,6 @@ public final class SocksChainServer {
             PORT = Integer.parseInt(args[0]);
         }
 
-        SelfSignedCertificate ssc = new SelfSignedCertificate();
-        SslContext sslCtx = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey())
-                .build();
-
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
@@ -46,7 +42,7 @@ public final class SocksChainServer {
             b.group(bossGroup, workerGroup)
              .channel(NioServerSocketChannel.class)
              .handler(new LoggingHandler(LogLevel.INFO))
-             .childHandler(new SocksChainServerInitializer(sslCtx));
+             .childHandler(new SocksChainServerInitializer(null));
             System.out.println("Starting on port " + PORT);
             b.bind(PORT).sync().channel().closeFuture().sync();
         } finally {

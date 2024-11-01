@@ -7,10 +7,15 @@ import io.netty.handler.codec.socksx.v5.Socks5CommandResponseDecoder;
 import io.netty.handler.codec.socksx.v5.Socks5InitialResponseDecoder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.concurrent.DefaultPromise;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
+import io.netty.util.concurrent.ImmediateEventExecutor;
+import io.netty.util.concurrent.Promise;
 
 import javax.annotation.Nullable;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 public class SocksChainClientPipelineManager {
     //TODO: support for other SOCKS versions
@@ -19,13 +24,10 @@ public class SocksChainClientPipelineManager {
                                           @Nullable GenericFutureListener<Future<? super Channel>> sslHandshakeListener) {
         ChannelPipeline pipeline = channel.pipeline();
 
+        SslHandler sslHandler = null;
         if (sslCtx != null) {
-            SslHandler sslHandler = sslCtx.newHandler(channel.alloc());
+            sslHandler = sslCtx.newHandler(channel.alloc());
             pipeline.addLast(sslHandler);
-
-            if (sslHandshakeListener != null) {
-                sslHandler.handshakeFuture().addListener(sslHandshakeListener);
-            }
         }
 
         pipeline.addLast(new Socks5InitialResponseDecoder());
@@ -33,6 +35,21 @@ public class SocksChainClientPipelineManager {
 
         // and then business logic.
         pipeline.addLast(new SocksChainClientHandler(address, port, client));
+
+        if (sslCtx != null) {
+            if (sslHandshakeListener != null) {
+                checkNotNull(sslHandler).handshakeFuture().addListener(sslHandshakeListener);
+            }
+        } else {
+            if (sslHandshakeListener != null) {
+                try {
+                    Future<? super Channel> channelFuture = ImmediateEventExecutor.INSTANCE.newSucceededFuture(channel);
+                    sslHandshakeListener.operationComplete(channelFuture);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
     }
 
     //TODO: support for other SOCKS versions

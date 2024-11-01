@@ -18,23 +18,25 @@ package com.flower.sockschain.server;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.socksx.SocksPortUnificationServerHandler;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
 
-public final class SocksChainServerInitializer extends ChannelInitializer<SocketChannel> {
-    private final SslContext sslCtx;
+import javax.annotation.Nullable;
 
-    public SocksChainServerInitializer(SslContext sslCtx) {
+public final class SocksChainServerInitializer extends ChannelInitializer<SocketChannel> {
+    private final @Nullable SslContext sslCtx;
+
+    public SocksChainServerInitializer(@Nullable SslContext sslCtx) {
         this.sslCtx = sslCtx;
     }
 
     @Override
     public void initChannel(SocketChannel ch) {
+        //ch.pipeline().addLast(new LoggingHandler(LogLevel.DEBUG));
+        if (sslCtx != null) {
+            ch.pipeline().addLast(sslCtx.newHandler(ch.alloc()));
+        }
         ch.pipeline().addLast(
-                new LoggingHandler(LogLevel.DEBUG),//TODO: comment out, no logs
-                sslCtx.newHandler(ch.alloc()),
-                new SocksPortUnificationServerHandler(),
-                new SocksChainServerHandler());
+            new SocksPortUnificationServerHandler(),
+            new SocksChainServerHandler());
     }
 }

@@ -1,6 +1,7 @@
 package com.flower.sockschain.client;
 
 import com.flower.handlers.RelayHandler;
+import com.flower.utils.PkiUtil;
 import com.google.common.base.Preconditions;
 import com.flower.sockschain.config.SocksNode;
 import com.flower.sockschain.config.SocksProtocolVersion;
@@ -20,10 +21,12 @@ import io.netty.handler.codec.socksx.v5.Socks5CommandRequestDecoder;
 import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
 import io.netty.handler.codec.socksx.v5.Socks5InitialRequestDecoder;
 import io.netty.handler.codec.socksx.v5.Socks5ServerEncoder;
+import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 
+import javax.annotation.Nullable;
+import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,9 +34,12 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.flower.utils.ServerUtil;
 
+import static com.flower.trust.FlowerTrust.TRUST_MANAGER;
 import static com.flower.utils.ServerUtil.showPipeline;
 
 public class SocksChainClient {
+    static KeyManagerFactory KEY_MANAGER = PkiUtil.getKeyManagerFromPKCS11("/usr/lib/libeToken.so", "Qwerty123");
+
     private final ChannelHandlerContext inboundCtx;
     private final Channel inboundChannel;
     private final SocksMessage inboundMessage;
@@ -50,10 +56,18 @@ public class SocksChainClient {
         return Preconditions.checkNotNull(outgoingChannel.get());
     }
 
-    public SslContext sslCtx() throws SSLException {
-        // TODO: replace with Flower CA root
-        return SslContextBuilder.forClient()
-                .trustManager(InsecureTrustManagerFactory.INSTANCE).build();
+    @Nullable
+    public SslContext sslCtx(SocksProtocolVersion socksProtocolVersion) throws SSLException {
+        if (socksProtocolVersion == SocksProtocolVersion.SOCKS5s) {
+            // Configure SSL.
+            return SslContextBuilder.forClient()
+//                    .keyManager(KEY_MANAGER)
+  //                  .clientAuth(ClientAuth.REQUIRE)
+                    .trustManager(TRUST_MANAGER)
+                    .build();
+        } else {
+            return null;
+        }
     }
 
     public SocksChainClient(final ChannelHandlerContext inboundCtx, final SocksMessage inboundMessage, List<SocksNode> socksProxyChain) {
@@ -126,9 +140,9 @@ public class SocksChainClient {
         if (nodeIndex.get() + 1 < socksProxyChain.size()) {
             //We have next proxy node in the chain to connect to.
             SocksNode nextNode = socksProxyChain.get(nodeIndex.get() + 1);
-            if (currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5s) {
+            if (currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5 || currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5s) {
                 SocksChainClientPipelineManager.initSocks5Pipeline(outgoingChannel(), nextNode.serverAddress(),
-                        nextNode.serverPort(), this, sslCtx(), future -> {
+                        nextNode.serverPort(), this, sslCtx(currentNode.socksProtocolVersion()), future -> {
                     //System.out.println("HANDSHAKE DONE! PROXY");
                     outgoingChannel().writeAndFlush(new DefaultSocks5InitialRequest(Socks5AuthMethod.NO_AUTH));
                 });
@@ -139,11 +153,11 @@ public class SocksChainClient {
             }
         } else {
             //Chain's completed, connect to the endpoint.
-            if (currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5) {
+            if (currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5 || currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5s) {
                 if (inboundMessage instanceof Socks5CommandRequest) {
                     Socks5CommandRequest socks5Request = (Socks5CommandRequest) inboundMessage;
                     SocksChainClientPipelineManager.initSocks5Pipeline(outgoingChannel(), socks5Request.dstAddr(),
-                            socks5Request.dstPort(), this, sslCtx(), future -> {
+                            socks5Request.dstPort(), this, sslCtx(currentNode.socksProtocolVersion()), future -> {
                         //System.out.println("HANDSHAKE DONE! ENDPOINT");
                         outgoingChannel().writeAndFlush(new DefaultSocks5InitialRequest(Socks5AuthMethod.NO_AUTH));
                     });
@@ -202,7 +216,7 @@ public class SocksChainClient {
         System.out.println(showPipeline(outgoingChannel().pipeline()));
         System.out.println(showPipeline(inboundCtx.pipeline()));
 
-        if (currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5) {
+        if (currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5 || currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5s) {
             SocksChainClientPipelineManager.cleanupSocks5Pipeline(outgoingChannel().pipeline());
         } else {
             connectionFailed();

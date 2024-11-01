@@ -15,6 +15,8 @@
  */
 package com.flower.socks5s;
 
+import com.flower.handlers.RelayHandler;
+import com.flower.utils.ServerUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -43,7 +45,7 @@ import java.util.NoSuchElementException;
 
 import static com.flower.socks5s.ConnectionAttributes.DESTINATION_KEY;
 import static com.flower.socks5s.ConnectionAttributes.getConnectionInfo;
-import static com.flower.socks5s.ServerUtil.showPipeline;
+import static com.flower.utils.ServerUtil.showPipeline;
 
 @ChannelHandler.Sharable
 public final class SocksServerConnectHandler extends SimpleChannelInboundHandler<SocksMessage> {

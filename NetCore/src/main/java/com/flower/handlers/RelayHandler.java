@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package com.flower.socks5s;
+package com.flower.handlers;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
@@ -22,6 +22,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.flower.utils.ServerUtil;
 
 public final class RelayHandler extends ChannelInboundHandlerAdapter {
     final static Logger LOGGER = LoggerFactory.getLogger(RelayHandler.class);

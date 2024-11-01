@@ -19,23 +19,25 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.ssl.util.SelfSignedCertificate;
+import io.netty.handler.ssl.SslContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class SocksServer {
     final static Logger LOGGER = LoggerFactory.getLogger(SocksServer.class);
 
-    static int PORT = Integer.parseInt(System.getProperty("port", "8080"));
+    static boolean IS_SOCKS5_OVER_TLS = false;
+    static int PORT = 8080;
 
     public static void main(String[] args) throws Exception {
         if (args.length > 0) {
-            PORT = Integer.parseInt(args[0]);
+            IS_SOCKS5_OVER_TLS = Boolean.parseBoolean(args[0]);
+        }
+        if (args.length > 0) {
+            PORT = Integer.parseInt(args[1]);
         }
 
-        SelfSignedCertificate ssc = new SelfSignedCertificate();
-/*        SslContext sslCtx = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey())
-                .build();*/
+        SslContext sslCtx = IS_SOCKS5_OVER_TLS ? FlowerSslContextBuilder.buildSslContext() : null;
 
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
@@ -45,7 +47,7 @@ public final class SocksServer {
             b.group(bossGroup, workerGroup)
              .channel(NioServerSocketChannel.class)
 //             .handler(new LoggingHandler(LogLevel.INFO))
-             .childHandler(new SocksServerInitializer(/*sslCtx*/));
+             .childHandler(new SocksServerInitializer(sslCtx));
             b.bind(PORT).sync().channel().closeFuture().sync();
         } finally {
             bossGroup.shutdownGracefully();

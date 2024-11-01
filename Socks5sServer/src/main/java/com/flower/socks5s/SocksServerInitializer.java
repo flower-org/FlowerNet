@@ -18,20 +18,28 @@ package com.flower.socks5s;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.socksx.SocksPortUnificationServerHandler;
+import io.netty.handler.ssl.SslContext;
+
+import javax.annotation.Nullable;
 
 public final class SocksServerInitializer extends ChannelInitializer<SocketChannel> {
-    //private final SslContext sslCtx;
+    @Nullable private final SslContext sslCtx;
 
-    public SocksServerInitializer(/*SslContext sslCtx*/) {
-        //this.sslCtx = sslCtx;
+    public SocksServerInitializer(@Nullable SslContext sslCtx) {
+        this.sslCtx = sslCtx;
     }
 
     @Override
     public void initChannel(SocketChannel ch) {
+        // ch.pipeline().addLast(new LoggingHandler(LogLevel.DEBUG));
+
+        if (sslCtx != null) {
+            ch.pipeline().addLast(
+                sslCtx.newHandler(ch.alloc()));
+        }
+
         ch.pipeline().addLast(
-//                new LoggingHandler(LogLevel.DEBUG),
-//                sslCtx.newHandler(ch.alloc()),
-                new SocksPortUnificationServerHandler(),
-                SocksServerHandler.INSTANCE);
+            new SocksPortUnificationServerHandler(),
+            SocksServerHandler.INSTANCE);
     }
 }

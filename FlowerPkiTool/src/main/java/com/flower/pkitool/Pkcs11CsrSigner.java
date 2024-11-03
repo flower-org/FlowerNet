@@ -1,5 +1,6 @@
-package com.flower.utils;
+package com.flower.pkitool;
 
+import com.flower.utils.PkiUtil;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
@@ -33,9 +34,26 @@ import java.util.Enumeration;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-public class CsrSigner {
-    public static void main(String[] args) throws IOException, KeyStoreException, UnrecoverableKeyException, NoSuchAlgorithmException, CertificateEncodingException {
-        KeyStore keyStore = PkiUtil.loadPKCS11KeyStore("/usr/lib/libeToken.so", "Qwerty123");
+public class Pkcs11CsrSigner {
+    public static void printHelp() {
+        System.out.println("Params: reqFile certAlias pin (OPT)libraryPath");
+    }
+
+    public static void main(String[] args) throws IOException, KeyStoreException, UnrecoverableKeyException,
+            NoSuchAlgorithmException, CertificateEncodingException {
+        String reqFile;
+        if (args.length > 0) { reqFile = args[0]; } else { printHelp(); return; }
+
+        String certAlias;
+        if (args.length > 1) { certAlias = args[1]; } else { printHelp(); return; }
+
+        String pin;
+        if (args.length > 2) { pin = args[2]; } else { printHelp(); return; }
+
+        String libraryPath = "/usr/lib/libeToken.so";
+        if (args.length > 3) { libraryPath = args[3]; }
+
+        KeyStore keyStore = PkiUtil.loadPKCS11KeyStore(libraryPath, pin);
 
         PrivateKey key = null;
         X509Certificate cert = null;
@@ -45,7 +63,7 @@ public class CsrSigner {
             String alias = aliases.nextElement();
             System.out.println("Alias: " + alias);
 
-            if (!alias.equals("562924BA4BCF5942")) {
+            if (!alias.equals(certAlias)) {
                 continue;
             }
 
@@ -57,7 +75,7 @@ public class CsrSigner {
             }
         }
 
-        File csrFile = new File("/home/john/my_req2/MY_REQ2.req");
+        File csrFile = new File(reqFile);
         PEMParser pemParser = new PEMParser(new FileReader(csrFile));
         PKCS10CertificationRequest csr = (PKCS10CertificationRequest)pemParser.readObject();
         pemParser.close();

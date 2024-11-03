@@ -34,11 +34,11 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.flower.utils.ServerUtil;
 
-import static com.flower.trust.FlowerTrust.TRUST_MANAGER;
+import static com.flower.trust.FlowerTrust.TRUST_MANAGER_WITH_SERVER_CA;
 import static com.flower.utils.ServerUtil.showPipeline;
 
 public class SocksChainClient {
-    static KeyManagerFactory KEY_MANAGER = PkiUtil.getKeyManagerFromPKCS11("/usr/lib/libeToken.so", "Qwerty123");
+    static KeyManagerFactory PKCS11_KEY_MANAGER = PkiUtil.getKeyManagerFromPKCS11("/usr/lib/libeToken.so", "Qwerty123");
 
     private final ChannelHandlerContext inboundCtx;
     private final Channel inboundChannel;
@@ -61,9 +61,9 @@ public class SocksChainClient {
         if (socksProtocolVersion == SocksProtocolVersion.SOCKS5s) {
             // Configure SSL.
             return SslContextBuilder.forClient()
-//                    .keyManager(KEY_MANAGER)
-  //                  .clientAuth(ClientAuth.REQUIRE)
-                    .trustManager(TRUST_MANAGER)
+                    .keyManager(PKCS11_KEY_MANAGER)
+                    .clientAuth(ClientAuth.REQUIRE)
+                    .trustManager(TRUST_MANAGER_WITH_SERVER_CA)
                     .build();
         } else {
             return null;
@@ -193,9 +193,15 @@ public class SocksChainClient {
 
                 //TODO: replace with `inboundChannel.pipeline`, get rid of ctx
                 //TODO: this is SOCKS5-specific, make it support other versions
-                inboundCtx.pipeline().remove(Socks5CommandRequestDecoder.class);
-                inboundCtx.pipeline().remove(Socks5InitialRequestDecoder.class);
-                inboundCtx.pipeline().remove(Socks5ServerEncoder.class);
+                try {
+                    inboundCtx.pipeline().remove(Socks5CommandRequestDecoder.class);
+                } catch (Exception e) {}
+                try {
+                    inboundCtx.pipeline().remove(Socks5InitialRequestDecoder.class);
+                } catch (Exception e) {}
+                try {
+                    inboundCtx.pipeline().remove(Socks5ServerEncoder.class);
+                } catch (Exception e) {}
 
                 tunnelCleanup();
 

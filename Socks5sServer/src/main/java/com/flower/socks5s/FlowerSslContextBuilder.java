@@ -7,7 +7,7 @@ import io.netty.handler.ssl.SslContext;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 
-import static com.flower.trust.FlowerTrust.TRUST_MANAGER;
+import static com.flower.trust.FlowerTrust.TRUST_MANAGER_WITH_CLIENT_CA;
 
 public class FlowerSslContextBuilder {
     public static final KeyManagerFactory SERVER_KEY_MANAGER =
@@ -16,8 +16,8 @@ public class FlowerSslContextBuilder {
     public static SslContext buildSslContext() throws SSLException {
         return io.netty.handler.ssl.SslContextBuilder
                 .forServer(SERVER_KEY_MANAGER)
-//                .trustManager(TRUST_MANAGER)
-//                .clientAuth(ClientAuth.REQUIRE)
+                .trustManager(TRUST_MANAGER_WITH_CLIENT_CA)
+                .clientAuth(ClientAuth.REQUIRE)
                 .build();
     }
 }

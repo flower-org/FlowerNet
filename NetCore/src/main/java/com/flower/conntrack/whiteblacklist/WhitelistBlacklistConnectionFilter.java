@@ -13,6 +13,7 @@ import static com.flower.conntrack.whiteblacklist.AddressFilterList.AddressRecor
 import static com.flower.conntrack.whiteblacklist.AddressFilterList.HostRecord;
 import static com.flower.conntrack.whiteblacklist.AddressFilterList.PortRecord;
 
+// TODO: extensive test coverage
 public class WhitelistBlacklistConnectionFilter implements ConnectionListenerAndFilter {
     final List<Pair<AddressFilterList, Boolean>> addressLists;
 

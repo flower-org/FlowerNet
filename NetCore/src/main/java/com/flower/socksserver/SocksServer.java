@@ -21,14 +21,17 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public final class SocksServer {
     final static Logger LOGGER = LoggerFactory.getLogger(SocksServer.class);
 
+    final boolean allowDirectAccessByIpAddress;
     final Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider;
     @Nullable final List<ConnectionListenerAndFilter> connectionListenerAndFilters;
 
     @Nullable EventLoopGroup bossGroup;
     @Nullable EventLoopGroup workerGroup;
 
-    public SocksServer(Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider,
+    public SocksServer(boolean allowDirectAccessByIpAddress,
+                       Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider,
                        @Nullable List<ConnectionListenerAndFilter> connectionListenerAndFilters) {
+        this.allowDirectAccessByIpAddress = allowDirectAccessByIpAddress;
         this.connectHandlerProvider = connectHandlerProvider;
         this.connectionListenerAndFilters = connectionListenerAndFilters;
     }
@@ -46,7 +49,8 @@ public final class SocksServer {
         b.group(bossGroup, workerGroup)
             .channel(NioServerSocketChannel.class)
             //.handler(new LoggingHandler(LogLevel.INFO))
-            .childHandler(new SocksServerInitializer(connectHandlerProvider, sslCtx, connectionListenerAndFilters));
+            .childHandler(new SocksServerInitializer(connectHandlerProvider, allowDirectAccessByIpAddress, sslCtx,
+                    connectionListenerAndFilters));
         return b.bind(port);
     }
 }

@@ -14,12 +14,15 @@ import java.util.function.Supplier;
 
 public final class SocksServerInitializer extends ChannelInitializer<SocketChannel> {
     final Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider;
+    private final boolean allowDirectAccessByIpAddress;
     @Nullable private final SslContext sslCtx;
     @Nullable private final List<ConnectionListenerAndFilter> connectionListenerAndFilters;
 
     public SocksServerInitializer(Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider,
+                                  boolean allowDirectAccessByIpAddress,
                                   @Nullable SslContext sslCtx,
                                   @Nullable List<ConnectionListenerAndFilter> connectionListenerAndFilters) {
+        this.allowDirectAccessByIpAddress = allowDirectAccessByIpAddress;
         this.connectHandlerProvider = connectHandlerProvider;
         this.sslCtx = sslCtx;
         this.connectionListenerAndFilters = connectionListenerAndFilters;
@@ -32,6 +35,6 @@ public final class SocksServerInitializer extends ChannelInitializer<SocketChann
         }
         ch.pipeline().addLast(
             new SocksPortUnificationServerHandler(),
-            new SocksServerHandler(connectHandlerProvider, connectionListenerAndFilters));
+            new SocksServerHandler(allowDirectAccessByIpAddress, connectHandlerProvider, connectionListenerAndFilters));
     }
 }

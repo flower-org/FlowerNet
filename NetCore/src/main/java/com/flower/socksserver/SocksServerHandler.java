@@ -1,6 +1,7 @@
 package com.flower.socksserver;
 
 import com.flower.conntrack.ConnectionListenerAndFilter;
+import com.flower.utils.NonDnsHostnameChecker;
 import com.flower.utils.ServerUtil;
 import com.google.common.base.Preconditions;
 import io.netty.channel.ChannelHandler;
@@ -34,11 +35,14 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
     final static AtomicLong SOCKS5_COUNTER = new AtomicLong(1);
     final static Logger LOGGER = LoggerFactory.getLogger(SocksServerHandler.class);
 
+    final boolean allowDirectAccessByIpAddress;
     final Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider;
     @Nullable final List<ConnectionListenerAndFilter> connectionListenerAndFilters;
 
-    public SocksServerHandler(Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider,
+    public SocksServerHandler(boolean allowDirectAccessByIpAddress,
+                              Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider,
                               @Nullable List<ConnectionListenerAndFilter> connectionListenerAndFilters) {
+        this.allowDirectAccessByIpAddress = allowDirectAccessByIpAddress;
         this.connectHandlerProvider = connectHandlerProvider;
         this.connectionListenerAndFilters = connectionListenerAndFilters;
     }
@@ -128,6 +132,13 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
 
     @Override
     public AddressCheck approveConnection(String dstHost, int dstPort) {
+        if (!allowDirectAccessByIpAddress) {
+            if (NonDnsHostnameChecker.isIPAddress(dstHost)) {
+                LOGGER.error("CONNECTION_PROHIBITED: no direct IP access allowed {}:{}", dstHost, dstPort);
+                return AddressCheck.CONNECTION_PROHIBITED;
+            }
+        }
+
         AddressCheck addressCheck = AddressCheck.CONNECTION_ALLOWED;
         if (connectionListenerAndFilters != null) {
             for (ConnectionListenerAndFilter filter : connectionListenerAndFilters) {

@@ -11,6 +11,7 @@ public final class Socks5sServer {
 
     static final boolean DEFAULT_IS_SOCKS5_OVER_TLS = false;
     static final int DEFAULT_PORT = 8080;
+    static final boolean ALLOW_DIRECT_IP_ACCESS = true;
 
     public static void main(String[] args) throws Exception {
         boolean isSocks5OverTls = DEFAULT_IS_SOCKS5_OVER_TLS;
@@ -23,7 +24,7 @@ public final class Socks5sServer {
         }
         SslContext sslCtx = isSocks5OverTls ? FlowerSslContextBuilder.buildSslContext() : null;
 
-        SocksServer server = new SocksServer(SocksServerConnectHandler::new, null);
+        SocksServer server = new SocksServer(ALLOW_DIRECT_IP_ACCESS, SocksServerConnectHandler::new, null);
         try {
             LOGGER.info("Starting on port {} TLS: {}", port, isSocks5OverTls);
             server.startServer(port, sslCtx)

@@ -1,0 +1,138 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+    id 'org.beryx.jlink' version '2.24.1'
+    id "net.ltgt.errorprone" version "3.0.1"
+    id "com.github.johnrengelman.shadow" version "7.1.2"
+}
+
+group 'com.flower.socksui'
+version '0.0.1-SNAPSHOT-Intel'
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    junitVersion = '5.8.1'
+}
+
+sourceCompatibility = '17'
+targetCompatibility = '17'
+
+compileJava {
+    options.compilerArgs << '-parameters'
+}
+compileTestJava {
+    options.compilerArgs << '-parameters'
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+application {
+    mainModule = 'com.flower.socksui'
+    mainClass = 'com.flower.socksui.SocksUiLauncher'
+}
+
+javafx {
+    version = '21.0.1'
+    modules = ['javafx.controls', 'javafx.fxml', 'javafx.graphics', 'javafx.media']
+}
+
+sourceSets {
+    main { java { srcDir 'src/main' } }
+    test { java { srcDir 'src/test' } }
+}
+
+dependencies {
+    annotationProcessor "org.immutables:value:2.9.2"
+    annotationProcessor "com.uber.nullaway:nullaway:0.7.9"
+
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.13.0'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.0'
+    implementation 'com.google.guava:guava:31.1-jre'
+    implementation "org.immutables:value-annotations:2.9.2" // or implementation, or compileOnly
+
+    implementation 'org.apache.logging.log4j:log4j-api:2.20.0'
+    implementation 'org.apache.logging.log4j:log4j-core:2.20.0'
+    implementation 'org.apache.logging.log4j:log4j-slf4j-impl:2.20.0'
+
+    implementation 'com.google.code.findbugs:jsr305:3.0.2'
+    implementation 'com.squareup.okhttp3:okhttp:3.14.9'
+    implementation 'com.squareup.okhttp3:logging-interceptor:3.14.9'
+    implementation 'com.google.guava:guava:31.1-jre'
+    implementation 'com.google.guava:guava-testlib:31.1-jre'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-guava:2.13.4'
+    implementation 'org.apache.commons:commons-lang3:3.13.0'
+    implementation 'org.jfxtras:jfxtras-controls:17-r1'
+
+    implementation group: 'org.openjfx', name: 'javafx-base', version: javafx.version, classifier: 'win'
+    implementation group: 'org.openjfx', name: 'javafx-base', version: javafx.version, classifier: 'mac'
+    //implementation group: 'org.openjfx', name: 'javafx-base', version: javafx.version, classifier: 'mac-aarch64'
+    implementation group: 'org.openjfx', name: 'javafx-base', version: javafx.version, classifier: 'linux'
+
+    implementation group: 'org.openjfx', name: 'javafx-controls', version: javafx.version, classifier: 'win'
+    implementation group: 'org.openjfx', name: 'javafx-controls', version: javafx.version, classifier: 'mac'
+    //implementation group: 'org.openjfx', name: 'javafx-controls', version: javafx.version, classifier: 'mac-aarch64'
+    implementation group: 'org.openjfx', name: 'javafx-controls', version: javafx.version, classifier: 'linux'
+
+    implementation group: 'org.openjfx', name: 'javafx-fxml', version: javafx.version, classifier: 'win'
+    implementation group: 'org.openjfx', name: 'javafx-fxml', version: javafx.version, classifier: 'mac'
+    //implementation group: 'org.openjfx', name: 'javafx-fxml', version: javafx.version, classifier: 'mac-aarch64'
+    implementation group: 'org.openjfx', name: 'javafx-fxml', version: javafx.version, classifier: 'linux'
+
+    implementation group: 'org.openjfx', name: 'javafx-graphics', version: javafx.version, classifier: 'win'
+    implementation group: 'org.openjfx', name: 'javafx-graphics', version: javafx.version, classifier: 'mac'
+    //implementation group: 'org.openjfx', name: 'javafx-graphics', version: javafx.version, classifier: 'mac-aarch64'
+    implementation group: 'org.openjfx', name: 'javafx-graphics', version: javafx.version, classifier: 'linux'
+
+    implementation group: 'org.openjfx', name: 'javafx-media', version: javafx.version, classifier: 'win'
+    implementation group: 'org.openjfx', name: 'javafx-media', version: javafx.version, classifier: 'mac'
+    //implementation group: 'org.openjfx', name: 'javafx-media', version: javafx.version, classifier: 'mac-aarch64'
+    implementation group: 'org.openjfx', name: 'javafx-media', version: javafx.version, classifier: 'linux'
+
+    testImplementation("org.junit.jupiter:junit-jupiter-api:${junitVersion}")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junitVersion}")
+
+    compileOnly "com.google.code.findbugs:jsr305:3.0.2"
+    errorprone "com.google.errorprone:error_prone_core:2.10.0"
+    errorproneJavac "com.google.errorprone:javac:9+181-r4173-1"
+}
+
+test {
+    useJUnitPlatform()
+}
+
+// build jar:
+// ./gradlew jar -Dorg.gradle.java.home=/Users/john/Library/Java/JavaVirtualMachines/temurin-17.0.5/Contents/Home
+jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes 'Main-Class': 'com.flower.socksui.SocksUiLauncher'
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+import net.ltgt.gradle.errorprone.CheckSeverity
+
+tasks.withType(JavaCompile) {
+    // remove the if condition if you want to run NullAway on test code
+    if (!name.toLowerCase().contains("test") && !name.toLowerCase().contains("build")) {
+
+        options.errorprone {
+            //Exclude Immutables generated code
+            excludedPaths.set("$buildDir/generated/sources/.*")
+            check("NullAway", CheckSeverity.ERROR)
+            option("NullAway:AnnotatedPackages", "com.flower.socksui")
+        }
+    } else {
+        options.errorprone {
+            check("DoNotMock", CheckSeverity.WARN)
+        }
+    }
+}

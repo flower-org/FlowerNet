@@ -1,7 +1,6 @@
 package com.flower.sockschain.client;
 
 import com.flower.handlers.RelayHandler;
-import com.flower.utils.PkiUtil;
 import com.google.common.base.Preconditions;
 import com.flower.sockschain.config.SocksNode;
 import com.flower.sockschain.config.SocksProtocolVersion;
@@ -26,7 +25,6 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 
 import javax.annotation.Nullable;
-import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,11 +33,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import com.flower.utils.ServerUtil;
 
 import static com.flower.trust.FlowerTrust.TRUST_MANAGER_WITH_SERVER_CA;
-import static com.flower.utils.ServerUtil.showPipeline;
 
 public class SocksChainClient {
-    static KeyManagerFactory PKCS11_KEY_MANAGER = PkiUtil.getKeyManagerFromPKCS11("/usr/lib/libeToken.so", "Qwerty123");
-
     private final ChannelHandlerContext inboundCtx;
     private final Channel inboundChannel;
     private final SocksMessage inboundMessage;
@@ -61,7 +56,7 @@ public class SocksChainClient {
         if (socksProtocolVersion == SocksProtocolVersion.SOCKS5s) {
             // Configure SSL.
             return SslContextBuilder.forClient()
-                    .keyManager(PKCS11_KEY_MANAGER)
+                    .keyManager(ETokenKeyManagerProvider.getManager())
                     .clientAuth(ClientAuth.REQUIRE)
                     .trustManager(TRUST_MANAGER_WITH_SERVER_CA)
                     .build();
@@ -134,8 +129,8 @@ public class SocksChainClient {
         SocksNode currentNode = socksProxyChain.get(nodeIndex.get());
 
         //Print pipelines before
-        System.out.println(showPipeline(outgoingChannel().pipeline()));
-        System.out.println(showPipeline(inboundCtx.pipeline()));
+        //System.out.println(showPipeline(outgoingChannel().pipeline()));
+        //System.out.println(showPipeline(inboundCtx.pipeline()));
 
         if (nodeIndex.get() + 1 < socksProxyChain.size()) {
             //We have next proxy node in the chain to connect to.
@@ -173,8 +168,8 @@ public class SocksChainClient {
         }
 
         //Print pipelines after
-        System.out.println(showPipeline(outgoingChannel().pipeline()));
-        System.out.println(showPipeline(inboundCtx.pipeline()));
+        //System.out.println(showPipeline(outgoingChannel().pipeline()));
+        //System.out.println(showPipeline(inboundCtx.pipeline()));
     }
 
     public void connectNextNode() throws SSLException {
@@ -188,8 +183,8 @@ public class SocksChainClient {
 
             responseFuture.addListener((ChannelFutureListener) channelFuture -> {
                 //Print pipelines before
-                System.out.println(showPipeline(outgoingChannel().pipeline()));
-                System.out.println(showPipeline(inboundCtx.pipeline()));
+                //System.out.println(showPipeline(outgoingChannel().pipeline()));
+                //System.out.println(showPipeline(inboundCtx.pipeline()));
 
                 //TODO: replace with `inboundChannel.pipeline`, get rid of ctx
                 //TODO: this is SOCKS5-specific, make it support other versions
@@ -209,8 +204,8 @@ public class SocksChainClient {
                 outgoingChannel().pipeline().addLast(new RelayHandler(inboundChannel));
 
                 //Print pipelines after
-                System.out.println(showPipeline(outgoingChannel().pipeline()));
-                System.out.println(showPipeline(inboundCtx.pipeline()));
+//                System.out.println(showPipeline(outgoingChannel().pipeline()));
+//                System.out.println(showPipeline(inboundCtx.pipeline()));
             });
         }
     }
@@ -219,8 +214,8 @@ public class SocksChainClient {
         SocksNode currentNode = socksProxyChain.get(nodeIndex.get());
 
         //Print pipelines before
-        System.out.println(showPipeline(outgoingChannel().pipeline()));
-        System.out.println(showPipeline(inboundCtx.pipeline()));
+//        System.out.println(showPipeline(outgoingChannel().pipeline()));
+//        System.out.println(showPipeline(inboundCtx.pipeline()));
 
         if (currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5 || currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5s) {
             SocksChainClientPipelineManager.cleanupSocks5Pipeline(outgoingChannel().pipeline());
@@ -230,8 +225,8 @@ public class SocksChainClient {
         }
 
         //Print pipelines after
-        System.out.println(showPipeline(outgoingChannel().pipeline()));
-        System.out.println(showPipeline(inboundCtx.pipeline()));
+//        System.out.println(showPipeline(outgoingChannel().pipeline()));
+//        System.out.println(showPipeline(inboundCtx.pipeline()));
     }
 
     public void connectionFailed() {

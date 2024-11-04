@@ -23,10 +23,10 @@ public final class Socks5sServer {
         }
         SslContext sslCtx = isSocks5OverTls ? FlowerSslContextBuilder.buildSslContext() : null;
 
-        SocksServer server = new SocksServer(SocksServerConnectHandler::new);
+        SocksServer server = new SocksServer(SocksServerConnectHandler::new, null);
         try {
             LOGGER.info("Starting on port {} TLS: {}", port, isSocks5OverTls);
-            server.startServer(isSocks5OverTls, port, sslCtx)
+            server.startServer(port, sslCtx)
                     .sync().channel().closeFuture().sync();
         } finally {
             server.shutdownServer();

@@ -1,20 +1,6 @@
-/*
- * Copyright 2012 The Netty Project
- *
- * The Netty Project licenses this file to you under the Apache License,
- * version 2.0 (the "License"); you may not use this file except in compliance
- * with the License. You may obtain a copy of the License at:
- *
- *   https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations
- * under the License.
- */
 package com.flower.socksserver;
 
+import com.flower.conntrack.ConnectionListenerAndFilter;
 import com.flower.utils.ServerUtil;
 import com.google.common.base.Preconditions;
 import io.netty.channel.ChannelHandler;
@@ -34,6 +20,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.flower.conntrack.ConnectionId;
 
+import javax.annotation.Nullable;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
@@ -41,15 +29,18 @@ import static com.flower.conntrack.ConnectionAttributes.CONNECTION_ID_KEY;
 import static com.flower.conntrack.ConnectionAttributes.getConnectionInfo;
 
 @ChannelHandler.Sharable
-public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksMessage> {
+public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksMessage> implements ConnectionListenerAndFilter {
     final static AtomicLong SOCKS4_COUNTER = new AtomicLong(1);
     final static AtomicLong SOCKS5_COUNTER = new AtomicLong(1);
     final static Logger LOGGER = LoggerFactory.getLogger(SocksServerHandler.class);
 
     final Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider;
+    @Nullable final List<ConnectionListenerAndFilter> connectionListenerAndFilters;
 
-    public SocksServerHandler(Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider) {
+    public SocksServerHandler(Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider,
+                              @Nullable List<ConnectionListenerAndFilter> connectionListenerAndFilters) {
         this.connectHandlerProvider = connectHandlerProvider;
+        this.connectionListenerAndFilters = connectionListenerAndFilters;
     }
 
     @Override
@@ -63,9 +54,14 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
 
                 Socks4CommandRequest socksV4CmdRequest = (Socks4CommandRequest) socksRequest;
                 if (socksV4CmdRequest.type() == Socks4CommandType.CONNECT) {
-                    ctx.pipeline().addLast(connectHandlerProvider.get());
-                    ctx.pipeline().remove(this);
-                    ctx.fireChannelRead(socksRequest);
+                    if (approveConnection(socksV4CmdRequest.dstAddr(), socksV4CmdRequest.dstPort()) == AddressCheck.CONNECTION_PROHIBITED) {
+                        ctx.pipeline().addLast(connectHandlerProvider.get());
+                        ctx.pipeline().remove(this);
+                        ctx.fireChannelRead(socksRequest);
+                    } else {
+                        LOGGER.error("DISCONNECTED {} connection prohibited", getConnectionInfo(ctx));
+                        ctx.close();
+                    }
                 } else {
                     LOGGER.error("DISCONNECTED {} unknown command", getConnectionInfo(ctx));
                     ctx.close();
@@ -92,9 +88,14 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
                 } else if (socksRequest instanceof Socks5CommandRequest) {
                     final Socks5CommandRequest socks5CmdRequest = (Socks5CommandRequest)socksRequest;
                     if (socks5CmdRequest.type() == Socks5CommandType.CONNECT) {
-                        ctx.pipeline().addLast(connectHandlerProvider.get());
-                        ctx.pipeline().remove(this);
-                        ctx.fireChannelRead(socksRequest);
+                        if (approveConnection(socks5CmdRequest.dstAddr(), socks5CmdRequest.dstPort()) == AddressCheck.CONNECTION_ALLOWED) {
+                            ctx.pipeline().addLast(connectHandlerProvider.get());
+                            ctx.pipeline().remove(this);
+                            ctx.fireChannelRead(socksRequest);
+                        } else {
+                            LOGGER.error("DISCONNECTED {} connection prohibited", getConnectionInfo(ctx));
+                            ctx.close();
+                        }
                     } else {
                         LOGGER.error("DISCONNECTED {} unknown command", getConnectionInfo(ctx));
                         ctx.close();
@@ -123,5 +124,18 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
         //TODO: close feedback
         LOGGER.error("DISCONNECTED {} exception caught: ", getConnectionInfo(ctx), cause);
         ServerUtil.closeOnFlush(ctx.channel());
+    }
+
+    @Override
+    public AddressCheck approveConnection(String dstHost, int dstPort) {
+        AddressCheck addressCheck = AddressCheck.CONNECTION_ALLOWED;
+        if (connectionListenerAndFilters != null) {
+            for (ConnectionListenerAndFilter filter : connectionListenerAndFilters) {
+                if (filter.approveConnection(dstHost, dstPort) == AddressCheck.CONNECTION_PROHIBITED) {
+                    addressCheck = AddressCheck.CONNECTION_PROHIBITED;
+                }
+            }
+        }
+        return addressCheck;
     }
 }

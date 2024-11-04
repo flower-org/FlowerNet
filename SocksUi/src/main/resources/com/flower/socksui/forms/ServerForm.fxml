@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TitledPane?>
+<?import javafx.scene.control.ToolBar?>
+<?import javafx.scene.control.cell.PropertyValueFactory?>
+<?import javafx.scene.layout.AnchorPane?>
+
+<fx:root prefHeight="712.0" prefWidth="919.0" type="AnchorPane" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1">
+    <SplitPane dividerPositions="0.5" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1">
+      <AnchorPane maxHeight="50.0" minHeight="50.0" prefHeight="50.0">
+         <children>
+            <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+               <items>
+                  <Button mnemonicParsing="false" text="Start server" />
+                  <Button mnemonicParsing="false" text="Stop server" disable="true" />
+               </items>
+            </ToolBar>
+         </children>
+      </AnchorPane>
+        <AnchorPane>
+         <TitledPane animated="false" text="Proxy Chain" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+           <content>
+             <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                  <children>
+                        <SplitPane dividerPositions="0.5" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                        <AnchorPane maxHeight="50.0" minHeight="50.0" prefHeight="50.0">
+                            <children>
+                                <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                    <items>
+                                        <Button mnemonicParsing="false" text="Add" />
+                                        <Button mnemonicParsing="false" text="Remove" />
+                                        <Separator orientation="VERTICAL" prefHeight="200.0" />
+                                        <Button mnemonicParsing="false" text="Save to file" />
+                                        <Button mnemonicParsing="false" text="Load from file" />
+                                    </items>
+                                </ToolBar>
+                            </children>
+                        </AnchorPane>
+                        <AnchorPane>
+                            <TableView fx:id="chatTable" prefHeight="200.0" prefWidth="200.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                <columns>
+                                    <TableColumn minWidth="150.0" prefWidth="150.0" text="Socks version">
+                                        <cellValueFactory>
+                                            <PropertyValueFactory property="socksProtocolVersion" />
+                                        </cellValueFactory>
+                                    </TableColumn>
+                                    <TableColumn minWidth="150.0" prefWidth="150.0" text="Host">
+                                        <cellValueFactory>
+                                            <PropertyValueFactory property="serverAddress" />
+                                        </cellValueFactory>
+                                    </TableColumn>
+                                    <TableColumn minWidth="200.0" prefWidth="200.0" text="Port">
+                                        <cellValueFactory>
+                                            <PropertyValueFactory property="serverPort" />
+                                        </cellValueFactory>
+                                    </TableColumn>
+                                    <TableColumn minWidth="150.0" prefWidth="150.0" text="Client cert">
+                                        <cellValueFactory>
+                                            <PropertyValueFactory property="clientCertificate" />
+                                        </cellValueFactory>
+                                    </TableColumn>
+                                    <TableColumn minWidth="200.0" prefWidth="200.0" text="Server CA cert">
+                                        <cellValueFactory>
+                                            <PropertyValueFactory property="rootServerCertificate" />
+                                        </cellValueFactory>
+                                    </TableColumn>
+                                </columns>
+                            </TableView>
+                        </AnchorPane>
+                        </SplitPane>
+                  </children>
+               </AnchorPane>
+           </content>
+         </TitledPane>
+        </AnchorPane>
+    </SplitPane>
+</fx:root>

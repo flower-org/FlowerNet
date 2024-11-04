@@ -10,8 +10,7 @@
 
 <VBox prefHeight="400.0" prefWidth="478.0" xmlns="http://javafx.com/javafx/23" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.flower.socksui.MainApp">
     <MenuBar VBox.vgrow="NEVER">
-        <Menu mnemonicParsing="false" text="Chat">
-            <MenuItem mnemonicParsing="false" text="Open group chat" />
+        <Menu mnemonicParsing="false" text="SocksUI">
             <MenuItem mnemonicParsing="false" onAction="#quit" text="Quit" />
         </Menu>
         <Menu mnemonicParsing="false" text="Help">
@@ -24,6 +23,6 @@
       </children>
     </AnchorPane>
     <AnchorPane maxHeight="20.0" minHeight="20.0" prefHeight="20.0" prefWidth="241.0">
-        <Label fx:id="serverInfoLabel" alignment="CENTER_RIGHT" layoutX="3.0" layoutY="2.0" prefHeight="16.0" prefWidth="235.0" text="Server not assigned" textAlignment="RIGHT" AnchorPane.leftAnchor="3.0" AnchorPane.rightAnchor="3.0" />
+        <Label fx:id="serverInfoLabel" alignment="CENTER_RIGHT" layoutX="3.0" layoutY="2.0" prefHeight="16.0" prefWidth="235.0" text="Server not running" textAlignment="RIGHT" AnchorPane.leftAnchor="3.0" AnchorPane.rightAnchor="3.0" />
     </AnchorPane>
 </VBox>

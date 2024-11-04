@@ -44,6 +44,7 @@ public class SocksUiApplication extends Application {
             mainStage.setTitle("Socks UI");
             mainStage.setScene(mainScene);
             mainStage.setResizable(true);
+            mainApp.showTabs();
             mainStage.show();
         } catch (Exception e) {
             e.printStackTrace();

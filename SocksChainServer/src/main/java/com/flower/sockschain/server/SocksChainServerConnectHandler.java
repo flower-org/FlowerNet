@@ -27,10 +27,16 @@ import javax.net.ssl.SSLException;
 
 @ChannelHandler.Sharable
 public final class SocksChainServerConnectHandler extends SimpleChannelInboundHandler<SocksMessage> {
+    final ProxyChainProvider proxyChainProvider;
+
+    public SocksChainServerConnectHandler(ProxyChainProvider proxyChainProvider) {
+        this.proxyChainProvider = proxyChainProvider;
+    }
+
     @Override
     public void channelRead0(final ChannelHandlerContext ctx, final SocksMessage message) throws SSLException {
         ctx.pipeline().remove(SocksChainServerConnectHandler.this);
-        new SocksChainClient(ctx, message, ProxyChainProvider.getProxyChain()).connectChain();
+        new SocksChainClient(ctx, message, proxyChainProvider.getProxyChain()).connectChain();
     }
 
     @Override

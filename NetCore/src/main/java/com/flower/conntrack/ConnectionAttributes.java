@@ -1,4 +1,4 @@
-package com.flower.socks5s;
+package com.flower.conntrack;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -6,10 +6,9 @@ import io.netty.util.AttributeKey;
 
 public class ConnectionAttributes {
     public static final AttributeKey<ConnectionId> CONNECTION_ID_KEY =
-            AttributeKey.valueOf("username_and chat_id");
+            AttributeKey.valueOf("connection_id");
     public static final AttributeKey<Destination> DESTINATION_KEY =
-            AttributeKey.valueOf("channel_message_listener");
-
+            AttributeKey.valueOf("destination_key");
 
     public static String getConnectionInfo(ChannelHandlerContext ctx) {
         StringBuilder builder = new StringBuilder();

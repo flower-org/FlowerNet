@@ -5,7 +5,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.flower.socks5s.ConnectionAttributes.getConnectionInfo;
+import static com.flower.conntrack.ConnectionAttributes.getConnectionInfo;
 
 public class InactiveChannelHandler extends ChannelInboundHandlerAdapter {
     final static Logger LOGGER = LoggerFactory.getLogger(SocksServerConnectHandler.class);

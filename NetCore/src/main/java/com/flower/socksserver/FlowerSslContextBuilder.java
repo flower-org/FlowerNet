@@ -1,4 +1,4 @@
-package com.flower.socks5s;
+package com.flower.socksserver;
 
 import com.flower.utils.PkiUtil;
 import io.netty.handler.ssl.ClientAuth;

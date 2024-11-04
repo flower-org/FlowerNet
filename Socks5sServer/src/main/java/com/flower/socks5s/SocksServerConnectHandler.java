@@ -15,6 +15,7 @@
  */
 package com.flower.socks5s;
 
+import com.flower.conntrack.Destination;
 import com.flower.handlers.RelayHandler;
 import com.flower.utils.ServerUtil;
 import io.netty.bootstrap.Bootstrap;
@@ -43,8 +44,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.NoSuchElementException;
 
-import static com.flower.socks5s.ConnectionAttributes.DESTINATION_KEY;
-import static com.flower.socks5s.ConnectionAttributes.getConnectionInfo;
+import static com.flower.conntrack.ConnectionAttributes.DESTINATION_KEY;
+import static com.flower.conntrack.ConnectionAttributes.getConnectionInfo;
 import static com.flower.utils.ServerUtil.showPipeline;
 
 @ChannelHandler.Sharable

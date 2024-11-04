@@ -1,4 +1,4 @@
-package com.flower.sockschain.server;
+package com.flower.socks5s;
 
 import com.flower.socksserver.FlowerSslContextBuilder;
 import com.flower.socksserver.SocksServer;
@@ -6,15 +6,15 @@ import io.netty.handler.ssl.SslContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public final class SocksChainServer {
-    final static Logger LOGGER = LoggerFactory.getLogger(SocksChainServer.class);
+public final class Socks5sServer {
+    final static Logger LOGGER = LoggerFactory.getLogger(Socks5sServer.class);
 
-    final static int PORT = 1081;
-    final static boolean TLS = false;
+    static final boolean DEFAULT_IS_SOCKS5_OVER_TLS = false;
+    static final int DEFAULT_PORT = 8080;
 
     public static void main(String[] args) throws Exception {
-        boolean isSocks5OverTls = TLS;
-        int port = PORT;
+        boolean isSocks5OverTls = DEFAULT_IS_SOCKS5_OVER_TLS;
+        int port = DEFAULT_PORT;
         if (args.length > 0) {
             isSocks5OverTls = Boolean.parseBoolean(args[0]);
         }
@@ -23,7 +23,7 @@ public final class SocksChainServer {
         }
         SslContext sslCtx = isSocks5OverTls ? FlowerSslContextBuilder.buildSslContext() : null;
 
-        SocksServer server = new SocksServer(SocksChainServerConnectHandler::new);
+        SocksServer server = new SocksServer(SocksServerConnectHandler::new);
         try {
             LOGGER.info("Starting on port {} TLS: {}", port, isSocks5OverTls);
             server.startServer(isSocks5OverTls, port, sslCtx)

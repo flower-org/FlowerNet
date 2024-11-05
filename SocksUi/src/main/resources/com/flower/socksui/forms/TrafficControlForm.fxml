@@ -50,6 +50,7 @@
                                        <items>
                                           <Button mnemonicParsing="false" onAction="#newRule" text="New rule" />
                                           <Button mnemonicParsing="false" onAction="#removeRule" text="Remove rule" />
+                                          <Button mnemonicParsing="false" onAction="#clearRules" text="Clear rules" />
                                           <Separator orientation="VERTICAL" prefHeight="200.0" />
                                           <Button mnemonicParsing="false" onAction="#flipRule" text="Flip rule" />
                                           <Separator orientation="VERTICAL" prefHeight="200.0" />

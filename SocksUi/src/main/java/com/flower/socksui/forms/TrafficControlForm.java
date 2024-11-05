@@ -368,6 +368,12 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         refreshContent();
     }
 
+
+    public void clearRules() {
+        innerFilter.clear();
+        refreshContent();
+    }
+
     public void removeRule() {
         TrafficRule trafficRule = checkNotNull(trafficRulesTable).getSelectionModel().getSelectedItem();
         if (trafficRule != null) {

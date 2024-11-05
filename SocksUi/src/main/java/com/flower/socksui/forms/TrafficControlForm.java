@@ -1,6 +1,10 @@
 package com.flower.socksui.forms;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.datatype.guava.GuavaModule;
 import com.flower.conntrack.ConnectionListenerAndFilter;
+import com.flower.conntrack.whiteblacklist.AddressFilterList;
 import com.flower.conntrack.whiteblacklist.FilterType;
 import com.flower.conntrack.whiteblacklist.ImmutableAddressRecord;
 import com.flower.conntrack.whiteblacklist.ImmutableHostRecord;
@@ -17,12 +21,15 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.AnchorPane;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 
@@ -39,9 +46,9 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     final static String BLACKLIST = "Blacklist";
 
     public static class CapturedRequest {
-        final String host;
-        final Integer port;
-        final AddressCheck filterResult;
+        private final String host;
+        private final Integer port;
+        private final AddressCheck filterResult;
 
         public CapturedRequest(String host, Integer port, AddressCheck filterResult) {
             this.host = host;
@@ -51,9 +58,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
         public String getHost() { return host; }
 
-        public int port() { return port; }
-
-        public String getPort() { return port > 0 ? Integer.toString(port) : ""; }
+        public int getPort() { return port; }
 
         public String getFilterResult() {
             return filterResult == AddressCheck.CONNECTION_ALLOWED ? "Allowed" : "Prohibited";
@@ -105,13 +110,13 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 throw new IllegalStateException("Either addressRecord or hostRecord or portRecord should be not null");
             }
         }
-        public Integer getPort() {
+        public String getPort() {
             if (addressRecord != null) {
-                return addressRecord.dstPort();
+                return Integer.toString(addressRecord.dstPort());
             } else if (hostRecord != null) {
-                return -1;
+                return "";
             } else if (portRecord != null) {
-                return portRecord.dstPort();
+                return Integer.toString(portRecord.dstPort());
             } else {
                 throw new IllegalStateException("Either addressRecord or hostRecord or portRecord should be not null");
             }
@@ -125,6 +130,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     final ObservableList<CapturedRequest> capturedRequests;
     @Nullable @FXML TableView<TrafficRule> trafficRulesTable;
     final ObservableList<TrafficRule> trafficRules;
+    @Nullable @FXML TextField maxRequests;
 
     final WhitelistBlacklistConnectionFilter innerFilter;
 
@@ -171,6 +177,13 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         if (checkNotNull(captureRequestsCheckBox).selectedProperty().get()) {
             CapturedRequest capturedRequest = new CapturedRequest(dstHost, dstPort, checkResult);
             capturedRequests.add(capturedRequest);
+            try {
+                int max = Integer.parseInt(checkNotNull(maxRequests).textProperty().get());
+                while (capturedRequests.size() > max) {
+                    capturedRequests.remove(0);
+                }
+            } catch (Exception e) {}
+
             checkNotNull(capturedRequestsTable).refresh();
         }
 
@@ -190,7 +203,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         if (capturedRequest != null) {
             AddressRecord addressRecord = ImmutableAddressRecord.builder()
                     .dstHost(capturedRequest.getHost())
-                    .dstPort(capturedRequest.port())
+                    .dstPort(capturedRequest.getPort())
                     .filterType(FilterType.WHITELIST)
                     .build();
             innerFilter.addAddressRecord(addressRecord, true);
@@ -203,7 +216,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         if (capturedRequest != null) {
             AddressRecord addressRecord = ImmutableAddressRecord.builder()
                     .dstHost(capturedRequest.getHost())
-                    .dstPort(capturedRequest.port())
+                    .dstPort(capturedRequest.getPort())
                     .filterType(FilterType.BLACKLIST)
                     .build();
             innerFilter.addAddressRecord(addressRecord, true);
@@ -239,7 +252,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
         if (capturedRequest != null) {
             PortRecord portRecord = ImmutablePortRecord.builder()
-                    .dstPort(capturedRequest.port())
+                    .dstPort(capturedRequest.getPort())
                     .filterType(FilterType.WHITELIST)
                     .build();
             innerFilter.addPortRecord(portRecord, true);
@@ -251,7 +264,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
         if (capturedRequest != null) {
             PortRecord portRecord = ImmutablePortRecord.builder()
-                    .dstPort(capturedRequest.port())
+                    .dstPort(capturedRequest.getPort())
                     .filterType(FilterType.BLACKLIST)
                     .build();
             innerFilter.addPortRecord(portRecord, true);
@@ -341,11 +354,93 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         refreshContent();
     }
 
+    FilterType flipFilterType(FilterType type) {
+        switch (type) {
+            case BLACKLIST: return FilterType.WHITELIST;
+            case WHITELIST: return FilterType.BLACKLIST;
+            default: throw new IllegalArgumentException("FilterType should be either Blacklist or Whitelist");
+        }
+    }
+
+    public void flipRule() {
+        TrafficRule trafficRule = checkNotNull(trafficRulesTable).getSelectionModel().getSelectedItem();
+        if (trafficRule != null) {
+            if (trafficRule.addressRecord != null) {
+                innerFilter.addAddressRecord(ImmutableAddressRecord.builder()
+                        .dstHost(trafficRule.addressRecord.dstHost())
+                        .dstPort(trafficRule.addressRecord.dstPort())
+                        .filterType(flipFilterType(trafficRule.addressRecord.filterType()))
+                        .build(),
+                        true);
+            } else if (trafficRule.hostRecord != null) {
+                innerFilter.removeHostRecord(trafficRule.hostRecord);
+                innerFilter.addHostRecord(ImmutableHostRecord.builder()
+                        .dstHost(trafficRule.hostRecord.dstHost())
+                        .filterType(flipFilterType(trafficRule.hostRecord.filterType()))
+                        .build(),
+                        true);
+            } else if (trafficRule.portRecord != null) {
+                innerFilter.removePortRecord(trafficRule.portRecord);
+                innerFilter.addPortRecord(ImmutablePortRecord.builder()
+                        .dstPort(trafficRule.portRecord.dstPort())
+                        .filterType(flipFilterType(trafficRule.portRecord.filterType()))
+                        .build(),
+                        true);
+            }
+        }
+        refreshContent();
+    }
+
     public void saveRules() {
-        //
+        try {
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Traffic filter ruleset (*.rls)", "*.rls"));
+            fileChooser.setTitle("Save Traffic filter ruleset");
+            File configFile = fileChooser.showSaveDialog(checkNotNull(stage));
+
+            if (configFile != null) {
+                if (!configFile.getName().endsWith(".rls")) {
+                    configFile = new File(configFile.getPath()  + ".rls");
+                }
+                AddressFilterList addressFilterList = innerFilter.getFullList();
+
+                ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
+                        .registerModule(new GuavaModule());
+                mapper.writeValue(configFile, addressFilterList);
+
+                Alert alert = new Alert(Alert.AlertType.INFORMATION, "Traffic filter ruleset saved to : " + configFile.getPath(), ButtonType.OK);
+                LOGGER.error("Traffic filter ruleset saved to : " + configFile.getPath());
+                alert.showAndWait();
+            }
+        } catch (Exception e) {
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Error saving Traffic filter ruleset: " + e, ButtonType.OK);
+            LOGGER.error("Error saving Traffic filter ruleset: ", e);
+            alert.showAndWait();
+        }
     }
 
     public void loadRules() {
-        //
+        try {
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Traffic filter ruleset (*.rls)", "*.rls"));
+            fileChooser.setTitle("Open Traffic filter ruleset");
+
+            File configFile = fileChooser.showOpenDialog(checkNotNull(stage));
+
+            if (configFile != null) {
+                ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
+                        .registerModule(new GuavaModule());
+
+                AddressFilterList addressFilterList = mapper.readValue(configFile, AddressFilterList.class);
+
+                innerFilter.clear();
+                innerFilter.addList(addressFilterList, true);
+            }
+            refreshContent();
+        } catch (Exception e) {
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Error loading config file: " + e, ButtonType.OK);
+            LOGGER.error("Error loading config file: ", e);
+            alert.showAndWait();
+        }
     }
 }

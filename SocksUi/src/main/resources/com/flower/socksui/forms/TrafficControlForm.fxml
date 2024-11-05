@@ -10,6 +10,7 @@
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.TitledPane?>
 <?import javafx.scene.control.ToolBar?>
 <?import javafx.scene.control.cell.PropertyValueFactory?>
@@ -47,11 +48,13 @@
                                  <children>
                                     <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                        <items>
-                                          <Button mnemonicParsing="false" text="New rule" onAction="#newRule" />
-                                          <Button mnemonicParsing="false" text="Remove rule" onAction="#removeRule" />
+                                          <Button mnemonicParsing="false" onAction="#newRule" text="New rule" />
+                                          <Button mnemonicParsing="false" onAction="#removeRule" text="Remove rule" />
                                           <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                          <Button mnemonicParsing="false" text="Save rules to file" onAction="#saveRules" />
-                                          <Button mnemonicParsing="false" text="Load rules from file" onAction="#loadRules" />
+                                          <Button mnemonicParsing="false" onAction="#flipRule" text="Flip rule" />
+                                          <Separator orientation="VERTICAL" prefHeight="200.0" />
+                                          <Button mnemonicParsing="false" onAction="#saveRules" text="Save rules to file" />
+                                          <Button mnemonicParsing="false" onAction="#loadRules" text="Load rules from file" />
                                        </items>
                                     </ToolBar>
                                  </children>
@@ -98,6 +101,7 @@
                                 <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                     <items>
                                         <CheckBox fx:id="captureRequestsCheckBox" mnemonicParsing="false" text="Capture requests" />
+                                        <TextField fx:id="maxRequests" prefHeight="26.0" prefWidth="60.0" text="50" />
                                         <Button mnemonicParsing="false" onAction="#clearCapturedData" text="Clear" />
                                         <Separator orientation="VERTICAL" prefHeight="200.0" />
                                         <Button mnemonicParsing="false" onAction="#whitelistCapture" text="Whitelist" />

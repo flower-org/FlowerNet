@@ -129,6 +129,13 @@ public class WhitelistBlacklistConnectionFilter implements ConnectionListenerAnd
         return portRecords.remove(port);
     }
 
+    public void clear() {
+        addressLists.clear();
+        addressRecords.clear();
+        hostRecords.clear();
+        portRecords.clear();
+    }
+
     public AddressFilterList getFullList() {
         List<AddressRecord> addressRecords = new ArrayList<>();
         List<HostRecord> hostRecords = new ArrayList<>();

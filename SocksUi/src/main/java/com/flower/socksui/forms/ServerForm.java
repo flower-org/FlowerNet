@@ -32,17 +32,21 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.io.StringWriter;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.prefs.Preferences;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class ServerForm extends AnchorPane implements Refreshable, ProxyChainProvider {
     final static Logger LOGGER = LoggerFactory.getLogger(ServerForm.class);
+
+    final static String PROXY_CHAIN_AND_SERVERS_PREF = "proxyChainAndServersPref";
 
     final ReentrantLock startLock;
     final MainApp mainApp;
@@ -89,6 +93,24 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
 
         socksChain = FXCollections.observableArrayList();
         checkNotNull(socksChainTable).itemsProperty().set(socksChain);
+
+        try {
+            Preferences userPreferences = Preferences.userRoot();
+            String trafficRules = userPreferences.get(PROXY_CHAIN_AND_SERVERS_PREF, "");
+            ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
+                    .registerModule(new GuavaModule());
+            ChainConfiguration chainConfiguration = mapper.readValue(trafficRules, ChainConfiguration.class);
+
+            knownServers.clear();
+            knownServers.addAll(chainConfiguration.knownProxyServers().stream().map(FXSocksNode::new).toList());
+            checkNotNull(knownServersTable).itemsProperty().set(knownServers);
+
+            socksChain.clear();
+            socksChain.addAll(chainConfiguration.proxyChain().stream().map(FXSocksNode::new).toList());
+            checkNotNull(socksChainTable).itemsProperty().set(socksChain);
+        } catch (Exception e) {}
+
+        refreshContent();
     }
 
     public void addConnectionListenerAndFilter(ConnectionListenerAndFilter connectionListenerAndFilter) {
@@ -175,6 +197,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
             LOGGER.error("Error adding known server: ", e);
             alert.showAndWait();
         }
+        refreshContent();
     }
 
     public void editServer() {
@@ -213,6 +236,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
             LOGGER.error("Error adding known server: ", e);
             alert.showAndWait();
         }
+        refreshContent();
     }
 
     public void deleteServer() {
@@ -227,6 +251,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
             LOGGER.error("Error deleting known server: ", e);
             alert.showAndWait();
         }
+        refreshContent();
     }
 
     public void addServerToChain() {
@@ -241,6 +266,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
             LOGGER.error("Error deleting known server: ", e);
             alert.showAndWait();
         }
+        refreshContent();
     }
 
     public void removeServerFromChain() {
@@ -255,6 +281,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
             LOGGER.error("Error removing server from chain: ", e);
             alert.showAndWait();
         }
+        refreshContent();
     }
 
     public void clearServerChain() {
@@ -266,6 +293,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
             LOGGER.error("Error clearing server chain: ", e);
             alert.showAndWait();
         }
+        refreshContent();
     }
 
     public void moveServerUpInChain() {
@@ -282,6 +310,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
             LOGGER.error("Error moving server up in chain: ", e);
             alert.showAndWait();
         }
+        refreshContent();
     }
 
     public void moveServerDownInChain() {
@@ -298,11 +327,27 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
             LOGGER.error("Error moving server down in chain: ", e);
             alert.showAndWait();
         }
+        refreshContent();
     }
 
     @Override
     public void refreshContent() {
-        // TODO:
+        try {
+            ChainConfiguration config = ImmutableChainConfiguration.builder()
+                    .knownProxyServers(knownServers.stream().map(f -> f.node).toList())
+                    .proxyChain(socksChain.stream().map(f -> f.node).toList())
+                    .build();
+
+            StringWriter writer = new StringWriter();
+            ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
+                    .registerModule(new GuavaModule());
+            mapper.writeValue(writer, config);
+
+            String trafficRules = writer.toString();
+
+            Preferences userPreferences = Preferences.userRoot();
+            userPreferences.put(PROXY_CHAIN_AND_SERVERS_PREF, trafficRules);
+        } catch (Exception e) {}
     }
 
     public void notImplemented() {
@@ -341,6 +386,8 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
             }
         }
         checkNotNull(socksChainTable).refresh();
+
+        refreshContent();
     }
 
     @Override
@@ -406,5 +453,6 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
             LOGGER.error("Error loading config file: ", e);
             alert.showAndWait();
         }
+        refreshContent();
     }
 }

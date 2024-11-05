@@ -31,7 +31,9 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.io.StringWriter;
 import java.util.Map;
+import java.util.prefs.Preferences;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.flower.conntrack.whiteblacklist.AddressFilterList.AddressRecord;
@@ -40,6 +42,7 @@ import static com.flower.conntrack.whiteblacklist.AddressFilterList.PortRecord;
 
 public class TrafficControlForm extends AnchorPane implements Refreshable, ConnectionListenerAndFilter {
     final static Logger LOGGER = LoggerFactory.getLogger(TrafficControlForm.class);
+    final static String TRAFFIC_RULES_PREF = "trafficRulesPref";
 
     final static String OFF = "Off";
     final static String WHITELIST = "Whitelist";
@@ -156,6 +159,17 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
         trafficRules = FXCollections.observableArrayList();
         checkNotNull(trafficRulesTable).itemsProperty().set(trafficRules);
+
+        try {
+            Preferences userPreferences = Preferences.userRoot();
+            String trafficRules = userPreferences.get(TRAFFIC_RULES_PREF, "");
+            ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
+                    .registerModule(new GuavaModule());
+            AddressFilterList addressFilterList = mapper.readValue(trafficRules, AddressFilterList.class);
+
+            innerFilter.clear();
+            innerFilter.addList(addressFilterList, true);
+        } catch (Exception e) {}
 
         refreshContent();
     }
@@ -296,6 +310,20 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         .forEach(trafficRules::add);
 
         checkNotNull(trafficRulesTable).refresh();
+
+        try {
+            AddressFilterList addressFilterList = innerFilter.getFullList();
+
+            StringWriter writer = new StringWriter();
+            ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
+                    .registerModule(new GuavaModule());
+            mapper.writeValue(writer, addressFilterList);
+
+            String filterList = writer.getBuffer().toString();
+
+            Preferences userPreferences = Preferences.userRoot();
+            userPreferences.put(TRAFFIC_RULES_PREF, filterList);
+        } catch (Exception e) {}
     }
 
     public void newRule() {

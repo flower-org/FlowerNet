@@ -1,6 +1,7 @@
 package com.flower.socksserver;
 
 import com.flower.conntrack.ConnectionListenerAndFilter;
+import com.flower.conntrack.Destination;
 import com.flower.utils.NonDnsHostnameChecker;
 import com.flower.utils.ServerUtil;
 import com.google.common.base.Preconditions;
@@ -22,11 +23,12 @@ import org.slf4j.LoggerFactory;
 import com.flower.conntrack.ConnectionId;
 
 import javax.annotation.Nullable;
-import java.util.List;
+import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 import static com.flower.conntrack.ConnectionAttributes.CONNECTION_ID_KEY;
+import static com.flower.conntrack.ConnectionAttributes.DESTINATION_KEY;
 import static com.flower.conntrack.ConnectionAttributes.getConnectionInfo;
 
 @ChannelHandler.Sharable
@@ -37,11 +39,11 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
 
     final boolean allowDirectAccessByIpAddress;
     final Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider;
-    @Nullable final List<ConnectionListenerAndFilter> connectionListenerAndFilters;
+    @Nullable final Collection<ConnectionListenerAndFilter> connectionListenerAndFilters;
 
     public SocksServerHandler(boolean allowDirectAccessByIpAddress,
                               Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider,
-                              @Nullable List<ConnectionListenerAndFilter> connectionListenerAndFilters) {
+                              @Nullable Collection<ConnectionListenerAndFilter> connectionListenerAndFilters) {
         this.allowDirectAccessByIpAddress = allowDirectAccessByIpAddress;
         this.connectHandlerProvider = connectHandlerProvider;
         this.connectionListenerAndFilters = connectionListenerAndFilters;
@@ -58,7 +60,11 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
 
                 Socks4CommandRequest socksV4CmdRequest = (Socks4CommandRequest) socksRequest;
                 if (socksV4CmdRequest.type() == Socks4CommandType.CONNECT) {
-                    if (approveConnection(socksV4CmdRequest.dstAddr(), socksV4CmdRequest.dstPort()) == AddressCheck.CONNECTION_PROHIBITED) {
+                    if (!ctx.channel().hasAttr(DESTINATION_KEY)) {
+                        ctx.channel().attr(DESTINATION_KEY).set(new Destination(socksV4CmdRequest.dstAddr(), socksV4CmdRequest.dstPort()));
+                    }
+
+                    if (approveConnection(socksV4CmdRequest.dstAddr(), socksV4CmdRequest.dstPort()) == AddressCheck.CONNECTION_ALLOWED) {
                         ctx.pipeline().addLast(connectHandlerProvider.get());
                         ctx.pipeline().remove(this);
                         ctx.fireChannelRead(socksRequest);
@@ -92,6 +98,10 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
                 } else if (socksRequest instanceof Socks5CommandRequest) {
                     final Socks5CommandRequest socks5CmdRequest = (Socks5CommandRequest)socksRequest;
                     if (socks5CmdRequest.type() == Socks5CommandType.CONNECT) {
+                        if (!ctx.channel().hasAttr(DESTINATION_KEY)) {
+                            ctx.channel().attr(DESTINATION_KEY).set(new Destination(socks5CmdRequest.dstAddr(), socks5CmdRequest.dstPort()));
+                        }
+
                         if (approveConnection(socks5CmdRequest.dstAddr(), socks5CmdRequest.dstPort()) == AddressCheck.CONNECTION_ALLOWED) {
                             ctx.pipeline().addLast(connectHandlerProvider.get());
                             ctx.pipeline().remove(this);

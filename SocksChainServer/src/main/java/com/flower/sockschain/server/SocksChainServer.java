@@ -36,7 +36,7 @@ public final class SocksChainServer {
         SslContext sslCtx = isSocks5OverTls ? FlowerSslContextBuilder.buildSslContext() : null;
 
         SocksServer server = new SocksServer(ALLOW_DIRECT_IP_ACCESS,
-                () -> new SocksChainServerConnectHandler(HARDCODED_CHAIN_PROVIDER), null);
+                () -> new SocksChainServerConnectHandler(HARDCODED_CHAIN_PROVIDER));
         try {
             LOGGER.info("Starting on port {} TLS: {}", port, isSocks5OverTls);
             server.startServer(port, sslCtx)

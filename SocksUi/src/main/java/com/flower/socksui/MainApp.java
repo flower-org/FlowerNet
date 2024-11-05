@@ -2,7 +2,6 @@ package com.flower.socksui;
 
 import com.flower.socksui.forms.ServerForm;
 import com.flower.socksui.forms.TrafficControlForm;
-import javafx.event.Event;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
@@ -60,6 +59,8 @@ public class MainApp {
     public void showTabs() {
         openServerTab();
         openTrafficControlTab();
+
+        checkNotNull(serverForm).addConnectionListenerAndFilter(checkNotNull(trafficControlForm));
 
         checkNotNull(tabs).getSelectionModel().select(0);
     }

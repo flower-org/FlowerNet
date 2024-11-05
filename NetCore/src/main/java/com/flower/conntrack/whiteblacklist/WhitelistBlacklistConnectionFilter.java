@@ -24,13 +24,33 @@ public class WhitelistBlacklistConnectionFilter implements ConnectionListenerAnd
     //Priority 2
     final Map<Integer, PortRecord> portRecords;
 
-    final FilterType filterType;
+    volatile FilterType filterType;
 
     public WhitelistBlacklistConnectionFilter(FilterType filterType, List<Pair<AddressFilterList, Boolean>> addressLists) {
         this(filterType);
         for (Pair<AddressFilterList, Boolean> listPair : addressLists) {
             addList(listPair.getKey(), listPair.getValue());
         }
+    }
+
+    public Map<String, Map<Integer, AddressRecord>> getAddressRecords() {
+        return addressRecords;
+    }
+
+    public Map<String, HostRecord> getHostRecords() {
+        return hostRecords;
+    }
+
+    public Map<Integer, PortRecord> getPortRecords() {
+        return portRecords;
+    }
+
+    public FilterType filterType() {
+        return filterType;
+    }
+
+    public void setFilterType(FilterType filterType) {
+        this.filterType = filterType;
     }
 
     public WhitelistBlacklistConnectionFilter(FilterType filterType) {
@@ -79,6 +99,10 @@ public class WhitelistBlacklistConnectionFilter implements ConnectionListenerAnd
         }
     }
 
+    public @Nullable AddressRecord removeAddressRecord(AddressRecord addressRecord) {
+        return removeAddressRecord(addressRecord.dstHost(), addressRecord.dstPort());
+    }
+
     public @Nullable AddressRecord removeAddressRecord(String host, Integer port) {
         Map<Integer, AddressRecord> portMap = addressRecords.get(host);
         if (portMap == null) {
@@ -89,8 +113,16 @@ public class WhitelistBlacklistConnectionFilter implements ConnectionListenerAnd
         }
     }
 
+    public @Nullable HostRecord removeHostRecord(HostRecord hostRecord) {
+        return removeHostRecord(hostRecord.dstHost());
+    }
+
     public @Nullable HostRecord removeHostRecord(String host) {
         return hostRecords.remove(host);
+    }
+
+    public @Nullable PortRecord removePortRecord(PortRecord portRecord) {
+        return removePortRecord(portRecord.dstPort());
     }
 
     public @Nullable PortRecord removePortRecord(Integer port) {
@@ -187,7 +219,10 @@ public class WhitelistBlacklistConnectionFilter implements ConnectionListenerAnd
     //TODO: simplify and DRY
     @Override
     public AddressCheck approveConnection(String dstHost, int dstPort) {
-        if (filterType == FilterType.WHITELIST) {
+        if (filterType == FilterType.OFF) {
+            // If filtering is off, we allow all connections
+            return AddressCheck.CONNECTION_ALLOWED;
+        } else if (filterType == FilterType.WHITELIST) {
             // ---------------------------------- WHITELIST ----------------------------------
             // Priority 1 - exact hostname/port match
             Map<Integer, AddressRecord> portMap = addressRecords.get(dstHost);

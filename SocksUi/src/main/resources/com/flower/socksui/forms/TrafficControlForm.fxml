@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import java.lang.String?>
+<?import javafx.collections.FXCollections?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ComboBox?>
@@ -19,15 +21,23 @@
          <children>
             <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                <items>
-                  <Label text="Mode:" />
-                  <ComboBox prefWidth="150.0" />
+                  <Label text="Filtering mode:" />
+                   <ComboBox fx:id="filteringModeComboBox" onAction="#filteringModeChanged" value="Whitelist" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="24.0" AnchorPane.rightAnchor="24.0" AnchorPane.topAnchor="10.0">
+                       <items>
+                           <FXCollections fx:factory="observableArrayList">
+                               <String fx:value="Whitelist" />
+                               <String fx:value="Blacklist" />
+                               <String fx:value="Off" />
+                           </FXCollections>
+                       </items>
+                   </ComboBox>
                </items>
             </ToolBar>
          </children>
       </AnchorPane>
       <AnchorPane>
          <children>
-            <TitledPane animated="false" text="Filter" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+            <TitledPane animated="false" text="Filter rules" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                <content>
                   <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                      <children>
@@ -37,30 +47,34 @@
                                  <children>
                                     <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                        <items>
-                                          <Button mnemonicParsing="false" text="Add" />
-                                          <Button mnemonicParsing="false" text="Remove" />
+                                          <Button mnemonicParsing="false" text="New rule" onAction="#newRule" />
+                                          <Button mnemonicParsing="false" text="Remove rule" onAction="#removeRule" />
                                           <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                          <Button mnemonicParsing="false" text="Save to file" />
-                                          <Button mnemonicParsing="false" text="Load from file" />
+                                          <Button mnemonicParsing="false" text="Save rules to file" onAction="#saveRules" />
+                                          <Button mnemonicParsing="false" text="Load rules from file" onAction="#loadRules" />
                                        </items>
                                     </ToolBar>
                                  </children>
                               </AnchorPane>
                               <AnchorPane>
                                  <children>
-                                    <TableView fx:id="chatTable1" prefHeight="200.0" prefWidth="200.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                    <TableView fx:id="trafficRulesTable" prefHeight="200.0" prefWidth="200.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                        <columns>
-                                          <TableColumn fx:id="messageIdColumn1" minWidth="150.0" prefWidth="150.0" text="MessageId">
+                                          <TableColumn minWidth="150.0" prefWidth="150.0" text="Host">
                                              <cellValueFactory>
-                                                <PropertyValueFactory property="messageId" />
+                                                <PropertyValueFactory property="host" />
                                              </cellValueFactory>
                                           </TableColumn>
-                                          <TableColumn minWidth="200.0" prefWidth="200.0" text="Username">
-                                             <cellValueFactory>
-                                                <PropertyValueFactory property="username" />
-                                             </cellValueFactory>
-                                          </TableColumn>
-                                          <TableColumn fx:id="messageColumn1" minWidth="500.0" prefWidth="500.0" text="Message" />
+                                          <TableColumn minWidth="200.0" prefWidth="200.0" text="Port">
+                                               <cellValueFactory>
+                                                   <PropertyValueFactory property="port" />
+                                               </cellValueFactory>
+                                           </TableColumn>
+                                           <TableColumn minWidth="500.0" prefWidth="500.0" text="FilterType">
+                                               <cellValueFactory>
+                                                   <PropertyValueFactory property="filterType" />
+                                               </cellValueFactory>
+                                           </TableColumn>
                                        </columns>
                                     </TableView>
                                  </children>
@@ -83,28 +97,39 @@
                             <children>
                                 <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                     <items>
-                                    <CheckBox mnemonicParsing="false" text="Capture requests" />
-                                    <Button mnemonicParsing="false" text="Clear" />
-                                    <Button mnemonicParsing="false" text="Allow" />
-                                    <Button mnemonicParsing="false" text="Prohibit" />
+                                        <CheckBox fx:id="captureRequestsCheckBox" mnemonicParsing="false" text="Capture requests" />
+                                        <Button mnemonicParsing="false" onAction="#clearCapturedData" text="Clear" />
+                                        <Separator orientation="VERTICAL" prefHeight="200.0" />
+                                        <Button mnemonicParsing="false" onAction="#whitelistCapture" text="Whitelist" />
+                                        <Button mnemonicParsing="false" onAction="#blacklistCapture" text="Blacklist" />
+                                        <Separator orientation="VERTICAL" prefHeight="200.0" />
+                                        <Button mnemonicParsing="false" onAction="#whitelistCaptureHost" text="Whitelist host" />
+                                        <Button mnemonicParsing="false" onAction="#blacklistCaptureHost" text="Blacklist host" />
+                                        <Separator orientation="VERTICAL" prefHeight="200.0" />
+                                        <Button mnemonicParsing="false" onAction="#whitelistCapturePort" text="Whitelist port" />
+                                        <Button mnemonicParsing="false" onAction="#blacklistCapturePort" text="Blacklist port" />
                                     </items>
                                 </ToolBar>
                             </children>
                         </AnchorPane>
                         <AnchorPane>
-                            <TableView fx:id="chatTable" prefHeight="200.0" prefWidth="200.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                            <TableView fx:id="capturedRequestsTable" prefHeight="200.0" prefWidth="200.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                 <columns>
-                                    <TableColumn fx:id="messageIdColumn" minWidth="150.0" prefWidth="150.0" text="MessageId">
+                                    <TableColumn minWidth="200.0" prefWidth="200.0" text="Host">
                                         <cellValueFactory>
-                                            <PropertyValueFactory property="messageId" />
+                                            <PropertyValueFactory property="host" />
                                         </cellValueFactory>
                                     </TableColumn>
-                                    <TableColumn minWidth="200.0" prefWidth="200.0" text="Username">
+                                    <TableColumn minWidth="100.0" prefWidth="100.0" text="Port">
                                         <cellValueFactory>
-                                            <PropertyValueFactory property="username" />
+                                            <PropertyValueFactory property="port" />
                                         </cellValueFactory>
                                     </TableColumn>
-                                    <TableColumn fx:id="messageColumn" minWidth="500.0" prefWidth="500.0" text="Message" />
+                                    <TableColumn minWidth="500.0" prefWidth="500.0" text="Filter result">
+                                        <cellValueFactory>
+                                            <PropertyValueFactory property="filterResult" />
+                                        </cellValueFactory>
+                                    </TableColumn>
                                 </columns>
                             </TableView>
                         </AnchorPane>

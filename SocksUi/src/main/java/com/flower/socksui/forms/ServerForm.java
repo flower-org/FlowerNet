@@ -3,6 +3,7 @@ package com.flower.socksui.forms;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
+import com.flower.conntrack.ConnectionListenerAndFilter;
 import com.flower.sockschain.config.ProxyChainProvider;
 import com.flower.sockschain.config.SocksNode;
 import com.flower.sockschain.server.SocksChainServerConnectHandler;
@@ -54,7 +55,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
     @Nullable @FXML CheckBox uniqueServersCheckBox;
 
     @Nullable Stage stage;
-    @Nullable SocksServer server;
+    SocksServer server;
 
     @FXML @Nullable TableView<FXSocksNode> knownServersTable;
     final ObservableList<FXSocksNode> knownServers;
@@ -81,14 +82,17 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
         }
 
         server = new SocksServer(false,
-                () -> new SocksChainServerConnectHandler(this),
-                null);
+                () -> new SocksChainServerConnectHandler(this));
 
         knownServers = FXCollections.observableArrayList();
         checkNotNull(knownServersTable).itemsProperty().set(knownServers);
 
         socksChain = FXCollections.observableArrayList();
         checkNotNull(socksChainTable).itemsProperty().set(socksChain);
+    }
+
+    public void addConnectionListenerAndFilter(ConnectionListenerAndFilter connectionListenerAndFilter) {
+        server.addConnectionListenerAndFilter(connectionListenerAndFilter);
     }
 
     public void startServer() throws InterruptedException {

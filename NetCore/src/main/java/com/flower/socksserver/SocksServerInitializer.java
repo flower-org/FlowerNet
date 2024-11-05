@@ -9,19 +9,19 @@ import io.netty.handler.codec.socksx.SocksPortUnificationServerHandler;
 import io.netty.handler.ssl.SslContext;
 
 import javax.annotation.Nullable;
-import java.util.List;
+import java.util.Collection;
 import java.util.function.Supplier;
 
 public final class SocksServerInitializer extends ChannelInitializer<SocketChannel> {
     final Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider;
     private final boolean allowDirectAccessByIpAddress;
     @Nullable private final SslContext sslCtx;
-    @Nullable private final List<ConnectionListenerAndFilter> connectionListenerAndFilters;
+    @Nullable private final Collection<ConnectionListenerAndFilter> connectionListenerAndFilters;
 
     public SocksServerInitializer(Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider,
                                   boolean allowDirectAccessByIpAddress,
                                   @Nullable SslContext sslCtx,
-                                  @Nullable List<ConnectionListenerAndFilter> connectionListenerAndFilters) {
+                                  @Nullable Collection<ConnectionListenerAndFilter> connectionListenerAndFilters) {
         this.allowDirectAccessByIpAddress = allowDirectAccessByIpAddress;
         this.connectHandlerProvider = connectHandlerProvider;
         this.sslCtx = sslCtx;

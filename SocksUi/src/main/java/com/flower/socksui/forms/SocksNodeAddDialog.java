@@ -87,7 +87,7 @@ public class SocksNodeAddDialog extends VBox {
             }
 
             if (StringUtils.isBlank(socksType)) {
-                Alert alert = new Alert(Alert.AlertType.INFORMATION, "Please specify item name", ButtonType.OK);
+                Alert alert = new Alert(Alert.AlertType.INFORMATION, "Please specify SOCKS type", ButtonType.OK);
                 alert.showAndWait();
             } else if (StringUtils.isBlank(host)) {
                 Alert alert = new Alert(Alert.AlertType.INFORMATION, "Please specify host " + host, ButtonType.OK);

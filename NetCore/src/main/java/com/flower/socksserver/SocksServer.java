@@ -13,7 +13,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
+import java.util.Vector;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -23,22 +28,29 @@ public final class SocksServer {
 
     final boolean allowDirectAccessByIpAddress;
     final Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider;
-    @Nullable final List<ConnectionListenerAndFilter> connectionListenerAndFilters;
+    final Deque<ConnectionListenerAndFilter> connectionListenerAndFilters;
 
     @Nullable EventLoopGroup bossGroup;
     @Nullable EventLoopGroup workerGroup;
 
     public SocksServer(boolean allowDirectAccessByIpAddress,
-                       Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider,
-                       @Nullable List<ConnectionListenerAndFilter> connectionListenerAndFilters) {
+                       Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider) {
         this.allowDirectAccessByIpAddress = allowDirectAccessByIpAddress;
         this.connectHandlerProvider = connectHandlerProvider;
-        this.connectionListenerAndFilters = connectionListenerAndFilters;
+        this.connectionListenerAndFilters = new LinkedBlockingDeque<>();
     }
 
     public void shutdownServer() {
         checkNotNull(bossGroup).shutdownGracefully();
         checkNotNull(workerGroup).shutdownGracefully();
+    }
+
+    public void addConnectionListenerAndFilter(ConnectionListenerAndFilter filter) {
+        connectionListenerAndFilters.add(filter);
+    }
+
+    public void removeConnectionListenerAndFilter(ConnectionListenerAndFilter filter) {
+        connectionListenerAndFilters.remove(filter);
     }
 
     public ChannelFuture startServer(int port, @Nullable SslContext sslCtx) {

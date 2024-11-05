@@ -15,7 +15,6 @@
  */
 package com.flower.socks5s;
 
-import com.flower.conntrack.Destination;
 import com.flower.handlers.RelayHandler;
 import com.flower.utils.ServerUtil;
 import io.netty.bootstrap.Bootstrap;
@@ -44,7 +43,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.NoSuchElementException;
 
-import static com.flower.conntrack.ConnectionAttributes.DESTINATION_KEY;
 import static com.flower.conntrack.ConnectionAttributes.getConnectionInfo;
 import static com.flower.utils.ServerUtil.showPipeline;
 
@@ -87,8 +85,6 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                     .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
                     .option(ChannelOption.SO_KEEPALIVE, true)
                     .handler(new DirectClientHandler(promise));
-
-            ctx.channel().attr(DESTINATION_KEY).set(new Destination(request.dstAddr(), request.dstPort()));
 
             b.connect(request.dstAddr(), request.dstPort()).addListener((ChannelFutureListener) future -> {
                 if (future.isSuccess()) {
@@ -160,8 +156,6 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                     .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
                     .option(ChannelOption.SO_KEEPALIVE, true)
                     .handler(new DirectClientHandler(promise));
-
-            ctx.channel().attr(DESTINATION_KEY).set(new Destination(request.dstAddr(), request.dstPort()));
 
             b.connect(request.dstAddr(), request.dstPort()).addListener((ChannelFutureListener) future -> {
                 if (future.isSuccess()) {

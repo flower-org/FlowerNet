@@ -218,6 +218,22 @@ public class PkiUtil {
         }
     }
 
+    public static Key getKeyFromKeyStore(KeyStore keyStore, String alias) {
+        try {
+            return keyStore.getKey(alias, null);
+        } catch (NoSuchAlgorithmException | KeyStoreException | UnrecoverableKeyException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static Certificate getCertificateFromKeyStore(KeyStore keyStore, String alias) {
+        try {
+            return keyStore.getCertificate(alias);
+        } catch (KeyStoreException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static void enumerateKeyStore(KeyStore keyStore, boolean outputKeysInPem, boolean outputCertsInPem) {
         try {
             Enumeration<String> aliases = keyStore.aliases();

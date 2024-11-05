@@ -1,11 +1,16 @@
 package com.flower.socksui.forms;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.datatype.guava.GuavaModule;
 import com.flower.sockschain.config.ProxyChainProvider;
 import com.flower.sockschain.config.SocksNode;
 import com.flower.sockschain.server.SocksChainServerConnectHandler;
 import com.flower.socksserver.SocksServer;
 import com.flower.socksui.MainApp;
 import com.flower.socksui.ModalWindow;
+import com.flower.socksui.chainconf.ChainConfiguration;
+import com.flower.socksui.chainconf.ImmutableChainConfiguration;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -18,11 +23,13 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.AnchorPane;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
@@ -139,7 +146,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
 
     public void newServer() {
         try {
-            SocksNodeAddDialog socksNodeAddDialog = new SocksNodeAddDialog();
+            SocksNodeAddDialog socksNodeAddDialog = new SocksNodeAddDialog(null);
             Stage workspaceStage = ModalWindow.showModal(checkNotNull(mainApp.getMainStage()),
                     stage -> { socksNodeAddDialog.setStage(stage); return socksNodeAddDialog; },
                     "Add new server");
@@ -159,6 +166,44 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
                         }
                     }
             );
+        } catch (Exception e) {
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Error adding known server: " + e, ButtonType.OK);
+            LOGGER.error("Error adding known server: ", e);
+            alert.showAndWait();
+        }
+    }
+
+    public void editServer() {
+        try {
+            FXSocksNode selectedSocksNode = checkNotNull(knownServersTable).getSelectionModel().getSelectedItem();
+            int selectedIndex = checkNotNull(knownServersTable).getSelectionModel().getSelectedIndex();
+            if (selectedSocksNode != null) {
+                SocksNodeAddDialog socksNodeAddDialog = new SocksNodeAddDialog(selectedSocksNode);
+                Stage workspaceStage = ModalWindow.showModal(checkNotNull(mainApp.getMainStage()),
+                        stage -> {
+                            socksNodeAddDialog.setStage(stage);
+                            return socksNodeAddDialog;
+                        },
+                        "Edit server");
+
+                workspaceStage.setOnHidden(
+                        ev -> {
+                            try {
+                                SocksNode socksNode = socksNodeAddDialog.getSocksNode();
+                                if (socksNode != null) {
+                                    knownServers.remove(selectedIndex);
+                                    knownServers.add(selectedIndex, new FXSocksNode(socksNode));
+                                    checkNotNull(knownServersTable).refresh();
+                                    refreshContent();
+                                }
+                            } catch (Exception e) {
+                                Alert alert = new Alert(Alert.AlertType.ERROR, "Error editing known server: " + e, ButtonType.OK);
+                                LOGGER.error("Error editing known server: ", e);
+                                alert.showAndWait();
+                            }
+                        }
+                );
+            }
         } catch (Exception e) {
             Alert alert = new Alert(Alert.AlertType.ERROR, "Error adding known server: " + e, ButtonType.OK);
             LOGGER.error("Error adding known server: ", e);
@@ -297,5 +342,65 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
     @Override
     public List<SocksNode> getProxyChain() {
         return socksChain.stream().map(fx -> (SocksNode)fx).toList();
+    }
+
+    public void saveConfigToFile() throws IOException {
+        try {
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Proxy chain config file (*.chn)", "*.chn"));
+            fileChooser.setTitle("Save Config file");
+            File configFile = fileChooser.showSaveDialog(checkNotNull(stage));
+
+            if (configFile != null) {
+                if (!configFile.getName().endsWith(".chn")) {
+                    configFile = new File(configFile.getPath()  + ".chn");
+                }
+                ChainConfiguration config = ImmutableChainConfiguration.builder()
+                        .knownProxyServers(knownServers.stream().map(f -> f.node).toList())
+                        .proxyChain(socksChain.stream().map(f -> f.node).toList())
+                        .build();
+
+                ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
+                        .registerModule(new GuavaModule());
+                mapper.writeValue(configFile, config);
+
+                Alert alert = new Alert(Alert.AlertType.INFORMATION, "Config file saved to : " + configFile.getPath(), ButtonType.OK);
+                LOGGER.error("Config file saved to : " + configFile.getPath());
+                alert.showAndWait();
+            }
+        } catch (Exception e) {
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Error saving config file: " + e, ButtonType.OK);
+            LOGGER.error("Error saving config file: ", e);
+            alert.showAndWait();
+        }
+    }
+
+    public void loadConfigFromFile() throws IOException {
+        try {
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Proxy chain config file (*.chn)", "*.chn"));
+            fileChooser.setTitle("Open Config file");
+
+            File configFile = fileChooser.showOpenDialog(checkNotNull(stage));
+
+            if (configFile != null) {
+                ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
+                        .registerModule(new GuavaModule());
+
+                ChainConfiguration chainConfiguration = mapper.readValue(configFile, ChainConfiguration.class);
+
+                knownServers.clear();
+                knownServers.addAll(chainConfiguration.knownProxyServers().stream().map(FXSocksNode::new).toList());
+                checkNotNull(knownServersTable).itemsProperty().set(knownServers);
+
+                socksChain.clear();
+                socksChain.addAll(chainConfiguration.proxyChain().stream().map(FXSocksNode::new).toList());
+                checkNotNull(socksChainTable).itemsProperty().set(socksChain);
+            }
+        } catch (Exception e) {
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Error loading config file: " + e, ButtonType.OK);
+            LOGGER.error("Error loading config file: ", e);
+            alert.showAndWait();
+        }
     }
 }

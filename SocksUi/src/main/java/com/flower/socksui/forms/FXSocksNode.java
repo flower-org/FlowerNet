@@ -6,7 +6,7 @@ import com.flower.sockschain.config.SocksProtocolVersion;
 import javax.annotation.Nullable;
 
 public class FXSocksNode implements SocksNode {
-    final SocksNode node;
+    public final SocksNode node;
 
     public FXSocksNode(SocksNode node) {
         this.node = node;

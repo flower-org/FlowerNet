@@ -7,6 +7,7 @@ import com.flower.sockschain.config.SocksProtocolVersion;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.TextField;
@@ -32,11 +33,12 @@ public class SocksNodeAddDialog extends VBox {
     @FXML @Nullable ComboBox<String> socksTypeComboBox;
     @FXML @Nullable TextField hostTextField;
     @FXML @Nullable TextField portTextField;
+    @FXML @Nullable Button addButton;
 
     @Nullable Stage stage;
     @Nullable volatile SocksNode returnSocksNode = null;
 
-    public SocksNodeAddDialog() {
+    public SocksNodeAddDialog(@Nullable SocksNode nodeToEdit) {
         FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("SocksNodeAddDialog.fxml"));
         fxmlLoader.setRoot(this);
         fxmlLoader.setController(this);
@@ -46,6 +48,26 @@ public class SocksNodeAddDialog extends VBox {
         } catch (IOException exception) {
             throw new RuntimeException(exception);
         }
+
+        if (nodeToEdit != null) {
+            checkNotNull(addButton).textProperty().set("Edit");
+            selectServerType(nodeToEdit.socksProtocolVersion());
+            checkNotNull(hostTextField).textProperty().set(nodeToEdit.serverAddress());
+            checkNotNull(portTextField).textProperty().set(Integer.toString(nodeToEdit.serverPort()));
+        }
+    }
+
+    public void selectServerType(SocksProtocolVersion protocolVersion) {
+        String valueToSelect;
+        switch (protocolVersion) {
+            case SOCKS4a: valueToSelect = SOCKS_4A; break;
+            case SOCKS5: valueToSelect = SOCKS_5; break;
+            case SOCKS5s: valueToSelect = SOCKS_5S; break;
+            case SOCKS_PLUS: valueToSelect = SOCKS_PLUS; break;
+            default: return;
+        }
+
+        checkNotNull(socksTypeComboBox).getSelectionModel().select(valueToSelect);
     }
 
     public void setStage(Stage stage) {

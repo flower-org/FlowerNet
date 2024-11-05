@@ -34,11 +34,7 @@ public class SocksUiApplication extends Application {
                 // TODO: close all tabs / clients
                 // Shutdown Netty
                 Platform.exit();
-                //HttpBase.shutdownHttp();
-            });
-
-            mainStage.setOnShown(event -> {
-                //mainApp.showSignInDialog(event, null);
+                mainApp.shutdownServer();
             });
 
             mainStage.setTitle("Socks UI");

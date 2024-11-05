@@ -42,8 +42,8 @@ public final class SocksServer {
     }
 
     public ChannelFuture startServer(int port, @Nullable SslContext sslCtx) {
-        EventLoopGroup bossGroup = new NioEventLoopGroup(1);
-        EventLoopGroup workerGroup = new NioEventLoopGroup();
+        bossGroup = new NioEventLoopGroup(1);
+        workerGroup = new NioEventLoopGroup();
 
         ServerBootstrap b = new ServerBootstrap();
         b.group(bossGroup, workerGroup)

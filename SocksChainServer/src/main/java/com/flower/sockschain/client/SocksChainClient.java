@@ -71,7 +71,7 @@ public class SocksChainClient {
         this.inboundMessage = inboundMessage;
         this.socksProxyChain = socksProxyChain;
 
-        if (socksProxyChain.size() < 1) {
+        if (socksProxyChain.isEmpty()) {
             throw new IllegalStateException("Proxy chain can't be empty.");
         }
 
@@ -102,9 +102,6 @@ public class SocksChainClient {
 
     /** Establish entry connection */
     private void connectFirstNode(SocksNode entryNode) {
-        //TODO: resolve domain names using DNS over TLS/HTTPS and connect IP only (use `connect(InetAddress inetHost, int inetPort)`).
-        //TODO: cache resolved domain names locally
-
         b.group(inboundChannel.eventLoop())
                 .channel(NioSocketChannel.class)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)

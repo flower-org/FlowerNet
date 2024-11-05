@@ -21,6 +21,9 @@ public class MainApp {
     @FXML @Nullable Label serverInfoLabel;
     @FXML @Nullable TabPane tabs;
 
+    @Nullable ServerForm serverForm;
+    @Nullable TrafficControlForm trafficControlForm;
+
     public MainApp() {
         //This form is created automatically.
         //No need to load fxml explicitly
@@ -28,6 +31,10 @@ public class MainApp {
 
     public void setMainStage(@Nullable Stage mainStage) {
         this.mainStage = mainStage;
+    }
+
+    public @Nullable Stage getMainStage() {
+        return mainStage;
     }
 
     public void setStatusText(String text) {
@@ -44,10 +51,6 @@ public class MainApp {
         tabs.getSelectionModel().select(tab);
     }
 
-    public void logout(Event event) {
-        closeAllTabs();
-    }
-
     public void quit() { checkNotNull(mainStage).close(); }
 
     public void closeAllTabs() {
@@ -62,7 +65,7 @@ public class MainApp {
     }
 
     public void openServerTab() {
-        ServerForm serverForm = new ServerForm();
+        serverForm = new ServerForm(this);
         serverForm.setStage(checkNotNull(mainStage));
         final Tab tab = new Tab("Server", serverForm);
         tab.setClosable(false);
@@ -71,11 +74,15 @@ public class MainApp {
     }
 
     public void openTrafficControlTab() {
-        TrafficControlForm trafficControlForm = new TrafficControlForm();
+        trafficControlForm = new TrafficControlForm();
         trafficControlForm.setStage(checkNotNull(mainStage));
         final Tab tab = new Tab("Traffic Control", trafficControlForm);
         tab.setClosable(false);
 
         addTab(tab);
+    }
+
+    public void shutdownServer() {
+        checkNotNull(serverForm).stopServer();
     }
 }

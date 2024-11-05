@@ -36,6 +36,7 @@ public final class SocksChainServerConnectHandler extends SimpleChannelInboundHa
     @Override
     public void channelRead0(final ChannelHandlerContext ctx, final SocksMessage message) throws SSLException {
         ctx.pipeline().remove(SocksChainServerConnectHandler.this);
+        // TODO: is it excessive to create a new client every time?
         new SocksChainClient(ctx, message, proxyChainProvider.getProxyChain()).connectChain();
     }
 

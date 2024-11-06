@@ -1,6 +1,6 @@
 package com.flower.conntrack.whiteblacklist;
 
-import com.flower.conntrack.ConnectionListenerAndFilter;
+import com.flower.conntrack.ConnectionListenerAndFilter.AddressCheck;
 import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nullable;
@@ -14,7 +14,7 @@ import static com.flower.conntrack.whiteblacklist.AddressFilterList.HostRecord;
 import static com.flower.conntrack.whiteblacklist.AddressFilterList.PortRecord;
 
 // TODO: extensive test coverage
-public class WhitelistBlacklistConnectionFilter implements ConnectionListenerAndFilter {
+public class WhitelistBlacklistConnectionFilter {
     final List<Pair<AddressFilterList, Boolean>> addressLists;
 
     //Priority 0
@@ -24,10 +24,8 @@ public class WhitelistBlacklistConnectionFilter implements ConnectionListenerAnd
     //Priority 2
     final Map<Integer, PortRecord> portRecords;
 
-    volatile FilterType filterType;
-
-    public WhitelistBlacklistConnectionFilter(FilterType filterType, List<Pair<AddressFilterList, Boolean>> addressLists) {
-        this(filterType);
+    public WhitelistBlacklistConnectionFilter(List<Pair<AddressFilterList, Boolean>> addressLists) {
+        this();
         for (Pair<AddressFilterList, Boolean> listPair : addressLists) {
             addList(listPair.getKey(), listPair.getValue());
         }
@@ -45,17 +43,7 @@ public class WhitelistBlacklistConnectionFilter implements ConnectionListenerAnd
         return portRecords;
     }
 
-    public FilterType filterType() {
-        return filterType;
-    }
-
-    public void setFilterType(FilterType filterType) {
-        this.filterType = filterType;
-    }
-
-    public WhitelistBlacklistConnectionFilter(FilterType filterType) {
-        this.filterType = filterType;
-
+    public WhitelistBlacklistConnectionFilter() {
         addressLists = new ArrayList<>();
         addressRecords = new ConcurrentHashMap<>();
         hostRecords = new ConcurrentHashMap<>();
@@ -161,7 +149,7 @@ public class WhitelistBlacklistConnectionFilter implements ConnectionListenerAnd
     }
 
     public AddressFilterList getLocalUpdatesDiff(List<AddressFilterList> baseLists) {
-        WhitelistBlacklistConnectionFilter otherFilter = new WhitelistBlacklistConnectionFilter(this.filterType);
+        WhitelistBlacklistConnectionFilter otherFilter = new WhitelistBlacklistConnectionFilter();
         for (Pair<AddressFilterList, Boolean> filterListEntry : addressLists) {
             otherFilter.addList(filterListEntry.getKey(), filterListEntry.getValue());
         }
@@ -223,105 +211,46 @@ public class WhitelistBlacklistConnectionFilter implements ConnectionListenerAnd
                 .build();
     }
 
-    //TODO: simplify and DRY
-    @Override
-    public AddressCheck approveConnection(String dstHost, int dstPort) {
-        if (filterType == FilterType.OFF) {
-            // If filtering is off, we allow all connections
-            return AddressCheck.CONNECTION_ALLOWED;
-        } else if (filterType == FilterType.WHITELIST) {
-            // ---------------------------------- WHITELIST ----------------------------------
-            // Priority 1 - exact hostname/port match
-            Map<Integer, AddressRecord> portMap = addressRecords.get(dstHost);
-            if (portMap != null) {
-                AddressRecord record = portMap.get(dstPort);
-                if (record != null) {
-                    if (record.filterType() == FilterType.WHITELIST) {
-                        return AddressCheck.CONNECTION_ALLOWED;
-                    } else if (record.filterType() == FilterType.BLACKLIST) {
-                        // Even if its host or port is whitelisted, exact host/port blacklisting takes precedence
-                        return AddressCheck.CONNECTION_PROHIBITED;
-                    } else {
-                        throw new IllegalArgumentException("Unknown filter type: " + record.filterType());
-                    }
-                }
-            }
-
-            // Priority 2 - hostname match (without port)
-            HostRecord hostRecord = hostRecords.get(dstHost);
-            if (hostRecord != null) {
-                if (hostRecord.filterType() == FilterType.WHITELIST) {
+    @Nullable public AddressCheck getRecordRule(String dstHost, int dstPort) {
+        // Priority 1 - exact hostname/port match
+        Map<Integer, AddressRecord> portMap = addressRecords.get(dstHost);
+        if (portMap != null) {
+            AddressRecord record = portMap.get(dstPort);
+            if (record != null) {
+                if (record.filterType() == FilterType.WHITELIST) {
                     return AddressCheck.CONNECTION_ALLOWED;
-                } else if (hostRecord.filterType() == FilterType.BLACKLIST) {
-                    // Even if its port is whitelisted, host blacklisting takes precedence
+                } else if (record.filterType() == FilterType.BLACKLIST) {
                     return AddressCheck.CONNECTION_PROHIBITED;
                 } else {
-                    throw new IllegalArgumentException("Unknown filter type: " + hostRecord.filterType());
+                    throw new IllegalArgumentException("Unknown filter type: " + record.filterType());
                 }
             }
-
-            // Priority 3 - port match (without hostname)
-            PortRecord portRecord = portRecords.get(dstPort);
-            if (portRecord != null) {
-                if (portRecord.filterType() == FilterType.WHITELIST) {
-                    return AddressCheck.CONNECTION_ALLOWED;
-                } else if (portRecord.filterType() == FilterType.BLACKLIST) {
-                    return AddressCheck.CONNECTION_PROHIBITED;
-                } else {
-                    throw new IllegalArgumentException("Unknown filter type: " + portRecord.filterType());
-                }
-            }
-
-            // If matching record npt found, we prohibit anything that's not whitelisted
-            return AddressCheck.CONNECTION_PROHIBITED;
-        } else
-        if (filterType == FilterType.BLACKLIST) {
-            // ---------------------------------- BLACKLIST ----------------------------------
-            // Priority 1 - exact hostname/port match
-            Map<Integer, AddressRecord> portMap = addressRecords.get(dstHost);
-            if (portMap != null) {
-                AddressRecord record = portMap.get(dstPort);
-                if (record != null) {
-                    if (record.filterType() == FilterType.BLACKLIST) {
-                        return AddressCheck.CONNECTION_PROHIBITED;
-                    } else if (record.filterType() == FilterType.WHITELIST) {
-                        // Even if its host or port is blacklisted, exact host/port whitelisting takes precedence
-                        return AddressCheck.CONNECTION_ALLOWED;
-                    } else {
-                        throw new IllegalArgumentException("Unknown filter type: " + record.filterType());
-                    }
-                }
-            }
-
-            // Priority 2 - hostname match (without port)
-            HostRecord hostRecord = hostRecords.get(dstHost);
-            if (hostRecord != null) {
-                if (hostRecord.filterType() == FilterType.BLACKLIST) {
-                    return AddressCheck.CONNECTION_PROHIBITED;
-                } else if (hostRecord.filterType() == FilterType.WHITELIST) {
-                    // Even if its port is blacklisted, host whitelisting takes precedence
-                    return AddressCheck.CONNECTION_ALLOWED;
-                } else {
-                    throw new IllegalArgumentException("Unknown filter type: " + hostRecord.filterType());
-                }
-            }
-
-            // Priority 3 - port match (without hostname)
-            PortRecord portRecord = portRecords.get(dstPort);
-            if (portRecord != null) {
-                if (portRecord.filterType() == FilterType.BLACKLIST) {
-                    return AddressCheck.CONNECTION_PROHIBITED;
-                } else if (portRecord.filterType() == FilterType.WHITELIST) {
-                    return AddressCheck.CONNECTION_ALLOWED;
-                } else {
-                    throw new IllegalArgumentException("Unknown filter type: " + portRecord.filterType());
-                }
-            }
-
-            // If matching records not found, we allow everything that's not blacklisted
-            return AddressCheck.CONNECTION_ALLOWED;
-        } else {
-            throw new IllegalArgumentException("Unknown filter type: " + filterType);
         }
+
+        // Priority 2 - hostname match (without port)
+        HostRecord hostRecord = hostRecords.get(dstHost);
+        if (hostRecord != null) {
+            if (hostRecord.filterType() == FilterType.WHITELIST) {
+                return AddressCheck.CONNECTION_ALLOWED;
+            } else if (hostRecord.filterType() == FilterType.BLACKLIST) {
+                return AddressCheck.CONNECTION_PROHIBITED;
+            } else {
+                throw new IllegalArgumentException("Unknown filter type: " + hostRecord.filterType());
+            }
+        }
+
+        // Priority 3 - port match (without hostname)
+        PortRecord portRecord = portRecords.get(dstPort);
+        if (portRecord != null) {
+            if (portRecord.filterType() == FilterType.WHITELIST) {
+                return AddressCheck.CONNECTION_ALLOWED;
+            } else if (portRecord.filterType() == FilterType.BLACKLIST) {
+                return AddressCheck.CONNECTION_PROHIBITED;
+            } else {
+                throw new IllegalArgumentException("Unknown filter type: " + portRecord.filterType());
+            }
+        }
+
+        return null;
     }
 }

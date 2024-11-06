@@ -12,6 +12,7 @@ import com.flower.conntrack.whiteblacklist.ImmutablePortRecord;
 import com.flower.conntrack.whiteblacklist.WhitelistBlacklistConnectionFilter;
 import com.flower.socksui.ModalWindow;
 import com.google.common.collect.Streams;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
@@ -52,11 +53,14 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         private final String host;
         private final Integer port;
         private final AddressCheck filterResult;
+        /** Ture if not based on any rules, but based on general policy Whitelist/Blacklist */
+        private final boolean isDefault;
 
-        public CapturedRequest(String host, Integer port, AddressCheck filterResult) {
+        public CapturedRequest(String host, Integer port, AddressCheck filterResult, boolean isDefault) {
             this.host = host;
             this.port = port;
             this.filterResult = filterResult;
+            this.isDefault = isDefault;
         }
 
         public String getHost() { return host; }
@@ -64,7 +68,8 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         public int getPort() { return port; }
 
         public String getFilterResult() {
-            return filterResult == AddressCheck.CONNECTION_ALLOWED ? "Allowed" : "Prohibited";
+            return (filterResult == AddressCheck.CONNECTION_ALLOWED ? "Allowed" : "Prohibited")
+                    + (isDefault ? " (default)" : " (rule match)");
         }
     }
 
@@ -134,6 +139,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     @Nullable @FXML TableView<TrafficRule> trafficRulesTable;
     final ObservableList<TrafficRule> trafficRules;
     @Nullable @FXML TextField maxRequests;
+    @Nullable @FXML CheckBox unmatchedOnlyCheckBox;
 
     final WhitelistBlacklistConnectionFilter innerFilter;
 
@@ -152,7 +158,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
             throw new RuntimeException(exception);
         }
 
-        innerFilter = new WhitelistBlacklistConnectionFilter(getFilterType());
+        innerFilter = new WhitelistBlacklistConnectionFilter();
 
         capturedRequests = FXCollections.observableArrayList();
         checkNotNull(capturedRequestsTable).itemsProperty().set(capturedRequests);
@@ -174,42 +180,87 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         refreshContent();
     }
 
-    public FilterType getFilterType() {
+    public enum TrafficControlType {
+        WHITELIST,
+        BLACKLIST,
+        OFF
+    }
+
+    public TrafficControlType getTrafficControlType() {
         String modeStr = checkNotNull(filteringModeComboBox).getSelectionModel().getSelectedItem();
         switch (modeStr) {
-            case OFF: return FilterType.OFF;
-            case BLACKLIST: return FilterType.BLACKLIST;
+            case OFF: return TrafficControlType.OFF;
+            case BLACKLIST: return TrafficControlType.BLACKLIST;
             case WHITELIST:
-            default: return FilterType.WHITELIST;
+            default: return TrafficControlType.WHITELIST;
         }
     }
 
     @Override
     public AddressCheck approveConnection(String dstHost, int dstPort) {
-        AddressCheck checkResult = innerFilter.approveConnection(dstHost, dstPort);
+        AddressCheck checkResult;
+        boolean isDefault;
 
-        if (checkNotNull(captureRequestsCheckBox).selectedProperty().get()) {
-            CapturedRequest capturedRequest = new CapturedRequest(dstHost, dstPort, checkResult);
-            capturedRequests.add(capturedRequest);
-            try {
-                int max = Integer.parseInt(checkNotNull(maxRequests).textProperty().get());
-                while (capturedRequests.size() > max) {
-                    capturedRequests.remove(0);
-                }
-            } catch (Exception e) {}
+        TrafficControlType trafficControlType = getTrafficControlType();
+        if (trafficControlType == TrafficControlType.OFF) {
+            // If filtering is off, we allow all connections
+            isDefault = true;
+            checkResult = AddressCheck.CONNECTION_ALLOWED;
+        } else if (trafficControlType == TrafficControlType.WHITELIST) {
+            isDefault = false;
+            checkResult = innerFilter.getRecordRule(dstHost, dstPort);
 
-            checkNotNull(capturedRequestsTable).refresh();
+            // If matching record not found, we prohibit anything that's not whitelisted
+            if (checkResult == null) {
+                isDefault = true;
+                checkResult = AddressCheck.CONNECTION_PROHIBITED;
+            }
+        } else if (trafficControlType == TrafficControlType.BLACKLIST) {
+            isDefault = false;
+            checkResult = innerFilter.getRecordRule(dstHost, dstPort);
+
+            // If matching records not found, we allow everything that's not blacklisted
+            if (checkResult == null) {
+                isDefault = true;
+                checkResult = AddressCheck.CONNECTION_ALLOWED;
+            }
+        } else {
+            throw new IllegalArgumentException("Unknown traffic control type: " + trafficControlType);
         }
+
+        final AddressCheck finalCheckResult = checkResult;
+        final boolean finalIsDefault = isDefault;
+        Platform.runLater(() -> {
+            if (checkNotNull(captureRequestsCheckBox).selectedProperty().get()) {
+                if (!checkNotNull(unmatchedOnlyCheckBox).selectedProperty().get() || finalIsDefault) {
+                    CapturedRequest capturedRequest = new CapturedRequest(dstHost, dstPort, finalCheckResult, finalIsDefault);
+                    capturedRequests.add(capturedRequest);
+                    try {
+                        int max = Integer.parseInt(checkNotNull(maxRequests).textProperty().get());
+                        while (capturedRequests.size() > max) {
+                            CapturedRequest selectedItem = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
+                            capturedRequests.remove(0);
+                            if (selectedItem != null) {
+                                try {
+                                    checkNotNull(capturedRequestsTable).getSelectionModel().select(selectedItem);
+                                } catch (Exception e) {
+                                    // selectedItem may be out of bounds
+                                }
+                            }
+                        }
+                    } catch (Exception e) {}
+
+                    checkNotNull(capturedRequestsTable).refresh();
+                }
+            }
+        });
 
         return checkResult;
     }
 
-    public void filteringModeChanged() {
-        innerFilter.setFilterType(getFilterType());
-    }
-
     public void clearCapturedData() {
         capturedRequests.clear();
+        checkNotNull(trafficRulesTable).refresh();
     }
 
     public void whitelistCapture() {
@@ -385,7 +436,19 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 innerFilter.removePortRecord(trafficRule.portRecord);
             }
         }
+
+        refreshAndRestoreCursor();
+    }
+
+    void refreshAndRestoreCursor() {
+        int selectedIndex = checkNotNull(trafficRulesTable).getSelectionModel().getSelectedIndex();
         refreshContent();
+        if (selectedIndex >= trafficRulesTable.itemsProperty().get().size()) {
+            selectedIndex = trafficRulesTable.itemsProperty().get().size() - 1;
+        }
+        if (selectedIndex > 0) {
+            checkNotNull(trafficRulesTable).getSelectionModel().select(selectedIndex);
+        }
     }
 
     FilterType flipFilterType(FilterType type) {
@@ -422,7 +485,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                         true);
             }
         }
-        refreshContent();
+        refreshAndRestoreCursor();
     }
 
     public void saveRules() {

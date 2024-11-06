@@ -16,14 +16,14 @@
 <?import javafx.scene.control.cell.PropertyValueFactory?>
 <?import javafx.scene.layout.AnchorPane?>
 
-<fx:root prefHeight="712.0" prefWidth="919.0" type="AnchorPane" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1">
-    <SplitPane dividerPositions="0.3, 0.6" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+<fx:root prefHeight="844.0" prefWidth="1066.0" type="AnchorPane" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1">
+    <SplitPane dividerPositions="0.3, 0.6" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
       <AnchorPane maxHeight="50.0" minHeight="50.0" prefHeight="50.0">
          <children>
             <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                <items>
                   <Label text="Filtering mode:" />
-                   <ComboBox fx:id="filteringModeComboBox" onAction="#filteringModeChanged" value="Whitelist" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="24.0" AnchorPane.rightAnchor="24.0" AnchorPane.topAnchor="10.0">
+                   <ComboBox fx:id="filteringModeComboBox" value="Whitelist" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="24.0" AnchorPane.rightAnchor="24.0" AnchorPane.topAnchor="10.0">
                        <items>
                            <FXCollections fx:factory="observableArrayList">
                                <String fx:value="Whitelist" />
@@ -40,9 +40,9 @@
          <children>
             <TitledPane animated="false" text="Filter rules" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                <content>
-                  <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                  <AnchorPane>
                      <children>
-                        <SplitPane dividerPositions="0.5" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                        <SplitPane dividerPositions="0.5" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                            <items>
                               <AnchorPane maxHeight="50.0" minHeight="50.0" prefHeight="50.0">
                                  <children>
@@ -62,9 +62,9 @@
                               </AnchorPane>
                               <AnchorPane>
                                  <children>
-                                    <TableView fx:id="trafficRulesTable" prefHeight="200.0" prefWidth="200.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                    <TableView fx:id="trafficRulesTable" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                        <columns>
-                                          <TableColumn minWidth="150.0" prefWidth="150.0" text="Host">
+                                          <TableColumn minWidth="500.0" prefWidth="500.0" text="Host">
                                              <cellValueFactory>
                                                 <PropertyValueFactory property="host" />
                                              </cellValueFactory>
@@ -74,7 +74,7 @@
                                                    <PropertyValueFactory property="port" />
                                                </cellValueFactory>
                                            </TableColumn>
-                                           <TableColumn minWidth="500.0" prefWidth="500.0" text="FilterType">
+                                           <TableColumn minWidth="250.0" prefWidth="250.0" text="FilterType">
                                                <cellValueFactory>
                                                    <PropertyValueFactory property="filterType" />
                                                </cellValueFactory>
@@ -94,9 +94,9 @@
         <AnchorPane>
          <TitledPane animated="false" text="Capture" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
            <content>
-             <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+             <AnchorPane>
                   <children>
-                        <SplitPane dividerPositions="0.5" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                        <SplitPane dividerPositions="0.5" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                         <AnchorPane maxHeight="50.0" minHeight="50.0" prefHeight="50.0">
                             <children>
                                 <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
@@ -113,24 +113,26 @@
                                         <Separator orientation="VERTICAL" prefHeight="200.0" />
                                         <Button mnemonicParsing="false" onAction="#whitelistCapturePort" text="Whitelist port" />
                                         <Button mnemonicParsing="false" onAction="#blacklistCapturePort" text="Blacklist port" />
+                                    <Separator orientation="VERTICAL" prefHeight="200.0" />
+                                    <CheckBox fx:id="unmatchedOnlyCheckBox" mnemonicParsing="false" text="Unmatched only" />
                                     </items>
                                 </ToolBar>
                             </children>
                         </AnchorPane>
                         <AnchorPane>
-                            <TableView fx:id="capturedRequestsTable" prefHeight="200.0" prefWidth="200.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                            <TableView fx:id="capturedRequestsTable" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                 <columns>
-                                    <TableColumn minWidth="200.0" prefWidth="200.0" text="Host">
+                                    <TableColumn minWidth="500.0" prefWidth="500.0" text="Host">
                                         <cellValueFactory>
                                             <PropertyValueFactory property="host" />
                                         </cellValueFactory>
                                     </TableColumn>
-                                    <TableColumn minWidth="100.0" prefWidth="100.0" text="Port">
+                                    <TableColumn minWidth="200.0" prefWidth="200.0" text="Port">
                                         <cellValueFactory>
                                             <PropertyValueFactory property="port" />
                                         </cellValueFactory>
                                     </TableColumn>
-                                    <TableColumn minWidth="500.0" prefWidth="500.0" text="Filter result">
+                                    <TableColumn minWidth="250.0" prefWidth="220.0" text="Filter result">
                                         <cellValueFactory>
                                             <PropertyValueFactory property="filterResult" />
                                         </cellValueFactory>

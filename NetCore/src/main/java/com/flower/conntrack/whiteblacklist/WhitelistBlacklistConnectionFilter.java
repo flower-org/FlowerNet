@@ -62,28 +62,28 @@ public class WhitelistBlacklistConnectionFilter {
         }
     }
 
-    public void addAddressRecord(AddressRecord addressRecord, boolean overrideExisting) {
+    @Nullable public AddressRecord addAddressRecord(AddressRecord addressRecord, boolean overrideExisting) {
         Map<Integer, AddressRecord> portMap = addressRecords.computeIfAbsent(addressRecord.dstHost(), k -> new ConcurrentHashMap<>());
         if (overrideExisting) {
-            portMap.put(addressRecord.dstPort(), addressRecord);
+            return portMap.put(addressRecord.dstPort(), addressRecord);
         } else {
-            portMap.putIfAbsent(addressRecord.dstPort(), addressRecord);
+            return portMap.putIfAbsent(addressRecord.dstPort(), addressRecord);
         }
     }
 
-    public void addHostRecord(HostRecord hostRecord, boolean overrideExisting) {
+    @Nullable public HostRecord addHostRecord(HostRecord hostRecord, boolean overrideExisting) {
         if (overrideExisting) {
-            hostRecords.put(hostRecord.dstHost(), hostRecord);
+            return hostRecords.put(hostRecord.dstHost(), hostRecord);
         } else {
-            hostRecords.putIfAbsent(hostRecord.dstHost(), hostRecord);
+            return hostRecords.putIfAbsent(hostRecord.dstHost(), hostRecord);
         }
     }
 
-    public void addPortRecord(PortRecord portRecord, boolean overrideExisting) {
+    @Nullable public PortRecord addPortRecord(PortRecord portRecord, boolean overrideExisting) {
         if (overrideExisting) {
-            portRecords.put(portRecord.dstPort(), portRecord);
+            return portRecords.put(portRecord.dstPort(), portRecord);
         } else {
-            portRecords.putIfAbsent(portRecord.dstPort(), portRecord);
+            return portRecords.putIfAbsent(portRecord.dstPort(), portRecord);
         }
     }
 

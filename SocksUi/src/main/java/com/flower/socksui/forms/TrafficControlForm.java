@@ -10,6 +10,7 @@ import com.flower.conntrack.whiteblacklist.ImmutableAddressRecord;
 import com.flower.conntrack.whiteblacklist.ImmutableHostRecord;
 import com.flower.conntrack.whiteblacklist.ImmutablePortRecord;
 import com.flower.conntrack.whiteblacklist.WhitelistBlacklistConnectionFilter;
+import com.flower.socksui.JavaFxUtils;
 import com.flower.socksui.ModalWindow;
 import com.google.common.collect.Streams;
 import javafx.application.Platform;
@@ -48,6 +49,10 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     final static String OFF = "Off";
     final static String WHITELIST = "Whitelist";
     final static String BLACKLIST = "Blacklist";
+
+    final static String ALL = "All";
+    final static String MATCHED = "Matched";
+    final static String UNMATCHED = "Unmatched";
 
     public static class CapturedRequest {
         private final String host;
@@ -139,7 +144,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     @Nullable @FXML TableView<TrafficRule> trafficRulesTable;
     final ObservableList<TrafficRule> trafficRules;
     @Nullable @FXML TextField maxRequests;
-    @Nullable @FXML CheckBox unmatchedOnlyCheckBox;
+    @Nullable @FXML ComboBox<String> captureMatchFilterComboBox;
 
     final WhitelistBlacklistConnectionFilter innerFilter;
 
@@ -232,7 +237,10 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         final boolean finalIsDefault = isDefault;
         Platform.runLater(() -> {
             if (checkNotNull(captureRequestsCheckBox).selectedProperty().get()) {
-                if (!checkNotNull(unmatchedOnlyCheckBox).selectedProperty().get() || finalIsDefault) {
+                String selectedFilter = checkNotNull(captureMatchFilterComboBox).getSelectionModel().getSelectedItem();
+                if (selectedFilter.equals(ALL)
+                    || (selectedFilter.equals(MATCHED) && !finalIsDefault)
+                    || (selectedFilter.equals(UNMATCHED) && finalIsDefault)) {
                     CapturedRequest capturedRequest = new CapturedRequest(dstHost, dstPort, finalCheckResult, finalIsDefault);
                     capturedRequests.add(capturedRequest);
                     try {
@@ -271,7 +279,13 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                     .dstPort(capturedRequest.getPort())
                     .filterType(FilterType.WHITELIST)
                     .build();
-            innerFilter.addAddressRecord(addressRecord, true);
+            AddressRecord existingRule = innerFilter.addAddressRecord(addressRecord, false);
+            if (existingRule != null && !existingRule.equals(addressRecord)) {
+                //Ask to reload
+                if (JavaFxUtils.showYesNoDialog("Override existing rule?") == JavaFxUtils.YesNo.YES) {
+                    innerFilter.addAddressRecord(addressRecord, true);
+                }
+            }
             refreshContent();
         }
     }
@@ -284,7 +298,13 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                     .dstPort(capturedRequest.getPort())
                     .filterType(FilterType.BLACKLIST)
                     .build();
-            innerFilter.addAddressRecord(addressRecord, true);
+            AddressRecord existingRule = innerFilter.addAddressRecord(addressRecord, false);
+            if (existingRule != null && !existingRule.equals(addressRecord)) {
+                //Ask to reload
+                if (JavaFxUtils.showYesNoDialog("Override existing rule?") == JavaFxUtils.YesNo.YES) {
+                    innerFilter.addAddressRecord(addressRecord, true);
+                }
+            }
             refreshContent();
         }
     }
@@ -296,7 +316,13 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                     .dstHost(capturedRequest.getHost())
                     .filterType(FilterType.WHITELIST)
                     .build();
-            innerFilter.addHostRecord(hostRecord, true);
+            HostRecord existingRule = innerFilter.addHostRecord(hostRecord, false);
+            if (existingRule != null && !existingRule.equals(hostRecord)) {
+                //Ask to reload
+                if (JavaFxUtils.showYesNoDialog("Override existing rule?") == JavaFxUtils.YesNo.YES) {
+                    innerFilter.addHostRecord(hostRecord, true);
+                }
+            }
             refreshContent();
         }
     }
@@ -308,7 +334,13 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                     .dstHost(capturedRequest.getHost())
                     .filterType(FilterType.BLACKLIST)
                     .build();
-            innerFilter.addHostRecord(hostRecord, true);
+            HostRecord existingRule = innerFilter.addHostRecord(hostRecord, false);
+            if (existingRule != null && !existingRule.equals(hostRecord)) {
+                //Ask to reload
+                if (JavaFxUtils.showYesNoDialog("Override existing rule?") == JavaFxUtils.YesNo.YES) {
+                    innerFilter.addHostRecord(hostRecord, true);
+                }
+            }
             refreshContent();
         }
     }
@@ -320,7 +352,13 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                     .dstPort(capturedRequest.getPort())
                     .filterType(FilterType.WHITELIST)
                     .build();
-            innerFilter.addPortRecord(portRecord, true);
+            PortRecord existingRule = innerFilter.addPortRecord(portRecord, false);
+            if (existingRule != null && !existingRule.equals(portRecord)) {
+                //Ask to reload
+                if (JavaFxUtils.showYesNoDialog("Override existing rule?") == JavaFxUtils.YesNo.YES) {
+                    innerFilter.addPortRecord(portRecord, true);
+                }
+            }
             refreshContent();
         }
     }
@@ -332,7 +370,13 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                     .dstPort(capturedRequest.getPort())
                     .filterType(FilterType.BLACKLIST)
                     .build();
-            innerFilter.addPortRecord(portRecord, true);
+            PortRecord existingRule = innerFilter.addPortRecord(portRecord, false);
+            if (existingRule != null && !existingRule.equals(portRecord)) {
+                //Ask to reload
+                if (JavaFxUtils.showYesNoDialog("Override existing rule?") == JavaFxUtils.YesNo.YES) {
+                    innerFilter.addPortRecord(portRecord, true);
+                }
+            }
             refreshContent();
         }
     }

@@ -114,7 +114,15 @@
                                         <Button mnemonicParsing="false" onAction="#whitelistCapturePort" text="Whitelist port" />
                                         <Button mnemonicParsing="false" onAction="#blacklistCapturePort" text="Blacklist port" />
                                     <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                    <CheckBox fx:id="unmatchedOnlyCheckBox" mnemonicParsing="false" text="Unmatched only" />
+                                    <ComboBox fx:id="captureMatchFilterComboBox" value="All" prefWidth="150.0" >
+                                        <items>
+                                            <FXCollections fx:factory="observableArrayList">
+                                                <String fx:value="All" />
+                                                <String fx:value="Unmatched" />
+                                                <String fx:value="Matched" />
+                                            </FXCollections>
+                                        </items>
+                                    </ComboBox>
                                     </items>
                                 </ToolBar>
                             </children>

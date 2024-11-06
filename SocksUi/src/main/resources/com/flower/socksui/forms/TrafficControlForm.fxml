@@ -101,7 +101,7 @@
                             <children>
                                 <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                     <items>
-                                        <CheckBox fx:id="captureRequestsCheckBox" mnemonicParsing="false" text="Capture requests" />
+                                        <CheckBox fx:id="captureRequestsCheckBox" mnemonicParsing="false" text="Capture:" />
                                         <TextField fx:id="maxRequests" prefHeight="26.0" prefWidth="60.0" text="50" />
                                         <Button mnemonicParsing="false" onAction="#clearCapturedData" text="Clear" />
                                         <Separator orientation="VERTICAL" prefHeight="200.0" />
@@ -114,7 +114,7 @@
                                         <Button mnemonicParsing="false" onAction="#whitelistCapturePort" text="Whitelist port" />
                                         <Button mnemonicParsing="false" onAction="#blacklistCapturePort" text="Blacklist port" />
                                     <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                    <ComboBox fx:id="captureMatchFilterComboBox" value="All" prefWidth="150.0" >
+                                    <ComboBox fx:id="captureMatchFilterComboBox" value="All" prefWidth="120.0" >
                                         <items>
                                             <FXCollections fx:factory="observableArrayList">
                                                 <String fx:value="All" />

@@ -477,10 +477,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         refreshContent();
     }
 
-
     public void clearRules() {
-        innerFilter.clear();
-        refreshContent();
+        if (JavaFxUtils.showYesNoDialog("Delete all rules?") == JavaFxUtils.YesNo.YES) {
+            innerFilter.clear();
+            refreshContent();
+        }
     }
 
     public void removeRule() {

@@ -57,6 +57,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
     @Nullable @FXML TextField portTextField;
     @Nullable @FXML TextField serverNumberTextField;
     @Nullable @FXML CheckBox uniqueServersCheckBox;
+    @Nullable @FXML CheckBox allowDirectIpAccessCheckBox;
 
     @Nullable Stage stage;
     SocksServer server;
@@ -85,7 +86,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
             throw new RuntimeException(exception);
         }
 
-        server = new SocksServer(false,
+        server = new SocksServer(() -> checkNotNull(allowDirectIpAccessCheckBox).selectedProperty().get(),
                 () -> new SocksChainServerConnectHandler(this));
 
         knownServers = FXCollections.observableArrayList();

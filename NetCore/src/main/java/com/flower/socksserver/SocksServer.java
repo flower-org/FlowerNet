@@ -13,11 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
 import java.util.Deque;
-import java.util.List;
-import java.util.Vector;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.function.Supplier;
 
@@ -26,14 +22,14 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public final class SocksServer {
     final static Logger LOGGER = LoggerFactory.getLogger(SocksServer.class);
 
-    final boolean allowDirectAccessByIpAddress;
+    final Supplier<Boolean> allowDirectAccessByIpAddress;
     final Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider;
     final Deque<ConnectionListenerAndFilter> connectionListenerAndFilters;
 
     @Nullable EventLoopGroup bossGroup;
     @Nullable EventLoopGroup workerGroup;
 
-    public SocksServer(boolean allowDirectAccessByIpAddress,
+    public SocksServer(Supplier<Boolean> allowDirectAccessByIpAddress,
                        Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider) {
         this.allowDirectAccessByIpAddress = allowDirectAccessByIpAddress;
         this.connectHandlerProvider = connectHandlerProvider;

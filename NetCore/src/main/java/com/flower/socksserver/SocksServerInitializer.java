@@ -14,12 +14,12 @@ import java.util.function.Supplier;
 
 public final class SocksServerInitializer extends ChannelInitializer<SocketChannel> {
     final Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider;
-    private final boolean allowDirectAccessByIpAddress;
+    private final Supplier<Boolean> allowDirectAccessByIpAddress;
     @Nullable private final SslContext sslCtx;
     @Nullable private final Collection<ConnectionListenerAndFilter> connectionListenerAndFilters;
 
     public SocksServerInitializer(Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider,
-                                  boolean allowDirectAccessByIpAddress,
+                                  Supplier<Boolean> allowDirectAccessByIpAddress,
                                   @Nullable SslContext sslCtx,
                                   @Nullable Collection<ConnectionListenerAndFilter> connectionListenerAndFilters) {
         this.allowDirectAccessByIpAddress = allowDirectAccessByIpAddress;

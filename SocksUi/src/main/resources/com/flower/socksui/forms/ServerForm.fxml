@@ -28,6 +28,7 @@
                   <Button mnemonicParsing="false" onAction="#saveConfigToFile" text="Save chain config" />
                   <Separator orientation="VERTICAL" prefHeight="200.0" />
                   <Button mnemonicParsing="false" onAction="#notImplemented" text="Generate iptables" />
+                  <CheckBox fx:id="allowDirectIpAccessCheckBox" mnemonicParsing="false" text="Allow direct IP Access" />
                </items>
             </ToolBar>
          </children>

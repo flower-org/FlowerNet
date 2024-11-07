@@ -37,11 +37,11 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
     final static AtomicLong SOCKS5_COUNTER = new AtomicLong(1);
     final static Logger LOGGER = LoggerFactory.getLogger(SocksServerHandler.class);
 
-    final boolean allowDirectAccessByIpAddress;
+    final Supplier<Boolean> allowDirectAccessByIpAddress;
     final Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider;
     @Nullable final Collection<ConnectionListenerAndFilter> connectionListenerAndFilters;
 
-    public SocksServerHandler(boolean allowDirectAccessByIpAddress,
+    public SocksServerHandler(Supplier<Boolean> allowDirectAccessByIpAddress,
                               Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider,
                               @Nullable Collection<ConnectionListenerAndFilter> connectionListenerAndFilters) {
         this.allowDirectAccessByIpAddress = allowDirectAccessByIpAddress;
@@ -142,7 +142,7 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
 
     @Override
     public AddressCheck approveConnection(String dstHost, int dstPort) {
-        if (!allowDirectAccessByIpAddress) {
+        if (!allowDirectAccessByIpAddress.get()) {
             if (NonDnsHostnameChecker.isIPAddress(dstHost)) {
                 LOGGER.error("CONNECTION_PROHIBITED: no direct IP access allowed {}:{}", dstHost, dstPort);
                 return AddressCheck.CONNECTION_PROHIBITED;

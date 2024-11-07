@@ -32,6 +32,7 @@
                            </FXCollections>
                        </items>
                    </ComboBox>
+                   <CheckBox fx:id="allowDirectIpAccessCheckBox" mnemonicParsing="false" text="Allow direct IP Access" />
                </items>
             </ToolBar>
          </children>

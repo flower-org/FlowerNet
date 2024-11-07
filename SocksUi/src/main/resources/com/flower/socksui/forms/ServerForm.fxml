@@ -28,7 +28,6 @@
                   <Button mnemonicParsing="false" onAction="#saveConfigToFile" text="Save chain config" />
                   <Separator orientation="VERTICAL" prefHeight="200.0" />
                   <Button mnemonicParsing="false" onAction="#notImplemented" text="Generate iptables" />
-                  <CheckBox fx:id="allowDirectIpAccessCheckBox" mnemonicParsing="false" text="Allow direct IP Access" />
                </items>
             </ToolBar>
          </children>
@@ -54,7 +53,7 @@
                                            <Label text="Servers:" />
                                            <TextField fx:id="serverNumberTextField" prefHeight="26.0" prefWidth="63.0" promptText="#nodes" text="3" />
                                            <Button mnemonicParsing="false" onAction="#addRandom" text="Add random" />
-                                           <CheckBox fx:id="uniqueServersCheckBox" mnemonicParsing="false" selected="true" text="unique" />
+                                           <CheckBox fx:id="uniqueServersCheckBox" mnemonicParsing="false" selected="true" text="Add unique" />
                                        </items>
                                     </ToolBar>
                                  </children>

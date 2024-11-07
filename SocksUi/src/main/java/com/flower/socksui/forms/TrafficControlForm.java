@@ -12,6 +12,7 @@ import com.flower.conntrack.whiteblacklist.ImmutablePortRecord;
 import com.flower.conntrack.whiteblacklist.WhitelistBlacklistConnectionFilter;
 import com.flower.socksui.JavaFxUtils;
 import com.flower.socksui.ModalWindow;
+import com.flower.utils.NonDnsHostnameChecker;
 import com.google.common.collect.Streams;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -60,12 +61,14 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         private final AddressCheck filterResult;
         /** Ture if not based on any rules, but based on general policy Whitelist/Blacklist */
         private final boolean isDefault;
+        private final boolean isDirectIpBlock;
 
-        public CapturedRequest(String host, Integer port, AddressCheck filterResult, boolean isDefault) {
+        public CapturedRequest(String host, Integer port, AddressCheck filterResult, boolean isDefault, boolean isDirectIpBlock) {
             this.host = host;
             this.port = port;
             this.filterResult = filterResult;
             this.isDefault = isDefault;
+            this.isDirectIpBlock = isDirectIpBlock;
         }
 
         public String getHost() { return host; }
@@ -74,7 +77,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
         public String getFilterResult() {
             return (filterResult == AddressCheck.CONNECTION_ALLOWED ? "Allowed" : "Prohibited")
-                    + (isDefault ? " (default)" : " (rule match)");
+                    + (isDirectIpBlock ? " (direct IP block)" : (isDefault ? " (default)" : " (rule match)"));
         }
     }
 
@@ -145,6 +148,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     final ObservableList<TrafficRule> trafficRules;
     @Nullable @FXML TextField maxRequests;
     @Nullable @FXML ComboBox<String> captureMatchFilterComboBox;
+    @Nullable @FXML CheckBox allowDirectIpAccessCheckBox;
 
     final WhitelistBlacklistConnectionFilter innerFilter;
 
@@ -204,6 +208,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     @Override
     public AddressCheck approveConnection(String dstHost, int dstPort) {
         AddressCheck checkResult;
+        boolean isDirectIpBlock = false;
         boolean isDefault;
 
         TrafficControlType trafficControlType = getTrafficControlType();
@@ -211,37 +216,46 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
             // If filtering is off, we allow all connections
             isDefault = true;
             checkResult = AddressCheck.CONNECTION_ALLOWED;
-        } else if (trafficControlType == TrafficControlType.WHITELIST) {
-            isDefault = false;
-            checkResult = innerFilter.getRecordRule(dstHost, dstPort);
-
-            // If matching record not found, we prohibit anything that's not whitelisted
-            if (checkResult == null) {
-                isDefault = true;
-                checkResult = AddressCheck.CONNECTION_PROHIBITED;
-            }
-        } else if (trafficControlType == TrafficControlType.BLACKLIST) {
-            isDefault = false;
-            checkResult = innerFilter.getRecordRule(dstHost, dstPort);
-
-            // If matching records not found, we allow everything that's not blacklisted
-            if (checkResult == null) {
-                isDefault = true;
-                checkResult = AddressCheck.CONNECTION_ALLOWED;
-            }
         } else {
-            throw new IllegalArgumentException("Unknown traffic control type: " + trafficControlType);
+            boolean isDirectIpAccessAllowed = checkNotNull(allowDirectIpAccessCheckBox).selectedProperty().get();
+            if (!isDirectIpAccessAllowed && NonDnsHostnameChecker.isIPAddress(dstHost)) {
+                isDirectIpBlock = true;
+                isDefault = false;
+                checkResult = AddressCheck.CONNECTION_PROHIBITED;
+            } else if (trafficControlType == TrafficControlType.WHITELIST) {
+                isDefault = false;
+                checkResult = innerFilter.getRecordRule(dstHost, dstPort);
+
+                // If matching record not found, we prohibit anything that's not whitelisted
+                if (checkResult == null) {
+                    isDefault = true;
+                    checkResult = AddressCheck.CONNECTION_PROHIBITED;
+                }
+            } else if (trafficControlType == TrafficControlType.BLACKLIST) {
+                isDefault = false;
+                checkResult = innerFilter.getRecordRule(dstHost, dstPort);
+
+                // If matching records not found, we allow everything that's not blacklisted
+                if (checkResult == null) {
+                    isDefault = true;
+                    checkResult = AddressCheck.CONNECTION_ALLOWED;
+                }
+            } else {
+                throw new IllegalArgumentException("Unknown traffic control type: " + trafficControlType);
+            }
         }
 
         final AddressCheck finalCheckResult = checkResult;
         final boolean finalIsDefault = isDefault;
+        final boolean finalIsDirectIpBlock = isDirectIpBlock;
         Platform.runLater(() -> {
             if (checkNotNull(captureRequestsCheckBox).selectedProperty().get()) {
                 String selectedFilter = checkNotNull(captureMatchFilterComboBox).getSelectionModel().getSelectedItem();
                 if (selectedFilter.equals(ALL)
                     || (selectedFilter.equals(MATCHED) && !finalIsDefault)
                     || (selectedFilter.equals(UNMATCHED) && finalIsDefault)) {
-                    CapturedRequest capturedRequest = new CapturedRequest(dstHost, dstPort, finalCheckResult, finalIsDefault);
+                    CapturedRequest capturedRequest = new CapturedRequest(dstHost, dstPort, finalCheckResult,
+                            finalIsDefault, finalIsDirectIpBlock);
                     capturedRequests.add(capturedRequest);
                     try {
                         int max = Integer.parseInt(checkNotNull(maxRequests).textProperty().get());

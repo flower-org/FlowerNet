@@ -6,6 +6,7 @@ import com.google.common.cache.RemovalListener;
 import io.netty.handler.codec.dns.DefaultDnsResponse;
 import io.netty.handler.codec.dns.DnsQuestion;
 import io.netty.handler.codec.dns.DnsRecord;
+import io.netty.handler.codec.dns.DnsSection;
 
 import javax.annotation.Nullable;
 import java.util.Objects;
@@ -52,7 +53,9 @@ public class AnswerCache {
 
     public void putResponse(DnsQuestion question, DefaultDnsResponse response) {
         response.retain();
-        cache.put(new DnsQuestionWrapper(question), response);
+        if (response.count(DnsSection.ANSWER) > 0) {
+            cache.put(new DnsQuestionWrapper(question), response);
+        }
     }
 
     @Nullable

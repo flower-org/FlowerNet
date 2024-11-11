@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.flower.sockschain.config.certs.local.LocalCertificate;
+import com.flower.sockschain.config.certs.remote.RemoteCertificate;
 import org.immutables.value.Value;
 
 import javax.annotation.Nullable;
@@ -24,10 +26,10 @@ public interface SocksNode {
 
     //TLS Settings for Socks5t and Socks+
     @JsonProperty
-    @Nullable String clientCertificate();
+    @Nullable LocalCertificate clientCertificate();
 
     @JsonProperty
-    @Nullable String rootServerCertificate();
+    @Nullable RemoteCertificate rootServerCertificate();
 
     static SocksNode of(SocksProtocolVersion socksProtocolVersion, String serverAddress, int serverPort) {
         return ImmutableSocksNode.builder()

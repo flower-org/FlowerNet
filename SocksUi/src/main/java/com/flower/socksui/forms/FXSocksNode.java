@@ -2,6 +2,8 @@ package com.flower.socksui.forms;
 
 import com.flower.sockschain.config.SocksNode;
 import com.flower.sockschain.config.SocksProtocolVersion;
+import com.flower.sockschain.config.certs.local.LocalCertificate;
+import com.flower.sockschain.config.certs.remote.RemoteCertificate;
 
 import javax.annotation.Nullable;
 
@@ -29,13 +31,13 @@ public class FXSocksNode implements SocksNode {
 
     @Nullable
     @Override
-    public String clientCertificate() {
+    public LocalCertificate clientCertificate() {
         return node.clientCertificate();
     }
 
     @Nullable
     @Override
-    public String rootServerCertificate() {
+    public RemoteCertificate rootServerCertificate() {
         return node.rootServerCertificate();
     }
 
@@ -54,12 +56,10 @@ public class FXSocksNode implements SocksNode {
     }
 
     @Nullable
-    public String getClientCertificate() {
-        return clientCertificate();
-    }
+    public LocalCertificate getClientCertificate() { return clientCertificate(); }
 
     @Nullable
-    public String getRootServerCertificate() {
+    public RemoteCertificate getRootServerCertificate() {
         return rootServerCertificate();
     }
 }

@@ -21,7 +21,9 @@ import java.net.InetAddress;
 public class DnsServer {
     final static Logger LOGGER = LoggerFactory.getLogger(DnsServer.class);
 
-    private static final InetAddress OTHER_DNS_TLS_SERVER_ADDRESS = ServerUtil.getByName("1.1.1.1");
+    private static String SOCKS_SERVER_ADDRESS = "";
+    private static int SOCKS_SERVER_PORT = -1;
+    private static final String OTHER_DNS_TLS_SERVER_ADDRESS = "1.1.1.1";
     private static final int OTHER_DNS_TLS_SERVER_PORT = 853;
     private static final TrustManagerFactory TRUST_MANAGER = PkiUtil.getTrustManagerForCertificateResource("oneone_cert.pem");
 
@@ -39,10 +41,24 @@ public class DnsServer {
             useCache = Boolean.parseBoolean(args[1]);
         }
 
-        final DnsOverTlsClient client = new DnsOverTlsClient(OTHER_DNS_TLS_SERVER_ADDRESS,
-                                                             OTHER_DNS_TLS_SERVER_PORT,
-                                                             TRUST_MANAGER,
-                                                             useCache);
+        final DnsOverTlsClient client;
+        if (args.length > 2) {
+            SOCKS_SERVER_ADDRESS = args[2];
+            SOCKS_SERVER_PORT = Integer.parseInt(args[3]);
+
+            client = new DnsOverTlsClient(SOCKS_SERVER_ADDRESS,
+                                          SOCKS_SERVER_PORT,
+                                          OTHER_DNS_TLS_SERVER_ADDRESS,
+                                          OTHER_DNS_TLS_SERVER_PORT,
+                                          TRUST_MANAGER,
+                                          useCache);
+        } else {
+            client = new DnsOverTlsClient(OTHER_DNS_TLS_SERVER_ADDRESS,
+                                          OTHER_DNS_TLS_SERVER_PORT,
+                                          TRUST_MANAGER,
+                                          useCache);
+        }
+
         final NioEventLoopGroup group = new NioEventLoopGroup();
 
         try {

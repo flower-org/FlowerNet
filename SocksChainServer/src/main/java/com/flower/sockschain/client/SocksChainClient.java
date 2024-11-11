@@ -1,6 +1,7 @@
 package com.flower.sockschain.client;
 
 import com.flower.handlers.RelayHandler;
+import com.flower.utils.EmptyPipelineChannelInitializer;
 import com.google.common.base.Preconditions;
 import com.flower.sockschain.config.SocksNode;
 import com.flower.sockschain.config.SocksProtocolVersion;

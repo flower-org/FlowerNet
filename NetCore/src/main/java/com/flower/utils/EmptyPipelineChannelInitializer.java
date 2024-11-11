@@ -1,4 +1,4 @@
-package com.flower.sockschain.client;
+package com.flower.utils;
 
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;

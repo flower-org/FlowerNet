@@ -20,34 +20,34 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Never close the channels, evicting when they will be closed by the peer.
  */
 public class AggressiveChannelPool implements ChannelPool {
-    private final int maxChannels;
-    private final AtomicInteger promiseCount = new AtomicInteger();
-    private final EvictLinkedList<Channel> channels;
-    private final EvictListElementPicker<Channel> picker;
+    protected final int maxChannels;
+    protected final AtomicInteger promiseCount = new AtomicInteger();
+    protected final EvictLinkedList<Channel> channels;
+    protected final EvictListElementPicker<Channel> picker;
 
-    private final Bootstrap bootstrap;
-    private final InetAddress dnsServerAddress;
-    private final int dnsServerPort;
+    protected final Bootstrap bootstrap;
+    protected final InetAddress connectAddress;
+    protected final int connectPort;
 
-    public AggressiveChannelPool(Bootstrap bootstrap, InetAddress dnsServerAddress, int dnsServerPort, int maxChannels) {
+    public AggressiveChannelPool(Bootstrap bootstrap, InetAddress connectAddress, int connectPort, int maxChannels) {
         this.maxChannels = maxChannels;
         this.bootstrap = bootstrap;
-        this.dnsServerAddress = dnsServerAddress;
-        this.dnsServerPort = dnsServerPort;
+        this.connectAddress = connectAddress;
+        this.connectPort = connectPort;
 
         // Custom eviction list for channels
         this.channels = new ConcurrentEvictList<>() {
             @Override
             protected MutableEvictLinkedNode<Channel> createMutableEvictLinkedNode(Channel value) {
-                return new MutableEvictNode<>(value) {
-                    @Override
-                    public boolean isEvicted() {
-                        if (!super.isEvicted() && !value.isActive()) {
-                            markForEviction();
-                        }
-                        return super.isEvicted();
+            return new MutableEvictNode<>(value) {
+                @Override
+                public boolean isEvicted() {
+                    if (!super.isEvicted() && !value.isActive()) {
+                        markForEviction();
                     }
-                };
+                    return super.isEvicted();
+                }
+            };
             }
         };
         this.picker = channels.newElementPicker();
@@ -59,7 +59,7 @@ public class AggressiveChannelPool implements ChannelPool {
             if (giveChannelPromise()) {
                 // 1. Aggressive approach - if we can create more channels, create more
                 Promise<EvictLinkedNode<Channel>> channelPromise = new DefaultPromise<>(bootstrap.config().group().next());
-                bootstrap.connect(dnsServerAddress, dnsServerPort).addListener(
+                bootstrap.connect(connectAddress, connectPort).addListener(
                     (ChannelFutureListener) channelFuture -> {
                         if (channelFuture.isSuccess()) {
                             channelPromise.setSuccess(addChannel(channelFuture.channel()));
@@ -82,7 +82,7 @@ public class AggressiveChannelPool implements ChannelPool {
         }
     }
 
-    private boolean giveChannelPromise() {
+    protected boolean giveChannelPromise() {
         while (true) {
             int currentPromises = promiseCount.get();
             if (channels.nonEvictedCount() + promiseCount.get() < maxChannels) {
@@ -95,11 +95,11 @@ public class AggressiveChannelPool implements ChannelPool {
         }
     }
 
-    private void failOnChannelPromise() {
+    protected void failOnChannelPromise() {
         promiseCount.decrementAndGet();
     }
 
-    private EvictLinkedNode<Channel> addChannel(Channel channel) {
+    protected EvictLinkedNode<Channel> addChannel(Channel channel) {
         promiseCount.decrementAndGet();
         return channels.addElement(channel);
     }

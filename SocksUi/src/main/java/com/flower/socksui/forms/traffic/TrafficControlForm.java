@@ -1,4 +1,4 @@
-package com.flower.socksui.forms;
+package com.flower.socksui.forms.traffic;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -13,6 +13,7 @@ import com.flower.conntrack.whiteblacklist.WhitelistBlacklistConnectionFilter;
 import com.flower.socksui.JavaFxUtils;
 import com.flower.socksui.MainApp;
 import com.flower.socksui.ModalWindow;
+import com.flower.socksui.forms.Refreshable;
 import com.flower.utils.NonDnsHostnameChecker;
 import com.google.common.collect.Streams;
 import javafx.application.Platform;
@@ -32,7 +33,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.net.SocketAddress;
-import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.prefs.Preferences;
@@ -49,119 +49,6 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     final static String OFF = "Off";
     final static String WHITELIST = "Whitelist";
     final static String BLACKLIST = "Blacklist";
-
-    final static String ALL = "All";
-    final static String MATCHED = "Matched";
-    final static String UNMATCHED = "Unmatched";
-
-    public static class CapturedRequest {
-        private final String host;
-        private final Integer port;
-        private final AddressCheck filterResult;
-        /** Ture if not based on any rules, but based on general policy Whitelist/Blacklist */
-        private final boolean isRuleMatched;
-        private final boolean isDirectIpBlock;
-        final long creationTimestamp;
-        final SocketAddress fromAddress;
-
-        public CapturedRequest(String host, Integer port, AddressCheck filterResult, boolean isRuleMatched, boolean isDirectIpBlock, SocketAddress fromAddress) {
-            this.host = host;
-            this.port = port;
-            this.filterResult = filterResult;
-            this.isRuleMatched = isRuleMatched;
-            this.isDirectIpBlock = isDirectIpBlock;
-            this.creationTimestamp = System.currentTimeMillis();
-            this.fromAddress = fromAddress;
-        }
-
-        public String getHost() { return host; }
-
-        public int getPort() { return port; }
-
-        public String getFilterResult() {
-            return (filterResult == AddressCheck.CONNECTION_ALLOWED ? "Allowed" : "Prohibited")
-                    + (isDirectIpBlock ? " (direct IP block)" : (isRuleMatched ? " (rule match)" : " (default)"));
-        }
-
-        public String getDate() {
-            return String.format("%s", new Date(creationTimestamp));
-        }
-
-        public String getFrom() {
-            return fromAddress.toString();
-        }
-    }
-
-    public static class TrafficRule {
-        @Nullable final AddressRecord addressRecord;
-        @Nullable final HostRecord hostRecord;
-        @Nullable final PortRecord portRecord;
-
-        final long creationTimestamp;
-
-        public TrafficRule(AddressRecord addressRecord) {
-            this.addressRecord = addressRecord;
-            this.hostRecord = null;
-            this.portRecord = null;
-            this.creationTimestamp = addressRecord.creationTimestamp();
-        }
-
-        public TrafficRule(HostRecord hostRecord) {
-            this.addressRecord = null;
-            this.hostRecord = hostRecord;
-            this.portRecord = null;
-            this.creationTimestamp = hostRecord.creationTimestamp();
-        }
-
-        public TrafficRule(PortRecord portRecord) {
-            this.addressRecord = null;
-            this.hostRecord = null;
-            this.portRecord = portRecord;
-            this.creationTimestamp = portRecord.creationTimestamp();
-        }
-
-        public FilterType getFilterType() {
-            if (addressRecord != null) {
-
-                return addressRecord.filterType();
-            } else if (hostRecord != null) {
-                return hostRecord.filterType();
-            } else if (portRecord != null) {
-                return portRecord.filterType();
-            } else {
-                throw new IllegalStateException("Either addressRecord or hostRecord or portRecord should be not null");
-            }
-        }
-
-        public String getHost() {
-            if (addressRecord != null) {
-                return addressRecord.dstHost();
-            } else if (hostRecord != null) {
-                return hostRecord.dstHost();
-            } else if (portRecord != null) {
-                return "";
-            } else {
-                throw new IllegalStateException("Either addressRecord or hostRecord or portRecord should be not null");
-            }
-        }
-
-        public String getPort() {
-            if (addressRecord != null) {
-                return Integer.toString(addressRecord.dstPort());
-            } else if (hostRecord != null) {
-                return "";
-            } else if (portRecord != null) {
-                return Integer.toString(portRecord.dstPort());
-            } else {
-                throw new IllegalStateException("Either addressRecord or hostRecord or portRecord should be not null");
-            }
-        }
-
-        public String getDate() {
-            Date date = new Date(creationTimestamp);
-            return String.format("%s", date);
-        }
-    }
 
     @Nullable Stage stage;
     @Nullable @FXML ComboBox<String> filteringModeComboBox;
@@ -238,68 +125,6 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
             case BLACKLIST: return TrafficControlType.BLACKLIST;
             case WHITELIST:
             default: return TrafficControlType.WHITELIST;
-        }
-    }
-
-    static class CaptureFilter {
-        final boolean matchedAllowed;
-        final boolean matchedProhibited;
-        final boolean unmatchedAllowed;
-        final boolean unmatchedProhibited;
-
-        CaptureFilter(boolean matchedAllowed, boolean matchedProhibited, boolean unmatchedAllowed, boolean unmatchedProhibited) {
-            this.matchedAllowed = matchedAllowed;
-            this.matchedProhibited = matchedProhibited;
-            this.unmatchedAllowed = unmatchedAllowed;
-            this.unmatchedProhibited = unmatchedProhibited;
-        }
-
-        boolean matchCapturedRecord(AddressCheck checkResult, boolean isRuleMatched) {
-            if (isRuleMatched) {
-                if (checkResult == AddressCheck.CONNECTION_ALLOWED) {
-                    return matchedAllowed;
-                } else {
-                    return matchedProhibited;
-                }
-            } else {
-                if (checkResult == AddressCheck.CONNECTION_ALLOWED) {
-                    return unmatchedAllowed;
-                } else {
-                    return unmatchedProhibited;
-                }
-            }
-        }
-
-        @Override
-        public String toString() {
-            StringBuilder builder = new StringBuilder();
-            if (matchedAllowed && matchedProhibited && unmatchedAllowed && unmatchedProhibited) {
-                builder.append("ALL");
-            } else if (matchedAllowed && matchedProhibited) {
-                builder.append("MATCHED");
-                if (unmatchedAllowed) { builder.append(" & UNMATCHED/ALLOWED"); }
-                if (unmatchedProhibited) { builder.append(" & UNMATCHED/PROHIBITED"); }
-            } else if (unmatchedAllowed && unmatchedProhibited) {
-                if (matchedAllowed) { builder.append("MATCHED/ALLOWED & "); }
-                if (matchedProhibited) { builder.append("MATCHED/PROHIBITED & "); }
-                builder.append("UNMATCHED");
-            } else {
-                if (matchedAllowed) { builder.append("MATCHED/ALLOWED"); }
-                if (matchedProhibited) {
-                    if (!builder.isEmpty()) { builder.append(" & "); }
-                    builder.append("MATCHED/PROHIBITED");
-                }
-                if (unmatchedAllowed) {
-                    if (!builder.isEmpty()) { builder.append(" & "); }
-                    builder.append("UNMATCHED/ALLOWED");
-                }
-                if (unmatchedProhibited) {
-                    if (!builder.isEmpty()) { builder.append(" & "); }
-                    builder.append("UNMATCHED/PROHIBITED");
-                }
-                if (builder.isEmpty()) { builder.append("NONE"); }
-            }
-            return builder.toString();
         }
     }
 

@@ -1,7 +1,7 @@
 package com.flower.socksui;
 
 import com.flower.socksui.forms.ServerForm;
-import com.flower.socksui.forms.TrafficControlForm;
+import com.flower.socksui.forms.traffic.TrafficControlForm;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;

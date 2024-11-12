@@ -1,4 +1,4 @@
-package com.flower.socksui.forms;
+package com.flower.socksui.forms.traffic;
 
 import com.flower.conntrack.whiteblacklist.FilterType;
 import com.flower.conntrack.whiteblacklist.ImmutableAddressRecord;
@@ -23,7 +23,6 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.flower.socksui.forms.TrafficControlForm.TrafficRule;
 
 public class TrafficRuleAddDialog extends VBox {
     final static Logger LOGGER = LoggerFactory.getLogger(TrafficRuleAddDialog.class);

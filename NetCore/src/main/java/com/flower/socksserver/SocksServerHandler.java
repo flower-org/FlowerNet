@@ -23,6 +23,8 @@ import org.slf4j.LoggerFactory;
 import com.flower.conntrack.ConnectionId;
 
 import javax.annotation.Nullable;
+import java.net.InetAddress;
+import java.net.SocketAddress;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
@@ -64,7 +66,7 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
                         ctx.channel().attr(DESTINATION_KEY).set(new Destination(socksV4CmdRequest.dstAddr(), socksV4CmdRequest.dstPort()));
                     }
 
-                    if (approveConnection(socksV4CmdRequest.dstAddr(), socksV4CmdRequest.dstPort()) == AddressCheck.CONNECTION_ALLOWED) {
+                    if (approveConnection(socksV4CmdRequest.dstAddr(), socksV4CmdRequest.dstPort(), ctx.channel().remoteAddress()) == AddressCheck.CONNECTION_ALLOWED) {
                         ctx.pipeline().addLast(connectHandlerProvider.get());
                         ctx.pipeline().remove(this);
                         ctx.fireChannelRead(socksRequest);
@@ -102,7 +104,7 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
                             ctx.channel().attr(DESTINATION_KEY).set(new Destination(socks5CmdRequest.dstAddr(), socks5CmdRequest.dstPort()));
                         }
 
-                        if (approveConnection(socks5CmdRequest.dstAddr(), socks5CmdRequest.dstPort()) == AddressCheck.CONNECTION_ALLOWED) {
+                        if (approveConnection(socks5CmdRequest.dstAddr(), socks5CmdRequest.dstPort(), ctx.channel().remoteAddress()) == AddressCheck.CONNECTION_ALLOWED) {
                             ctx.pipeline().addLast(connectHandlerProvider.get());
                             ctx.pipeline().remove(this);
                             ctx.fireChannelRead(socksRequest);
@@ -141,10 +143,10 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
     }
 
     @Override
-    public AddressCheck approveConnection(String dstHost, int dstPort) {
+    public AddressCheck approveConnection(String dstHost, int dstPort, SocketAddress from) {
         if (!allowDirectAccessByIpAddress.get()) {
             if (NonDnsHostnameChecker.isIPAddress(dstHost)) {
-                LOGGER.error("CONNECTION_PROHIBITED: no direct IP access allowed {}:{}", dstHost, dstPort);
+                LOGGER.error("CONNECTION_PROHIBITED: no direct IP access allowed {}:{} from {}", dstHost, dstPort, from);
                 return AddressCheck.CONNECTION_PROHIBITED;
             }
         }
@@ -152,7 +154,7 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
         AddressCheck addressCheck = AddressCheck.CONNECTION_ALLOWED;
         if (connectionListenerAndFilters != null) {
             for (ConnectionListenerAndFilter filter : connectionListenerAndFilters) {
-                if (filter.approveConnection(dstHost, dstPort) == AddressCheck.CONNECTION_PROHIBITED) {
+                if (filter.approveConnection(dstHost, dstPort, from) == AddressCheck.CONNECTION_PROHIBITED) {
                     addressCheck = AddressCheck.CONNECTION_PROHIBITED;
                 }
             }

@@ -17,6 +17,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class MainApp {
     @Nullable Stage mainStage;
 
+    @FXML @Nullable Label connectionsLabel;
     @FXML @Nullable Label serverInfoLabel;
     @FXML @Nullable TabPane tabs;
 
@@ -38,6 +39,9 @@ public class MainApp {
 
     public void setStatusText(String text) {
         checkNotNull(serverInfoLabel).setText(text);
+    }
+    public void setConnectionsText(String text) {
+        checkNotNull(connectionsLabel).setText(text);
     }
 
     public void showAboutDialog() {
@@ -75,7 +79,7 @@ public class MainApp {
     }
 
     public void openTrafficControlTab() {
-        trafficControlForm = new TrafficControlForm();
+        trafficControlForm = new TrafficControlForm(this);
         trafficControlForm.setStage(checkNotNull(mainStage));
         final Tab tab = new Tab("Traffic Control", trafficControlForm);
         tab.setClosable(false);

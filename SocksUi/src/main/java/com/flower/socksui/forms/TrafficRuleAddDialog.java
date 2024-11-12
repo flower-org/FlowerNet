@@ -98,18 +98,21 @@ public class TrafficRuleAddDialog extends VBox {
                             .filterType(filterType)
                             .dstHost(host)
                             .dstPort(port)
+                            .creationTimestamp(System.currentTimeMillis())
                             .build());
                     checkNotNull(stage).close();
                 } else if (!StringUtils.isBlank(host) && StringUtils.isBlank(portStr)) {
                     trafficRule = new TrafficRule(ImmutableHostRecord.builder()
                             .filterType(filterType)
                             .dstHost(host)
+                            .creationTimestamp(System.currentTimeMillis())
                             .build());
                     checkNotNull(stage).close();
                 } else if (StringUtils.isBlank(host) && !StringUtils.isBlank(portStr)) {
                     trafficRule = new TrafficRule(ImmutablePortRecord.builder()
                             .filterType(filterType)
                             .dstPort(port)
+                            .creationTimestamp(System.currentTimeMillis())
                             .build());
                     checkNotNull(stage).close();
                 }

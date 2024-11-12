@@ -20,6 +20,13 @@ public interface AddressFilterList {
         FilterType filterType();
         String dstHost();
         Integer dstPort();
+        Long creationTimestamp();
+
+        static boolean recordsEqual(AddressRecord record1, AddressRecord record2) {
+            return record1.filterType().equals(record2.filterType())
+                    && record1.dstHost().equals(record2.dstHost())
+                    && record1.dstPort().equals(record2.dstPort());
+        }
     }
 
     @Value.Immutable
@@ -29,6 +36,12 @@ public interface AddressFilterList {
     interface HostRecord {
         FilterType filterType();
         String dstHost();
+        Long creationTimestamp();
+
+        static boolean recordsEqual(HostRecord record1, HostRecord record2) {
+            return record1.filterType().equals(record2.filterType())
+                    && record1.dstHost().equals(record2.dstHost());
+        }
     }
 
     @Value.Immutable
@@ -38,6 +51,12 @@ public interface AddressFilterList {
     interface PortRecord {
         FilterType filterType();
         Integer dstPort();
+        Long creationTimestamp();
+
+        static boolean recordsEqual(PortRecord record1, PortRecord record2) {
+            return record1.filterType().equals(record2.filterType())
+                    && record1.dstPort().equals(record2.dstPort());
+        }
     }
 
     List<AddressRecord> addressRecords();

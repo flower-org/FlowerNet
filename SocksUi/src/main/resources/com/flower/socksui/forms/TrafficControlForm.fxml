@@ -6,6 +6,7 @@
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.MenuButton?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TableColumn?>
@@ -16,7 +17,8 @@
 <?import javafx.scene.control.cell.PropertyValueFactory?>
 <?import javafx.scene.layout.AnchorPane?>
 
-<fx:root prefHeight="844.0" prefWidth="1066.0" type="AnchorPane" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1">
+<?import javafx.scene.control.CheckMenuItem?>
+<fx:root prefHeight="844.0" prefWidth="1151.0" type="AnchorPane" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1">
     <SplitPane dividerPositions="0.3, 0.6" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
       <AnchorPane maxHeight="50.0" minHeight="50.0" prefHeight="50.0">
          <children>
@@ -80,6 +82,11 @@
                                                    <PropertyValueFactory property="filterType" />
                                                </cellValueFactory>
                                            </TableColumn>
+                                           <TableColumn minWidth="250.0" prefWidth="250.0" text="Date">
+                                               <cellValueFactory>
+                                                   <PropertyValueFactory property="date" />
+                                               </cellValueFactory>
+                                           </TableColumn>
                                        </columns>
                                     </TableView>
                                  </children>
@@ -115,15 +122,14 @@
                                         <Button mnemonicParsing="false" onAction="#whitelistCapturePort" text="Whitelist port" />
                                         <Button mnemonicParsing="false" onAction="#blacklistCapturePort" text="Blacklist port" />
                                     <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                    <ComboBox fx:id="captureMatchFilterComboBox" value="All" prefWidth="120.0" >
-                                        <items>
-                                            <FXCollections fx:factory="observableArrayList">
-                                                <String fx:value="All" />
-                                                <String fx:value="Unmatched" />
-                                                <String fx:value="Matched" />
-                                            </FXCollections>
-                                        </items>
-                                    </ComboBox>
+                                    <MenuButton fx:id="captureFilterMenuButton" mnemonicParsing="false" text="Filter">
+                                      <items>
+                                        <CheckMenuItem onAction="#captureFilterChange" selected="true" mnemonicParsing="false" text="Matched/Allowed" />
+                                        <CheckMenuItem onAction="#captureFilterChange" selected="true" mnemonicParsing="false" text="Matched/Prohibited" />
+                                        <CheckMenuItem onAction="#captureFilterChange" selected="true" mnemonicParsing="false" text="Unmatched/Allowed" />
+                                        <CheckMenuItem onAction="#captureFilterChange" selected="true" mnemonicParsing="false" text="Unmatched/Prohibited" />
+                                      </items>
+                                    </MenuButton>
                                     </items>
                                 </ToolBar>
                             </children>
@@ -144,6 +150,16 @@
                                     <TableColumn minWidth="250.0" prefWidth="220.0" text="Filter result">
                                         <cellValueFactory>
                                             <PropertyValueFactory property="filterResult" />
+                                        </cellValueFactory>
+                                    </TableColumn>
+                                    <TableColumn minWidth="250.0" prefWidth="250.0" text="Date">
+                                        <cellValueFactory>
+                                            <PropertyValueFactory property="date" />
+                                        </cellValueFactory>
+                                    </TableColumn>
+                                    <TableColumn minWidth="250.0" prefWidth="250.0" text="From IP">
+                                        <cellValueFactory>
+                                            <PropertyValueFactory property="from" />
                                         </cellValueFactory>
                                     </TableColumn>
                                 </columns>

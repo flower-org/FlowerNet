@@ -16,6 +16,9 @@ import java.net.UnknownHostException;
 import java.security.cert.CertificateException;
 import java.util.Map;
 
+import static com.flower.socksserver.FlowerSslContextBuilder.TLS_CIPHERS;
+import static com.flower.socksserver.FlowerSslContextBuilder.TLS_PROTOCOLS;
+
 public class ServerUtil {
     public static InetAddress getByName(String name) {
         try {
@@ -33,6 +36,8 @@ public class ServerUtil {
         SelfSignedCertificate ssc = new SelfSignedCertificate();
         return SslContextBuilder
                 .forServer(ssc.certificate(), ssc.privateKey())
+                .protocols(TLS_PROTOCOLS)
+                .ciphers(TLS_CIPHERS)
                 .build();
     }
 

@@ -33,6 +33,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.flower.utils.ServerUtil;
 
+import static com.flower.socksserver.FlowerSslContextBuilder.TLS_CIPHERS;
+import static com.flower.socksserver.FlowerSslContextBuilder.TLS_PROTOCOLS;
 import static com.flower.trust.FlowerTrust.TRUST_MANAGER_WITH_SERVER_CA;
 
 public class SocksChainClient {
@@ -57,6 +59,8 @@ public class SocksChainClient {
         if (socksProtocolVersion == SocksProtocolVersion.SOCKS5s) {
             // Configure SSL.
             return SslContextBuilder.forClient()
+                    .protocols(TLS_PROTOCOLS)
+                    .ciphers(TLS_CIPHERS)
                     .keyManager(ETokenKeyManagerProvider.getManager())
                     .clientAuth(ClientAuth.REQUIRE)
                     .trustManager(TRUST_MANAGER_WITH_SERVER_CA)

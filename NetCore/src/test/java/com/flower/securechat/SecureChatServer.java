@@ -29,6 +29,9 @@ import io.netty.handler.ssl.util.SelfSignedCertificate;
 
 import javax.net.ssl.TrustManagerFactory;
 
+import static com.flower.socksserver.FlowerSslContextBuilder.TLS_CIPHERS;
+import static com.flower.socksserver.FlowerSslContextBuilder.TLS_PROTOCOLS;
+
 /**
  * Simple SSL chat server modified from TelnetServer.
  */
@@ -50,6 +53,8 @@ public final class SecureChatServer {
         SslContext sslCtx = SslContextBuilder
               .forServer(ssc.certificate(), ssc.privateKey())
 //            .forServer(keyManager)
+            .protocols(TLS_PROTOCOLS)
+            .ciphers(TLS_CIPHERS)
             .trustManager(TRUST_MANAGER)
             .clientAuth(ClientAuth.REQUIRE)
             .build();

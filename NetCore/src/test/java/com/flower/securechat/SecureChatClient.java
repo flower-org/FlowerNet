@@ -32,6 +32,9 @@ import javax.net.ssl.TrustManagerFactory;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 
+import static com.flower.socksserver.FlowerSslContextBuilder.TLS_CIPHERS;
+import static com.flower.socksserver.FlowerSslContextBuilder.TLS_PROTOCOLS;
+
 /**
  * Simple SSL chat client modified from TelnetClient.
  */
@@ -52,6 +55,8 @@ public final class SecureChatClient {
 
         // Configure SSL.
         final SslContext sslCtx = SslContextBuilder.forClient()
+            .protocols(TLS_PROTOCOLS)
+            .ciphers(TLS_CIPHERS)
             .keyManager(keyManager)
             .clientAuth(ClientAuth.REQUIRE)
             .trustManager(TRUST_MANAGER)

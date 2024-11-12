@@ -40,6 +40,8 @@ import java.net.InetAddress;
 import java.util.Iterator;
 import java.util.function.Consumer;
 
+import static com.flower.socksserver.FlowerSslContextBuilder.TLS_CIPHERS;
+import static com.flower.socksserver.FlowerSslContextBuilder.TLS_PROTOCOLS;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class DnsOverTlsClient {
@@ -80,6 +82,8 @@ public class DnsOverTlsClient {
         // Configure SSL.
         this.sslCtx = SslContextBuilder
                 .forClient()
+                .protocols(TLS_PROTOCOLS)
+                .ciphers(TLS_CIPHERS)
                 .trustManager(trustManager)
                 .build();
 
@@ -112,6 +116,8 @@ public class DnsOverTlsClient {
         // Configure SSL.
         this.sslCtx = SslContextBuilder
                 .forClient()
+                .protocols(TLS_PROTOCOLS)
+                .ciphers(TLS_CIPHERS)
                 .trustManager(trustManager)
                 .build();
 

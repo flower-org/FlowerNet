@@ -92,7 +92,7 @@ public class MainApp {
     }
 
     public void openConnectionsTab() {
-        connectionControlForm = new ConnectionControlForm(this);
+        connectionControlForm = new ConnectionControlForm(this, checkNotNull(trafficControlForm));
         connectionControlForm.setStage(checkNotNull(mainStage));
         final Tab tab = new Tab("Connection Control", connectionControlForm);
         tab.setClosable(false);

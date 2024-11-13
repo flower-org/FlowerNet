@@ -3,8 +3,10 @@ package com.flower.socksui.forms;
 import com.flower.conntrack.ConnectionId;
 import com.flower.conntrack.ConnectionInfo;
 import com.flower.conntrack.ConnectionListener;
+import com.flower.conntrack.Destination;
 import com.flower.socksui.JavaFxUtils;
 import com.flower.socksui.MainApp;
+import com.flower.socksui.forms.traffic.TrafficController;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -64,12 +66,13 @@ public class ConnectionControlForm extends AnchorPane implements Refreshable, Co
     @Nullable @FXML TableView<ConnectionInfoWrapper> connectionTable;
     final ObservableList<ConnectionInfoWrapper> connections;
     final ConcurrentHashMap<ConnectionId, ConnectionInfoWrapper> connectionMap;
+    TrafficController trafficController;
 
     public void setStage(Stage stage) {
         this.stage = stage;
     }
 
-    public ConnectionControlForm(MainApp mainForm) {
+    public ConnectionControlForm(MainApp mainForm, TrafficController trafficController) {
         FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("ConnectionControlForm.fxml"));
         fxmlLoader.setRoot(this);
         fxmlLoader.setController(this);
@@ -79,6 +82,8 @@ public class ConnectionControlForm extends AnchorPane implements Refreshable, Co
         } catch (IOException exception) {
             throw new RuntimeException(exception);
         }
+
+        this.trafficController = trafficController;
 
         connectionMap = new ConcurrentHashMap<>();
         connections = FXCollections.observableArrayList();
@@ -92,10 +97,12 @@ public class ConnectionControlForm extends AnchorPane implements Refreshable, Co
         // TODO: implement
     }
 
+/*
+    //Keeping this for debug
     public void connectionStateQuery() {
         ConnectionInfoWrapper connection = checkNotNull(connectionTable).getSelectionModel().getSelectedItem();
         JavaFxUtils.showMessage("", "", "isActive: " + connection.connectionInfo.channel.isActive());
-    }
+    }*/
 
     public void closeConnection() {
         ConnectionInfoWrapper connection = checkNotNull(connectionTable).getSelectionModel().getSelectedItem();
@@ -113,26 +120,56 @@ public class ConnectionControlForm extends AnchorPane implements Refreshable, Co
 
     public void whitelistConnection() {
         // TODO: implement
+        ConnectionInfoWrapper connection = checkNotNull(connectionTable).getSelectionModel().getSelectedItem();
+        Destination destination = connection.connectionInfo.destination;
+        if (destination != null) {
+            trafficController.whitelist(destination.host, destination.port);
+        }
     }
 
     public void blacklistConnection() {
         // TODO: implement
+        ConnectionInfoWrapper connection = checkNotNull(connectionTable).getSelectionModel().getSelectedItem();
+        Destination destination = connection.connectionInfo.destination;
+        if (destination != null) {
+            trafficController.blacklist(destination.host, destination.port);
+        }
     }
 
     public void whitelistConnectionHost() {
         // TODO: implement
+        ConnectionInfoWrapper connection = checkNotNull(connectionTable).getSelectionModel().getSelectedItem();
+        Destination destination = connection.connectionInfo.destination;
+        if (destination != null) {
+            trafficController.whitelistHost(destination.host);
+        }
     }
 
     public void blacklistConnectionHost() {
         // TODO: implement
+        ConnectionInfoWrapper connection = checkNotNull(connectionTable).getSelectionModel().getSelectedItem();
+        Destination destination = connection.connectionInfo.destination;
+        if (destination != null) {
+            trafficController.blacklistHost(destination.host);
+        }
     }
 
     public void whitelistConnectionPort() {
         // TODO: implement
+        ConnectionInfoWrapper connection = checkNotNull(connectionTable).getSelectionModel().getSelectedItem();
+        Destination destination = connection.connectionInfo.destination;
+        if (destination != null) {
+            trafficController.whitelistPort(destination.port);
+        }
     }
 
     public void blacklistConnectionPort() {
         // TODO: implement
+        ConnectionInfoWrapper connection = checkNotNull(connectionTable).getSelectionModel().getSelectedItem();
+        Destination destination = connection.connectionInfo.destination;
+        if (destination != null) {
+            trafficController.blacklistPort(destination.port);
+        }
     }
 
     @Override

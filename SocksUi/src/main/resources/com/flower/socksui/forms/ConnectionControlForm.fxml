@@ -18,7 +18,8 @@
                     <items>
                         <Button mnemonicParsing="false" onAction="#closeConnection" text="Close" />
                         <Button mnemonicParsing="false" onAction="#closeAllConnections" text="Close All" />
-                        <Button mnemonicParsing="false" onAction="#connectionStateQuery" text="Query" />
+                        <!-- Keeping this for debug
+                        <Button mnemonicParsing="false" onAction="#connectionStateQuery" text="Query" /> -->
                         <Separator orientation="VERTICAL" prefHeight="200.0" />
                         <Button mnemonicParsing="false" onAction="#whitelistConnection" text="Whitelist" />
                         <Button mnemonicParsing="false" onAction="#blacklistConnection" text="Blacklist" />
@@ -35,7 +36,7 @@
         <AnchorPane>
             <TableView fx:id="connectionTable" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                 <columns>
-                    <TableColumn minWidth="100.0" prefWidth="100.0" text="Id">
+                    <TableColumn minWidth="130.0" prefWidth="130.0" text="Id">
                         <cellValueFactory>
                             <PropertyValueFactory property="id" />
                         </cellValueFactory>
@@ -50,7 +51,7 @@
                             <PropertyValueFactory property="to" />
                         </cellValueFactory>
                     </TableColumn>
-                    <TableColumn minWidth="100.0" prefWidth="100.0" text="Created at">
+                    <TableColumn minWidth="220.0" prefWidth="220.0" text="Created at">
                         <cellValueFactory>
                             <PropertyValueFactory property="createdAt" />
                         </cellValueFactory>

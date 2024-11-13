@@ -6,6 +6,7 @@ import io.netty.handler.ssl.SslContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 
@@ -26,7 +27,7 @@ public class FlowerSslContextBuilder {
             "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
             "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256");
 
-    public static KeyManagerFactory SERVER_KEY_MANAGER;
+    @Nullable public static KeyManagerFactory SERVER_KEY_MANAGER;
     static {
         try {
             SERVER_KEY_MANAGER = PkiUtil.getKeyManagerFromResources("socks5s_server.crt", "socks5s_server.key", "");

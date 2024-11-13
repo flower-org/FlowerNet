@@ -43,7 +43,7 @@ import static com.flower.conntrack.whiteblacklist.AddressFilterList.AddressRecor
 import static com.flower.conntrack.whiteblacklist.AddressFilterList.HostRecord;
 import static com.flower.conntrack.whiteblacklist.AddressFilterList.PortRecord;
 
-public class TrafficControlForm extends AnchorPane implements Refreshable, ConnectionFilter {
+public class TrafficControlForm extends AnchorPane implements Refreshable, ConnectionFilter, TrafficController {
     final static Logger LOGGER = LoggerFactory.getLogger(TrafficControlForm.class);
     final static String TRAFFIC_RULES_PREF = "trafficRulesPref";
 
@@ -234,6 +234,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         );
     }
 
+    @Override
     public void clearCapturedData() {
         capturedRequests.clear();
         checkNotNull(trafficRulesTable).refresh();
@@ -242,117 +243,147 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     public void whitelistCapture() {
         CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
         if (capturedRequest != null) {
-            AddressRecord addressRecord = ImmutableAddressRecord.builder()
-                    .dstHost(capturedRequest.getHost())
-                    .dstPort(capturedRequest.getPort())
-                    .filterType(FilterType.WHITELIST)
-                    .creationTimestamp(System.currentTimeMillis())
-                    .build();
-            AddressRecord existingRule = innerFilter.addAddressRecord(addressRecord, false);
-            if (existingRule != null && !AddressRecord.recordsEqual(existingRule, addressRecord)) {
-                //Ask to reload
-                if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                    innerFilter.addAddressRecord(addressRecord, true);
-                }
-            }
-            refreshContent();
+            whitelist(capturedRequest.getHost(), capturedRequest.getPort());
         }
+    }
+
+    @Override
+    public void whitelist(String host, int port) {
+        AddressRecord addressRecord = ImmutableAddressRecord.builder()
+                .dstHost(host)
+                .dstPort(port)
+                .filterType(FilterType.WHITELIST)
+                .creationTimestamp(System.currentTimeMillis())
+                .build();
+        AddressRecord existingRule = innerFilter.addAddressRecord(addressRecord, false);
+        if (existingRule != null && !AddressRecord.recordsEqual(existingRule, addressRecord)) {
+            //Ask to reload
+            if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
+                innerFilter.addAddressRecord(addressRecord, true);
+            }
+        }
+        refreshContent();
     }
 
     public void blacklistCapture() {
         CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
         if (capturedRequest != null) {
-            AddressRecord addressRecord = ImmutableAddressRecord.builder()
-                    .dstHost(capturedRequest.getHost())
-                    .dstPort(capturedRequest.getPort())
-                    .filterType(FilterType.BLACKLIST)
-                    .creationTimestamp(System.currentTimeMillis())
-                    .build();
-            AddressRecord existingRule = innerFilter.addAddressRecord(addressRecord, false);
-            if (existingRule != null && !AddressRecord.recordsEqual(existingRule, addressRecord)) {
-                //Ask to reload
-                if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                    innerFilter.addAddressRecord(addressRecord, true);
-                }
-            }
-            refreshContent();
+            blacklist(capturedRequest.getHost(), capturedRequest.getPort());
         }
+    }
+
+    @Override
+    public void blacklist(String host, int port) {
+        AddressRecord addressRecord = ImmutableAddressRecord.builder()
+                .dstHost(host)
+                .dstPort(port)
+                .filterType(FilterType.BLACKLIST)
+                .creationTimestamp(System.currentTimeMillis())
+                .build();
+        AddressRecord existingRule = innerFilter.addAddressRecord(addressRecord, false);
+        if (existingRule != null && !AddressRecord.recordsEqual(existingRule, addressRecord)) {
+            //Ask to reload
+            if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
+                innerFilter.addAddressRecord(addressRecord, true);
+            }
+        }
+        refreshContent();
     }
 
     public void whitelistCaptureHost() {
         CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
         if (capturedRequest != null) {
-            HostRecord hostRecord = ImmutableHostRecord.builder()
-                    .dstHost(capturedRequest.getHost())
-                    .filterType(FilterType.WHITELIST)
-                    .creationTimestamp(System.currentTimeMillis())
-                    .build();
-            HostRecord existingRule = innerFilter.addHostRecord(hostRecord, false);
-            if (existingRule != null && !HostRecord.recordsEqual(existingRule, hostRecord)) {
-                //Ask to reload
-                if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                    innerFilter.addHostRecord(hostRecord, true);
-                }
-            }
-            refreshContent();
+            whitelistHost(capturedRequest.getHost());
         }
+    }
+
+    @Override
+    public void whitelistHost(String host) {
+        HostRecord hostRecord = ImmutableHostRecord.builder()
+                .dstHost(host)
+                .filterType(FilterType.WHITELIST)
+                .creationTimestamp(System.currentTimeMillis())
+                .build();
+        HostRecord existingRule = innerFilter.addHostRecord(hostRecord, false);
+        if (existingRule != null && !HostRecord.recordsEqual(existingRule, hostRecord)) {
+            //Ask to reload
+            if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
+                innerFilter.addHostRecord(hostRecord, true);
+            }
+        }
+        refreshContent();
     }
 
     public void blacklistCaptureHost() {
         CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
         if (capturedRequest != null) {
-            HostRecord hostRecord = ImmutableHostRecord.builder()
-                    .dstHost(capturedRequest.getHost())
-                    .filterType(FilterType.BLACKLIST)
-                    .creationTimestamp(System.currentTimeMillis())
-                    .build();
-            HostRecord existingRule = innerFilter.addHostRecord(hostRecord, false);
-            if (existingRule != null && !HostRecord.recordsEqual(existingRule, hostRecord)) {
-                //Ask to reload
-                if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                    innerFilter.addHostRecord(hostRecord, true);
-                }
-            }
-            refreshContent();
+            blacklistHost(capturedRequest.getHost());
         }
+    }
+
+    @Override
+    public void blacklistHost(String host) {
+        HostRecord hostRecord = ImmutableHostRecord.builder()
+                .dstHost(host)
+                .filterType(FilterType.BLACKLIST)
+                .creationTimestamp(System.currentTimeMillis())
+                .build();
+        HostRecord existingRule = innerFilter.addHostRecord(hostRecord, false);
+        if (existingRule != null && !HostRecord.recordsEqual(existingRule, hostRecord)) {
+            //Ask to reload
+            if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
+                innerFilter.addHostRecord(hostRecord, true);
+            }
+        }
+        refreshContent();
     }
 
     public void whitelistCapturePort() {
         CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
         if (capturedRequest != null) {
-            PortRecord portRecord = ImmutablePortRecord.builder()
-                    .dstPort(capturedRequest.getPort())
-                    .filterType(FilterType.WHITELIST)
-                    .creationTimestamp(System.currentTimeMillis())
-                    .build();
-            PortRecord existingRule = innerFilter.addPortRecord(portRecord, false);
-            if (existingRule != null && !PortRecord.recordsEqual(existingRule, portRecord)) {
-                //Ask to reload
-                if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                    innerFilter.addPortRecord(portRecord, true);
-                }
-            }
-            refreshContent();
+            whitelistPort(capturedRequest.getPort());
         }
+    }
+
+    @Override
+    public void whitelistPort(int port) {
+        PortRecord portRecord = ImmutablePortRecord.builder()
+                .dstPort(port)
+                .filterType(FilterType.WHITELIST)
+                .creationTimestamp(System.currentTimeMillis())
+                .build();
+        PortRecord existingRule = innerFilter.addPortRecord(portRecord, false);
+        if (existingRule != null && !PortRecord.recordsEqual(existingRule, portRecord)) {
+            //Ask to reload
+            if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
+                innerFilter.addPortRecord(portRecord, true);
+            }
+        }
+        refreshContent();
     }
 
     public void blacklistCapturePort() {
         CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
         if (capturedRequest != null) {
-            PortRecord portRecord = ImmutablePortRecord.builder()
-                    .dstPort(capturedRequest.getPort())
-                    .filterType(FilterType.BLACKLIST)
-                    .creationTimestamp(System.currentTimeMillis())
-                    .build();
-            PortRecord existingRule = innerFilter.addPortRecord(portRecord, false);
-            if (existingRule != null && !PortRecord.recordsEqual(existingRule, portRecord)) {
-                //Ask to reload
-                if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                    innerFilter.addPortRecord(portRecord, true);
-                }
-            }
-            refreshContent();
+            blacklistPort(capturedRequest.getPort());
         }
+    }
+
+    @Override
+    public void blacklistPort(int port) {
+        PortRecord portRecord = ImmutablePortRecord.builder()
+                .dstPort(port)
+                .filterType(FilterType.BLACKLIST)
+                .creationTimestamp(System.currentTimeMillis())
+                .build();
+        PortRecord existingRule = innerFilter.addPortRecord(portRecord, false);
+        if (existingRule != null && !PortRecord.recordsEqual(existingRule, portRecord)) {
+            //Ask to reload
+            if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
+                innerFilter.addPortRecord(portRecord, true);
+            }
+        }
+        refreshContent();
     }
 
     @Override

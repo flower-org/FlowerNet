@@ -48,19 +48,24 @@ public final class RelayHandler extends ChannelInboundHandlerAdapter {
             relayChannel.writeAndFlush(msg);
         } else {
             ReferenceCountUtil.release(msg);
+            ctx.channel().close();
         }
     }
 
     @Override
-    public void channelInactive(ChannelHandlerContext ctx) {
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         if (relayChannel.isActive()) {
             ServerUtil.closeOnFlush(relayChannel);
         }
+        super.channelInactive(ctx);
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         LOGGER.error("RelayHandler exception caught: ", cause);
         ctx.close();
+        if (relayChannel.isActive()) {
+            ServerUtil.closeOnFlush(relayChannel);
+        }
     }
 }

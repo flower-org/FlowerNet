@@ -1,6 +1,6 @@
 package com.flower.socksui.forms.traffic;
 
-import com.flower.conntrack.ConnectionListenerAndFilter;
+import com.flower.conntrack.AddressCheck;
 
 public class CaptureFilter {
     final boolean matchedAllowed;
@@ -15,15 +15,15 @@ public class CaptureFilter {
         this.unmatchedProhibited = unmatchedProhibited;
     }
 
-    boolean matchCapturedRecord(ConnectionListenerAndFilter.AddressCheck checkResult, boolean isRuleMatched) {
+    boolean matchCapturedRecord(AddressCheck checkResult, boolean isRuleMatched) {
         if (isRuleMatched) {
-            if (checkResult == ConnectionListenerAndFilter.AddressCheck.CONNECTION_ALLOWED) {
+            if (checkResult == AddressCheck.CONNECTION_ALLOWED) {
                 return matchedAllowed;
             } else {
                 return matchedProhibited;
             }
         } else {
-            if (checkResult == ConnectionListenerAndFilter.AddressCheck.CONNECTION_ALLOWED) {
+            if (checkResult == AddressCheck.CONNECTION_ALLOWED) {
                 return unmatchedAllowed;
             } else {
                 return unmatchedProhibited;

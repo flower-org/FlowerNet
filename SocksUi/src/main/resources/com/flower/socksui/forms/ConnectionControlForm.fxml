@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.ToolBar?>
+<?import javafx.scene.control.cell.PropertyValueFactory?>
+<?import javafx.scene.layout.AnchorPane?>
+
+<fx:root prefHeight="844.0" prefWidth="1151.0" type="AnchorPane" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1">
+    <children>
+        <SplitPane dividerPositions="0.5" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+        <AnchorPane maxHeight="50.0" minHeight="50.0" prefHeight="50.0">
+            <children>
+                <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                    <items>
+                        <Button mnemonicParsing="false" onAction="#closeConnection" text="Close" />
+                        <Button mnemonicParsing="false" onAction="#closeAllConnections" text="Close All" />
+                        <Button mnemonicParsing="false" onAction="#connectionStateQuery" text="Query" />
+                        <Separator orientation="VERTICAL" prefHeight="200.0" />
+                        <Button mnemonicParsing="false" onAction="#whitelistConnection" text="Whitelist" />
+                        <Button mnemonicParsing="false" onAction="#blacklistConnection" text="Blacklist" />
+                        <Separator orientation="VERTICAL" prefHeight="200.0" />
+                        <Button mnemonicParsing="false" onAction="#whitelistConnectionHost" text="Whitelist host" />
+                        <Button mnemonicParsing="false" onAction="#blacklistConnectionHost" text="Blacklist host" />
+                        <Separator orientation="VERTICAL" prefHeight="200.0" />
+                        <Button mnemonicParsing="false" onAction="#whitelistConnectionPort" text="Whitelist port" />
+                        <Button mnemonicParsing="false" onAction="#blacklistConnectionPort" text="Blacklist port" />
+                    </items>
+                </ToolBar>
+            </children>
+        </AnchorPane>
+        <AnchorPane>
+            <TableView fx:id="connectionTable" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                <columns>
+                    <TableColumn minWidth="100.0" prefWidth="100.0" text="Id">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="id" />
+                        </cellValueFactory>
+                    </TableColumn>
+                    <TableColumn minWidth="200.0" prefWidth="200.0" text="From">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="from" />
+                        </cellValueFactory>
+                    </TableColumn>
+                    <TableColumn minWidth="200.0" prefWidth="200.0" text="To">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="to" />
+                        </cellValueFactory>
+                    </TableColumn>
+                    <TableColumn minWidth="100.0" prefWidth="100.0" text="Created at">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="createdAt" />
+                        </cellValueFactory>
+                    </TableColumn>
+                    <TableColumn minWidth="100.0" prefWidth="100.0" text="BytesIn">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="bytesIn" />
+                        </cellValueFactory>
+                    </TableColumn>
+                    <TableColumn minWidth="100.0" prefWidth="100.0" text="BytesOut">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="bytesOut" />
+                        </cellValueFactory>
+                    </TableColumn>
+                </columns>
+            </TableView>
+        </AnchorPane>
+        </SplitPane>
+    </children>
+</fx:root>

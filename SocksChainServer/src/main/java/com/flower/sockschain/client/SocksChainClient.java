@@ -188,6 +188,8 @@ public class SocksChainClient {
                 //System.out.println(showPipeline(outgoingChannel().pipeline()));
                 //System.out.println(showPipeline(inboundCtx.pipeline()));
 
+                //TODO: what if future is not a success?
+
                 //TODO: replace with `inboundChannel.pipeline`, get rid of ctx
                 //TODO: this is SOCKS5-specific, make it support other versions
                 try {
@@ -233,9 +235,14 @@ public class SocksChainClient {
 
     public void connectionFailed() {
         inboundChannel.writeAndFlush(downstreamResponseFailure);
-        ServerUtil.closeOnFlush(outgoingChannel());
-        if (outgoingChannel.get() != null) {
-            outgoingChannel().close();
+        ServerUtil.closeOnFlush(inboundChannel);
+
+        Channel outChannel = outgoingChannel.get();
+        if (outChannel != null) {
+            ServerUtil.closeOnFlush(outChannel);
+            if (outChannel != null) {
+                outChannel.close();
+            }
         }
     }
 }

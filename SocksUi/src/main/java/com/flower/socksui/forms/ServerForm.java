@@ -3,7 +3,8 @@ package com.flower.socksui.forms;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
-import com.flower.conntrack.ConnectionListenerAndFilter;
+import com.flower.conntrack.ConnectionFilter;
+import com.flower.conntrack.ConnectionListener;
 import com.flower.sockschain.config.ProxyChainProvider;
 import com.flower.sockschain.config.SocksNode;
 import com.flower.sockschain.server.SocksChainServerConnectHandler;
@@ -114,8 +115,12 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
         refreshContent();
     }
 
-    public void addConnectionListenerAndFilter(ConnectionListenerAndFilter connectionListenerAndFilter) {
-        server.addConnectionListenerAndFilter(connectionListenerAndFilter);
+    public void addConnectionFilter(ConnectionFilter connectionFilter) {
+        server.addConnectionFilter(connectionFilter);
+    }
+
+    public void addConnectionListener(ConnectionListener connectionListener) {
+        server.addConnectionListener(connectionListener);
     }
 
     public void startServer() throws InterruptedException {

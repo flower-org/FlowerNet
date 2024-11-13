@@ -1,6 +1,6 @@
 package com.flower.conntrack.whiteblacklist;
 
-import com.flower.conntrack.ConnectionListenerAndFilter.AddressCheck;
+import com.flower.conntrack.AddressCheck;
 import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nullable;

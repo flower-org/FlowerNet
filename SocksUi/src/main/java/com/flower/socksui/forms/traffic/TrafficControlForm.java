@@ -3,7 +3,8 @@ package com.flower.socksui.forms.traffic;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
-import com.flower.conntrack.ConnectionListenerAndFilter;
+import com.flower.conntrack.AddressCheck;
+import com.flower.conntrack.ConnectionFilter;
 import com.flower.conntrack.whiteblacklist.AddressFilterList;
 import com.flower.conntrack.whiteblacklist.FilterType;
 import com.flower.conntrack.whiteblacklist.ImmutableAddressRecord;
@@ -42,7 +43,7 @@ import static com.flower.conntrack.whiteblacklist.AddressFilterList.AddressRecor
 import static com.flower.conntrack.whiteblacklist.AddressFilterList.HostRecord;
 import static com.flower.conntrack.whiteblacklist.AddressFilterList.PortRecord;
 
-public class TrafficControlForm extends AnchorPane implements Refreshable, ConnectionListenerAndFilter {
+public class TrafficControlForm extends AnchorPane implements Refreshable, ConnectionFilter {
     final static Logger LOGGER = LoggerFactory.getLogger(TrafficControlForm.class);
     final static String TRAFFIC_RULES_PREF = "trafficRulesPref";
 

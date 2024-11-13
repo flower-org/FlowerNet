@@ -1,5 +1,6 @@
 package com.flower.socksui;
 
+import com.flower.socksui.forms.ConnectionControlForm;
 import com.flower.socksui.forms.ServerForm;
 import com.flower.socksui.forms.traffic.TrafficControlForm;
 import javafx.fxml.FXML;
@@ -23,6 +24,7 @@ public class MainApp {
 
     @Nullable ServerForm serverForm;
     @Nullable TrafficControlForm trafficControlForm;
+    @Nullable ConnectionControlForm connectionControlForm;
 
     public MainApp() {
         //This form is created automatically.
@@ -63,8 +65,10 @@ public class MainApp {
     public void showTabs() {
         openServerTab();
         openTrafficControlTab();
+        openConnectionsTab();
 
-        checkNotNull(serverForm).addConnectionListenerAndFilter(checkNotNull(trafficControlForm));
+        checkNotNull(serverForm).addConnectionFilter(checkNotNull(trafficControlForm));
+        checkNotNull(serverForm).addConnectionListener(checkNotNull(connectionControlForm));
 
         checkNotNull(tabs).getSelectionModel().select(0);
     }
@@ -82,6 +86,15 @@ public class MainApp {
         trafficControlForm = new TrafficControlForm(this);
         trafficControlForm.setStage(checkNotNull(mainStage));
         final Tab tab = new Tab("Traffic Control", trafficControlForm);
+        tab.setClosable(false);
+
+        addTab(tab);
+    }
+
+    public void openConnectionsTab() {
+        connectionControlForm = new ConnectionControlForm(this);
+        connectionControlForm.setStage(checkNotNull(mainStage));
+        final Tab tab = new Tab("Connection Control", connectionControlForm);
         tab.setClosable(false);
 
         addTab(tab);

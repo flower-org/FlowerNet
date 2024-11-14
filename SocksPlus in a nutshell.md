@@ -8,5 +8,5 @@
 
 
 Maybe:
-single_conn? - virtual connection closes, physical connection closes: useful for nodes in the middle of the chain.
+single_conn? - virtual connection closes, physical connection closes: useful for nodes in the middle of the chain.  
 remove_tls? - for speed-up, but might be impractical.

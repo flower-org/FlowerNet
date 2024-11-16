@@ -60,16 +60,37 @@ public class TrafficRule {
         }
     }
 
-    public String getPort() {
+    public @Nullable Integer getIntPort() {
         if (addressRecord != null) {
-            return Integer.toString(addressRecord.dstPort());
+            return addressRecord.dstPort();
         } else if (hostRecord != null) {
-            return "";
+            return null;
         } else if (portRecord != null) {
-            return Integer.toString(portRecord.dstPort());
+            return portRecord.dstPort();
         } else {
             throw new IllegalStateException("Either addressRecord or hostRecord or portRecord should be not null");
         }
+    }
+
+    public String getPort() {
+        Integer intPort = getIntPort();
+        return intPort == null ? "" : Integer.toString(intPort);
+    }
+
+    public boolean isWildcard() {
+        if (addressRecord != null) {
+            return addressRecord.isWildcard();
+        } else if (hostRecord != null) {
+            return hostRecord.isWildcard();
+        } else if (portRecord != null) {
+            return false;
+        } else {
+            throw new IllegalStateException("Either addressRecord or hostRecord or portRecord should be not null");
+        }
+    }
+
+    public String isWildcardStr() {
+        return Boolean.toString(isWildcard());
     }
 
     public String getDate() {

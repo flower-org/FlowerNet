@@ -51,7 +51,7 @@
                             <PropertyValueFactory property="to" />
                         </cellValueFactory>
                     </TableColumn>
-                    <TableColumn minWidth="220.0" prefWidth="220.0" text="Created at">
+                    <TableColumn minWidth="220.0" prefWidth="235.0" text="Created at">
                         <cellValueFactory>
                             <PropertyValueFactory property="createdAt" />
                         </cellValueFactory>

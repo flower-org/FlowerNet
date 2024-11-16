@@ -21,6 +21,7 @@ public interface AddressFilterList {
         String dstHost();
         Integer dstPort();
         Long creationTimestamp();
+        Boolean isWildcard();
 
         static boolean recordsEqual(AddressRecord record1, AddressRecord record2) {
             return record1.filterType().equals(record2.filterType())
@@ -37,6 +38,7 @@ public interface AddressFilterList {
         FilterType filterType();
         String dstHost();
         Long creationTimestamp();
+        Boolean isWildcard();
 
         static boolean recordsEqual(HostRecord record1, HostRecord record2) {
             return record1.filterType().equals(record2.filterType())
@@ -62,4 +64,7 @@ public interface AddressFilterList {
     List<AddressRecord> addressRecords();
     List<HostRecord> hostRecords();
     List<PortRecord> portRecords();
+
+    List<AddressRecord> wildcardAddressRecords();
+    List<HostRecord> wildcardHostRecords();
 }

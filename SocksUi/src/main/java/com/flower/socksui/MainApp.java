@@ -1,6 +1,6 @@
 package com.flower.socksui;
 
-import com.flower.socksui.forms.ConnectionControlForm;
+import com.flower.socksui.forms.ConnectionMonitorForm;
 import com.flower.socksui.forms.ServerForm;
 import com.flower.socksui.forms.traffic.TrafficControlForm;
 import javafx.fxml.FXML;
@@ -24,7 +24,7 @@ public class MainApp {
 
     @Nullable ServerForm serverForm;
     @Nullable TrafficControlForm trafficControlForm;
-    @Nullable ConnectionControlForm connectionControlForm;
+    @Nullable ConnectionMonitorForm connectionMonitorForm;
 
     public MainApp() {
         //This form is created automatically.
@@ -47,7 +47,7 @@ public class MainApp {
     }
 
     public void showAboutDialog() {
-        Alert alert = new Alert(Alert.AlertType.NONE, "Socks UI v 0.0.2", ButtonType.OK);
+        Alert alert = new Alert(Alert.AlertType.NONE, "Socks UI v 0.0.5", ButtonType.OK);
         alert.showAndWait();
     }
 
@@ -68,7 +68,7 @@ public class MainApp {
         openConnectionsTab();
 
         checkNotNull(serverForm).addConnectionFilter(checkNotNull(trafficControlForm));
-        checkNotNull(serverForm).addConnectionListener(checkNotNull(connectionControlForm));
+        checkNotNull(serverForm).addConnectionListener(checkNotNull(connectionMonitorForm));
 
         checkNotNull(tabs).getSelectionModel().select(0);
     }
@@ -92,9 +92,9 @@ public class MainApp {
     }
 
     public void openConnectionsTab() {
-        connectionControlForm = new ConnectionControlForm(this, checkNotNull(trafficControlForm));
-        connectionControlForm.setStage(checkNotNull(mainStage));
-        final Tab tab = new Tab("Connection Control", connectionControlForm);
+        connectionMonitorForm = new ConnectionMonitorForm(this, checkNotNull(trafficControlForm));
+        connectionMonitorForm.setStage(checkNotNull(mainStage));
+        final Tab tab = new Tab("Connection Monitor", connectionMonitorForm);
         tab.setClosable(false);
 
         addTab(tab);

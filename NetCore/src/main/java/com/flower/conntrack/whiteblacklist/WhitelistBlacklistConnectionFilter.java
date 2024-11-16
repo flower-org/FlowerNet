@@ -22,6 +22,10 @@ public class WhitelistBlacklistConnectionFilter {
     //Priority 1
     final Map<String, HostRecord> hostRecords;
     //Priority 2
+    final Map<String, Map<Integer, AddressRecord>> wildcardAddressRecords;
+    //Priority 3
+    final Map<String, HostRecord> wildcardHostRecords;
+    //Priority 4
     final Map<Integer, PortRecord> portRecords;
 
     public WhitelistBlacklistConnectionFilter(List<Pair<AddressFilterList, Boolean>> addressLists) {
@@ -39,15 +43,24 @@ public class WhitelistBlacklistConnectionFilter {
         return hostRecords;
     }
 
-    public Map<Integer, PortRecord> getPortRecords() {
-        return portRecords;
+    public Map<String, Map<Integer, AddressRecord>> getWildcardAddressRecords() {
+        return wildcardAddressRecords;
     }
+
+    public Map<String, HostRecord> getWildcardHostRecords() {
+        return wildcardHostRecords;
+    }
+
+    public Map<Integer, PortRecord> getPortRecords() { return portRecords; }
+
 
     public WhitelistBlacklistConnectionFilter() {
         addressLists = new ArrayList<>();
         addressRecords = new ConcurrentHashMap<>();
         hostRecords = new ConcurrentHashMap<>();
         portRecords = new ConcurrentHashMap<>();
+        wildcardAddressRecords = new ConcurrentHashMap<>();
+        wildcardHostRecords = new ConcurrentHashMap<>();
     }
 
     public void addList(AddressFilterList list, boolean overrideExisting) {
@@ -60,10 +73,19 @@ public class WhitelistBlacklistConnectionFilter {
         for (PortRecord portRecord : list.portRecords()) {
             addPortRecord(portRecord, overrideExisting);
         }
+        for (AddressRecord addressRecord : list.wildcardAddressRecords()) {
+            addAddressRecord(addressRecord, overrideExisting);
+        }
+        for (HostRecord hostRecord : list.wildcardHostRecords()) {
+            addHostRecord(hostRecord, overrideExisting);
+        }
     }
 
     @Nullable public AddressRecord addAddressRecord(AddressRecord addressRecord, boolean overrideExisting) {
-        Map<Integer, AddressRecord> portMap = addressRecords.computeIfAbsent(addressRecord.dstHost(), k -> new ConcurrentHashMap<>());
+        Map<Integer, AddressRecord> portMap =
+                addressRecord.isWildcard() ?
+                        wildcardAddressRecords.computeIfAbsent(addressRecord.dstHost(), k -> new ConcurrentHashMap<>())
+                        : addressRecords.computeIfAbsent(addressRecord.dstHost(), k -> new ConcurrentHashMap<>());
         if (overrideExisting) {
             return portMap.put(addressRecord.dstPort(), addressRecord);
         } else {
@@ -72,6 +94,7 @@ public class WhitelistBlacklistConnectionFilter {
     }
 
     @Nullable public HostRecord addHostRecord(HostRecord hostRecord, boolean overrideExisting) {
+        final Map<String, HostRecord> hostRecords = hostRecord.isWildcard() ? this.wildcardHostRecords : this.hostRecords;
         if (overrideExisting) {
             return hostRecords.put(hostRecord.dstHost(), hostRecord);
         } else {
@@ -88,11 +111,11 @@ public class WhitelistBlacklistConnectionFilter {
     }
 
     public @Nullable AddressRecord removeAddressRecord(AddressRecord addressRecord) {
-        return removeAddressRecord(addressRecord.dstHost(), addressRecord.dstPort());
+        return removeAddressRecord(addressRecord.dstHost(), addressRecord.dstPort(), addressRecord.isWildcard());
     }
 
-    public @Nullable AddressRecord removeAddressRecord(String host, Integer port) {
-        Map<Integer, AddressRecord> portMap = addressRecords.get(host);
+    public @Nullable AddressRecord removeAddressRecord(String host, Integer port, boolean isWildcard) {
+        Map<Integer, AddressRecord> portMap = isWildcard ? wildcardAddressRecords.get(host) : addressRecords.get(host);
         if (portMap == null) {
             return null;
         } else {
@@ -102,19 +125,12 @@ public class WhitelistBlacklistConnectionFilter {
     }
 
     public @Nullable HostRecord removeHostRecord(HostRecord hostRecord) {
-        return removeHostRecord(hostRecord.dstHost());
-    }
-
-    public @Nullable HostRecord removeHostRecord(String host) {
-        return hostRecords.remove(host);
+        final Map<String, HostRecord> hostRecords = hostRecord.isWildcard() ? this.wildcardHostRecords : this.hostRecords;
+        return hostRecords.remove(hostRecord.dstHost());
     }
 
     public @Nullable PortRecord removePortRecord(PortRecord portRecord) {
-        return removePortRecord(portRecord.dstPort());
-    }
-
-    public @Nullable PortRecord removePortRecord(Integer port) {
-        return portRecords.remove(port);
+        return portRecords.remove(portRecord.dstPort());
     }
 
     public void clear() {
@@ -122,6 +138,8 @@ public class WhitelistBlacklistConnectionFilter {
         addressRecords.clear();
         hostRecords.clear();
         portRecords.clear();
+        wildcardAddressRecords.clear();
+        wildcardHostRecords.clear();
     }
 
     public AddressFilterList getFullList() {
@@ -141,10 +159,24 @@ public class WhitelistBlacklistConnectionFilter {
             portRecords.add(portEntry.getValue());
         }
 
+        List<AddressRecord> wildcardAddressRecords = new ArrayList<>();
+        List<HostRecord> wildcardHostRecords = new ArrayList<>();
+
+        for (Map.Entry<String, Map<Integer, AddressRecord>> addressEntry : this.wildcardAddressRecords.entrySet()) {
+            for (Map.Entry<Integer, AddressRecord> addressPortEntry : addressEntry.getValue().entrySet()) {
+                wildcardAddressRecords.add(addressPortEntry.getValue());
+            }
+        }
+        for (Map.Entry<String, HostRecord> hostEntry : this.wildcardHostRecords.entrySet()) {
+            wildcardHostRecords.add(hostEntry.getValue());
+        }
+
         return ImmutableAddressFilterList.builder()
                 .addressRecords(addressRecords)
                 .hostRecords(hostRecords)
                 .portRecords(portRecords)
+                .wildcardAddressRecords(wildcardAddressRecords)
+                .wildcardHostRecords(wildcardHostRecords)
                 .build();
     }
 
@@ -204,15 +236,50 @@ public class WhitelistBlacklistConnectionFilter {
             }
         }
 
+        List<AddressRecord> wildcardAddressRecords = new ArrayList<>();
+        List<HostRecord> wildcardHostRecords = new ArrayList<>();
+
+        for (Map.Entry<String, Map<Integer, AddressRecord>> wildcardAddressEntry : fromThisFilter.wildcardAddressRecords.entrySet()) {
+            Map<Integer, AddressRecord> addressRecordByPortMap = wildcardAddressEntry.getValue();
+            Map<Integer, AddressRecord> otherMap = diffFromThatFilter.wildcardAddressRecords.get(wildcardAddressEntry.getKey());
+
+            for (Map.Entry<Integer, AddressRecord> addressPortEntry : addressRecordByPortMap.entrySet()) {
+                if (otherMap == null) {
+                    wildcardAddressRecords.add(addressPortEntry.getValue());
+                } else {
+                    AddressRecord otherRecord = otherMap.get(addressPortEntry.getKey());
+                    if (otherRecord == null) {
+                        wildcardAddressRecords.add(addressPortEntry.getValue());
+                    } else if (includeUpdated) {
+                        if (!addressPortEntry.getValue().equals(otherRecord)) {
+                            wildcardAddressRecords.add(addressPortEntry.getValue());
+                        }
+                    }
+                }
+            }
+        }
+        for (Map.Entry<String, HostRecord> hostEntry : fromThisFilter.wildcardHostRecords.entrySet()) {
+            HostRecord otherRecord = diffFromThatFilter.wildcardHostRecords.get(hostEntry.getKey());
+            if (otherRecord == null) {
+                wildcardHostRecords.add(hostEntry.getValue());
+            } else if (includeUpdated) {
+                if (!hostEntry.getValue().equals(otherRecord)) {
+                    wildcardHostRecords.add(hostEntry.getValue());
+                }
+            }
+        }
+
         return ImmutableAddressFilterList.builder()
                 .addressRecords(addressRecords)
                 .hostRecords(hostRecords)
                 .portRecords(portRecords)
+                .wildcardAddressRecords(wildcardAddressRecords)
+                .wildcardHostRecords(wildcardHostRecords)
                 .build();
     }
 
     @Nullable public AddressCheck getRecordRule(String dstHost, int dstPort) {
-        // Priority 1 - exact hostname/port match
+        // Priority 0 - exact hostname/port match
         Map<Integer, AddressRecord> portMap = addressRecords.get(dstHost);
         if (portMap != null) {
             AddressRecord record = portMap.get(dstPort);
@@ -227,7 +294,7 @@ public class WhitelistBlacklistConnectionFilter {
             }
         }
 
-        // Priority 2 - hostname match (without port)
+        // Priority 1 - hostname match (without port)
         HostRecord hostRecord = hostRecords.get(dstHost);
         if (hostRecord != null) {
             if (hostRecord.filterType() == FilterType.WHITELIST) {
@@ -239,7 +306,35 @@ public class WhitelistBlacklistConnectionFilter {
             }
         }
 
-        // Priority 3 - port match (without hostname)
+        // Priority 2 - wildcard hostname/port match
+        Map<Integer, AddressRecord> wildcardPortMap = getWildcardResource(dstHost, wildcardAddressRecords);
+        if (wildcardPortMap != null) {
+            AddressRecord record = wildcardPortMap.get(dstPort);
+
+            if (record != null) {
+                if (record.filterType() == FilterType.WHITELIST) {
+                    return AddressCheck.CONNECTION_ALLOWED;
+                } else if (record.filterType() == FilterType.BLACKLIST) {
+                    return AddressCheck.CONNECTION_PROHIBITED;
+                } else {
+                    throw new IllegalArgumentException("Unknown filter type: " + record.filterType());
+                }
+            }
+        }
+
+        // Priority 3 - wildcard hostname match (without port)
+        HostRecord wildcardHostRecord = getWildcardResource(dstHost, wildcardHostRecords);
+        if (wildcardHostRecord != null) {
+            if (wildcardHostRecord.filterType() == FilterType.WHITELIST) {
+                return AddressCheck.CONNECTION_ALLOWED;
+            } else if (wildcardHostRecord.filterType() == FilterType.BLACKLIST) {
+                return AddressCheck.CONNECTION_PROHIBITED;
+            } else {
+                throw new IllegalArgumentException("Unknown filter type: " + wildcardHostRecord.filterType());
+            }
+        }
+
+        // Priority 4 - port match (without hostname)
         PortRecord portRecord = portRecords.get(dstPort);
         if (portRecord != null) {
             if (portRecord.filterType() == FilterType.WHITELIST) {
@@ -251,6 +346,16 @@ public class WhitelistBlacklistConnectionFilter {
             }
         }
 
+        return null;
+    }
+
+    private @Nullable <T> T getWildcardResource(String text, Map<String, T> wildcardAddressRecords) {
+        for (Map.Entry<String, T> entry : wildcardAddressRecords.entrySet()) {
+            String pattern = entry.getKey();
+            if (WildcardMatcher.isMatch(text, pattern)) {
+                return entry.getValue();
+            }
+        }
         return null;
     }
 }

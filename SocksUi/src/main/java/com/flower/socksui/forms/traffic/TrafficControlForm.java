@@ -14,6 +14,7 @@ import com.flower.conntrack.whiteblacklist.WhitelistBlacklistConnectionFilter;
 import com.flower.socksui.JavaFxUtils;
 import com.flower.socksui.MainApp;
 import com.flower.socksui.ModalWindow;
+import com.flower.socksui.forms.ConnectionMonitorForm;
 import com.flower.socksui.forms.Refreshable;
 import com.flower.utils.NonDnsHostnameChecker;
 import com.google.common.collect.Streams;
@@ -26,6 +27,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +48,7 @@ import static com.flower.conntrack.whiteblacklist.AddressFilterList.PortRecord;
 public class TrafficControlForm extends AnchorPane implements Refreshable, ConnectionFilter, TrafficController {
     final static Logger LOGGER = LoggerFactory.getLogger(TrafficControlForm.class);
     final static String TRAFFIC_RULES_PREF = "trafficRulesPref";
+    final static String CAPTURE_FLAG_PREF = "captureFlagPref";
 
     final static String OFF = "Off";
     final static String WHITELIST = "Whitelist";
@@ -69,8 +72,14 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     final AtomicLong prohibitedConnections;
     final MainApp mainForm;
 
+    @Nullable ConnectionMonitorForm connectionMonitorForm;
+
     public void setStage(Stage stage) {
         this.stage = stage;
+    }
+
+    public void setConnectionMonitorForm(ConnectionMonitorForm connectionMonitorForm) {
+        this.connectionMonitorForm = connectionMonitorForm;
     }
 
     public TrafficControlForm(MainApp mainForm) {
@@ -103,6 +112,15 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
             ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
                     .registerModule(new GuavaModule());
             AddressFilterList addressFilterList = mapper.readValue(trafficRules, AddressFilterList.class);
+
+            String captureFlagStr = userPreferences.get(CAPTURE_FLAG_PREF, "");
+            boolean captureFlag = false;
+            if (!StringUtils.isBlank(captureFlagStr)) {
+                try {
+                    captureFlag = Boolean.parseBoolean(captureFlagStr);
+                } catch (Exception e) { }
+            }
+            checkNotNull(captureRequestsCheckBox).selectedProperty().set(captureFlag);
 
             innerFilter.clear();
             innerFilter.addList(addressFilterList, true);
@@ -144,7 +162,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     }
 
     @Override
-    public AddressCheck approveConnection(String dstHost, int dstPort, SocketAddress from) {
+    public AddressCheck approveConnection(String dstHost, int dstPort, @Nullable SocketAddress from) {
         AddressCheck checkResult;
         boolean isDirectIpBlock = false;
         boolean isRuleMatched;
@@ -186,43 +204,47 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         final AddressCheck finalCheckResult = checkResult;
         final boolean finalIsRuleMatched = isRuleMatched;
         final boolean finalIsDirectIpBlock = isDirectIpBlock;
-        Platform.runLater(() -> {
-            if (checkNotNull(captureRequestsCheckBox).selectedProperty().get()) {
-                CaptureFilter captureFilter = getCaptureFilter();
-                if (captureFilter.matchCapturedRecord(finalCheckResult, finalIsRuleMatched)) {
-                    CapturedRequest capturedRequest = new CapturedRequest(dstHost, dstPort, finalCheckResult,
-                            finalIsRuleMatched, finalIsDirectIpBlock, from);
-                    capturedRequests.add(capturedRequest);
-                    try {
-                        int max = Integer.parseInt(checkNotNull(maxRequests).textProperty().get());
-                        while (capturedRequests.size() > max) {
-                            CapturedRequest selectedItem = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
-                            capturedRequests.remove(0);
-                            if (selectedItem != null) {
-                                try {
-                                    checkNotNull(capturedRequestsTable).getSelectionModel().select(selectedItem);
-                                } catch (Exception e) {
-                                    // selectedItem may be out of bounds
+
+        if (from != null) {
+            Platform.runLater(() -> {
+                if (checkNotNull(captureRequestsCheckBox).selectedProperty().get()) {
+                    CaptureFilter captureFilter = getCaptureFilter();
+                    if (captureFilter.matchCapturedRecord(finalCheckResult, finalIsRuleMatched)) {
+                        CapturedRequest capturedRequest = new CapturedRequest(dstHost, dstPort, finalCheckResult,
+                                finalIsRuleMatched, finalIsDirectIpBlock, from);
+                        capturedRequests.add(capturedRequest);
+                        try {
+                            int max = Integer.parseInt(checkNotNull(maxRequests).textProperty().get());
+                            while (capturedRequests.size() > max) {
+                                CapturedRequest selectedItem = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
+                                capturedRequests.remove(0);
+                                if (selectedItem != null) {
+                                    try {
+                                        checkNotNull(capturedRequestsTable).getSelectionModel().select(selectedItem);
+                                    } catch (Exception e) {
+                                        // selectedItem may be out of bounds
+                                    }
                                 }
                             }
+                        } catch (Exception e) {
                         }
-                    } catch (Exception e) {}
 
-                    checkNotNull(capturedRequestsTable).refresh();
+                        checkNotNull(capturedRequestsTable).refresh();
+                    }
                 }
+            });
+
+            totalConnections.incrementAndGet();
+            if (checkResult == AddressCheck.CONNECTION_ALLOWED) {
+                allowedConnections.incrementAndGet();
+            } else {
+                prohibitedConnections.incrementAndGet();
             }
-        });
 
-        totalConnections.incrementAndGet();
-        if (checkResult == AddressCheck.CONNECTION_ALLOWED) {
-            allowedConnections.incrementAndGet();
-        } else {
-            prohibitedConnections.incrementAndGet();
+            Platform.runLater(() -> {
+                updateConnectionStats();
+            });
         }
-
-        Platform.runLater(() -> {
-            updateConnectionStats();
-        });
 
         return checkResult;
     }
@@ -254,6 +276,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 .dstPort(port)
                 .filterType(FilterType.WHITELIST)
                 .creationTimestamp(System.currentTimeMillis())
+                .isWildcard(false)
                 .build();
         AddressRecord existingRule = innerFilter.addAddressRecord(addressRecord, false);
         if (existingRule != null && !AddressRecord.recordsEqual(existingRule, addressRecord)) {
@@ -279,6 +302,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 .dstPort(port)
                 .filterType(FilterType.BLACKLIST)
                 .creationTimestamp(System.currentTimeMillis())
+                .isWildcard(false)
                 .build();
         AddressRecord existingRule = innerFilter.addAddressRecord(addressRecord, false);
         if (existingRule != null && !AddressRecord.recordsEqual(existingRule, addressRecord)) {
@@ -287,6 +311,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 innerFilter.addAddressRecord(addressRecord, true);
             }
         }
+        checkNotNull(connectionMonitorForm).checkBlacklistedHosts();
         refreshContent();
     }
 
@@ -303,6 +328,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 .dstHost(host)
                 .filterType(FilterType.WHITELIST)
                 .creationTimestamp(System.currentTimeMillis())
+                .isWildcard(false)
                 .build();
         HostRecord existingRule = innerFilter.addHostRecord(hostRecord, false);
         if (existingRule != null && !HostRecord.recordsEqual(existingRule, hostRecord)) {
@@ -327,6 +353,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 .dstHost(host)
                 .filterType(FilterType.BLACKLIST)
                 .creationTimestamp(System.currentTimeMillis())
+                .isWildcard(false)
                 .build();
         HostRecord existingRule = innerFilter.addHostRecord(hostRecord, false);
         if (existingRule != null && !HostRecord.recordsEqual(existingRule, hostRecord)) {
@@ -335,6 +362,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 innerFilter.addHostRecord(hostRecord, true);
             }
         }
+        checkNotNull(connectionMonitorForm).checkBlacklistedHosts();
         refreshContent();
     }
 
@@ -383,6 +411,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 innerFilter.addPortRecord(portRecord, true);
             }
         }
+        checkNotNull(connectionMonitorForm).checkBlacklistedHosts();
         refreshContent();
     }
 
@@ -400,6 +429,17 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 .sorted(Map.Entry.comparingByKey())
                 .map(e -> new TrafficRule(e.getValue())),
             innerFilter.getAddressRecords()
+                .entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(Map.Entry::getValue)
+                .flatMap(m -> m.entrySet().stream())
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> new TrafficRule(e.getValue())),
+            innerFilter.getWildcardHostRecords()
+                .entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> new TrafficRule(e.getValue())),
+            innerFilter.getWildcardAddressRecords()
                 .entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
                 .map(Map.Entry::getValue)
@@ -426,9 +466,50 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         } catch (Exception e) {}
     }
 
+    public void captureFlagChange() {
+        Preferences userPreferences = Preferences.userRoot();
+        userPreferences.put(CAPTURE_FLAG_PREF, Boolean.toString(checkNotNull(captureRequestsCheckBox).selectedProperty().get()));
+    }
+
     public void newRule() {
         try {
             TrafficRuleAddDialog trafficRuleAddDialog = new TrafficRuleAddDialog();
+            Stage workspaceStage = ModalWindow.showModal(checkNotNull(stage),
+                    stage -> { trafficRuleAddDialog.setStage(stage); return trafficRuleAddDialog; },
+                    "Add new traffic rule");
+
+            workspaceStage.setOnHidden(
+                    ev -> {
+                        try {
+                            TrafficRule trafficRule = trafficRuleAddDialog.getTrafficRule();
+                            if (trafficRule != null) {
+                                addTrafficRule(trafficRule);
+                                refreshContent();
+                            }
+                        } catch (Exception e) {
+                            Alert alert = new Alert(Alert.AlertType.ERROR, "Error adding known server: " + e, ButtonType.OK);
+                            LOGGER.error("Error adding known server: ", e);
+                            alert.showAndWait();
+                        }
+                    }
+            );
+        } catch (Exception e) {
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Error adding known server: " + e, ButtonType.OK);
+            LOGGER.error("Error adding known server: ", e);
+            alert.showAndWait();
+        }
+
+        refreshContent();
+    }
+
+    public void deriveRule() {
+        try {
+            TrafficRule trafficRuleToDeriveFrom = checkNotNull(trafficRulesTable).getSelectionModel().getSelectedItem();
+            if (trafficRuleToDeriveFrom == null) {
+                return;
+            }
+
+            TrafficRuleAddDialog trafficRuleAddDialog = new TrafficRuleAddDialog(trafficRuleToDeriveFrom);
             Stage workspaceStage = ModalWindow.showModal(checkNotNull(stage),
                     stage -> { trafficRuleAddDialog.setStage(stage); return trafficRuleAddDialog; },
                     "Add new traffic rule");
@@ -485,6 +566,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
             } else if (trafficRule.portRecord != null) {
                 innerFilter.removePortRecord(trafficRule.portRecord);
             }
+            checkNotNull(connectionMonitorForm).checkBlacklistedHosts();
         }
 
         refreshAndRestoreCursor();
@@ -513,30 +595,36 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         TrafficRule trafficRule = checkNotNull(trafficRulesTable).getSelectionModel().getSelectedItem();
         if (trafficRule != null) {
             if (trafficRule.addressRecord != null) {
+                FilterType newFilterType = flipFilterType(trafficRule.addressRecord.filterType());
                 innerFilter.addAddressRecord(ImmutableAddressRecord.builder()
                         .dstHost(trafficRule.addressRecord.dstHost())
                         .dstPort(trafficRule.addressRecord.dstPort())
-                        .filterType(flipFilterType(trafficRule.addressRecord.filterType()))
+                        .filterType(newFilterType)
                         .creationTimestamp(System.currentTimeMillis())
+                        .isWildcard(trafficRule.isWildcard())
                         .build(),
                         true);
             } else if (trafficRule.hostRecord != null) {
                 innerFilter.removeHostRecord(trafficRule.hostRecord);
+                FilterType newFilterType = flipFilterType(trafficRule.hostRecord.filterType());
                 innerFilter.addHostRecord(ImmutableHostRecord.builder()
                         .dstHost(trafficRule.hostRecord.dstHost())
-                        .filterType(flipFilterType(trafficRule.hostRecord.filterType()))
+                        .filterType(newFilterType)
                         .creationTimestamp(System.currentTimeMillis())
+                        .isWildcard(trafficRule.isWildcard())
                         .build(),
                         true);
             } else if (trafficRule.portRecord != null) {
                 innerFilter.removePortRecord(trafficRule.portRecord);
+                FilterType newFilterType = flipFilterType(trafficRule.portRecord.filterType());
                 innerFilter.addPortRecord(ImmutablePortRecord.builder()
                         .dstPort(trafficRule.portRecord.dstPort())
-                        .filterType(flipFilterType(trafficRule.portRecord.filterType()))
+                        .filterType(newFilterType)
                         .creationTimestamp(System.currentTimeMillis())
                         .build(),
                         true);
             }
+            checkNotNull(connectionMonitorForm).checkBlacklistedHosts();
         }
         refreshAndRestoreCursor();
     }

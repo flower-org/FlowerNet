@@ -61,6 +61,14 @@ public class JavaFxUtils {
     return YesNo.NO;
   }
 
+  public static void showMessage(String titleHeaderContext) {
+    showMessage(titleHeaderContext, titleHeaderContext);
+  }
+
+  public static void showMessage(String titleHeader, String context) {
+    showMessage(titleHeader, titleHeader, context);
+  }
+
   public static void showMessage(String title, String header, String context) {
     Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
     alert.setTitle(title);

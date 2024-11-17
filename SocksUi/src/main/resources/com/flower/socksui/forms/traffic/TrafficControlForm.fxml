@@ -10,6 +10,8 @@
 <?import javafx.scene.control.MenuButton?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
@@ -41,68 +43,152 @@
       </AnchorPane>
       <AnchorPane>
          <children>
-            <TitledPane animated="false" text="Filter rules" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-               <content>
-                  <AnchorPane>
-                     <children>
-                        <SplitPane dividerPositions="0.5" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                           <items>
-                              <AnchorPane maxHeight="50.0" minHeight="50.0" prefHeight="50.0">
-                                 <children>
-                                    <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                                       <items>
-                                          <Button mnemonicParsing="false" onAction="#newRule" text="New rule" />
-                                          <Button mnemonicParsing="false" onAction="#removeRule" text="Remove rule" />
-                                          <Button mnemonicParsing="false" onAction="#clearRules" text="Clear rules" />
-                                          <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                          <Button mnemonicParsing="false" onAction="#deriveRule" text="Derive rule" />
-                                          <Button mnemonicParsing="false" onAction="#flipRule" text="Flip rule" />
-                                          <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                          <Button mnemonicParsing="false" onAction="#saveRules" text="Save rules to file" />
-                                          <Button mnemonicParsing="false" onAction="#loadRules" text="Load rules from file" />
-                                       </items>
-                                    </ToolBar>
-                                 </children>
-                              </AnchorPane>
-                              <AnchorPane>
-                                 <children>
-                                    <TableView fx:id="trafficRulesTable" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                                       <columns>
-                                          <TableColumn minWidth="500.0" prefWidth="500.0" text="Host">
-                                             <cellValueFactory>
-                                                <PropertyValueFactory property="host" />
-                                             </cellValueFactory>
-                                          </TableColumn>
-                                          <TableColumn minWidth="200.0" prefWidth="200.0" text="Port">
-                                               <cellValueFactory>
-                                                   <PropertyValueFactory property="port" />
-                                               </cellValueFactory>
-                                           </TableColumn>
-                                           <TableColumn minWidth="250.0" prefWidth="250.0" text="FilterType">
-                                               <cellValueFactory>
-                                                   <PropertyValueFactory property="filterType" />
-                                               </cellValueFactory>
-                                           </TableColumn>
-                                           <TableColumn minWidth="250.0" prefWidth="250.0" text="Date">
-                                               <cellValueFactory>
-                                                   <PropertyValueFactory property="date" />
-                                               </cellValueFactory>
-                                           </TableColumn>
-                                           <TableColumn minWidth="100.0" prefWidth="100.0" text="Wildcard">
-                                               <cellValueFactory>
-                                                   <PropertyValueFactory property="wildcardStr" />
-                                               </cellValueFactory>
-                                           </TableColumn>
-                                       </columns>
-                                    </TableView>
-                                 </children>
-                              </AnchorPane>
-                           </items>
-                        </SplitPane>
-                     </children>
-                  </AnchorPane>
-               </content>
-            </TitledPane>
+            <TabPane tabClosingPolicy="UNAVAILABLE" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+              <tabs>
+                <Tab text="Filter rules">
+                     <content>
+                        <AnchorPane>
+                           <children>
+                              <SplitPane dividerPositions="0.5" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                 <items>
+                                    <AnchorPane maxHeight="50.0" minHeight="50.0" prefHeight="50.0">
+                                       <children>
+                                          <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                             <items>
+                                                <Button mnemonicParsing="false" onAction="#newRule" text="New rule" />
+                                                <Button mnemonicParsing="false" onAction="#removeRule" text="Remove rule" />
+                                                <Button mnemonicParsing="false" onAction="#clearRules" text="Clear rules" />
+                                                <Separator orientation="VERTICAL" prefHeight="200.0" />
+                                                <Button mnemonicParsing="false" onAction="#deriveRule" text="Derive rule" />
+                                                <Button mnemonicParsing="false" onAction="#flipRule" text="Flip rule" />
+                                                <Separator orientation="VERTICAL" prefHeight="200.0" />
+                                                <Button mnemonicParsing="false" onAction="#saveRules" text="Save rules to file" />
+                                                <Button mnemonicParsing="false" onAction="#loadRules" text="Load rules from file" />
+                                             </items>
+                                          </ToolBar>
+                                       </children>
+                                    </AnchorPane>
+                                    <AnchorPane>
+                                       <children>
+                                          <TableView fx:id="trafficRulesTable" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                             <columns>
+                                                <TableColumn minWidth="500.0" prefWidth="500.0" text="Host">
+                                                   <cellValueFactory>
+                                                      <PropertyValueFactory property="host" />
+                                                   </cellValueFactory>
+                                                </TableColumn>
+                                                <TableColumn minWidth="200.0" prefWidth="200.0" text="Port">
+                                                     <cellValueFactory>
+                                                         <PropertyValueFactory property="port" />
+                                                     </cellValueFactory>
+                                                 </TableColumn>
+                                                 <TableColumn minWidth="250.0" prefWidth="250.0" text="FilterType">
+                                                     <cellValueFactory>
+                                                         <PropertyValueFactory property="filterType" />
+                                                     </cellValueFactory>
+                                                 </TableColumn>
+                                                 <TableColumn minWidth="250.0" prefWidth="250.0" text="Date">
+                                                     <cellValueFactory>
+                                                         <PropertyValueFactory property="date" />
+                                                     </cellValueFactory>
+                                                 </TableColumn>
+                                                 <TableColumn minWidth="100.0" prefWidth="100.0" text="Wildcard">
+                                                     <cellValueFactory>
+                                                         <PropertyValueFactory property="wildcardStr" />
+                                                     </cellValueFactory>
+                                                 </TableColumn>
+                                             </columns>
+                                          </TableView>
+                                       </children>
+                                    </AnchorPane>
+                                 </items>
+                              </SplitPane>
+                           </children>
+                        </AnchorPane>
+                     </content>
+                </Tab>
+                <Tab text="Temporary rule list">
+                    <content>
+                        <AnchorPane>
+                            <children>
+                                <SplitPane dividerPositions="0.5" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                    <items>
+                                        <AnchorPane maxHeight="50.0" minHeight="50.0" prefHeight="50.0">
+                                            <children>
+                                                <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                                    <items>
+                                                <ComboBox fx:id="activateComboBox" prefWidth="150.0" value="Inactive" onAction="#filterListModeChange" >
+                                                    <items>
+                                                        <FXCollections fx:factory="observableArrayList">
+                                                            <String fx:value="Inactive" />
+                                                            <String fx:value="With main list" />
+                                                            <String fx:value="Exclusive" />
+                                                        </FXCollections>
+                                                    </items>
+                                                </ComboBox>
+                                                <Separator orientation="VERTICAL" prefHeight="200.0" />
+                                                        <Button mnemonicParsing="false" onAction="#newTmpRule" text="New tmp rule" />
+                                                        <Button mnemonicParsing="false" onAction="#removeTmpRule" text="Remove tmp rule" />
+                                                        <Button mnemonicParsing="false" onAction="#clearTmpRules" text="Clear tmp rules" />
+                                                        <Separator orientation="VERTICAL" prefHeight="200.0" />
+                                                <ComboBox fx:id="autoAddComboBox" prefWidth="150.0" value="No auto-add" >
+                                                    <items>
+                                                        <FXCollections fx:factory="observableArrayList">
+                                                            <String fx:value="No auto-add" />
+                                                            <String fx:value="Auto-Whitelist" />
+                                                            <String fx:value="Auto-Blacklist" />
+                                                        </FXCollections>
+                                                    </items>
+                                                </ComboBox>
+                                                        <Button mnemonicParsing="false" onAction="#deriveTmpRule" text="Derive tmp rule" />
+                                                        <Button mnemonicParsing="false" onAction="#flipTmpRule" text="Flip tmp rule" />
+                                                        <Separator orientation="VERTICAL" prefHeight="200.0" />
+                                                        <Button mnemonicParsing="false" onAction="#mergeTmpRules" text="Merge to main list" />
+                                                    </items>
+                                                </ToolBar>
+                                            </children>
+                                        </AnchorPane>
+                                        <AnchorPane>
+                                            <children>
+                                                <TableView fx:id="tmpTrafficRulesTable" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                                    <columns>
+                                                        <TableColumn minWidth="500.0" prefWidth="500.0" text="Host">
+                                                            <cellValueFactory>
+                                                                <PropertyValueFactory property="host" />
+                                                            </cellValueFactory>
+                                                        </TableColumn>
+                                                        <TableColumn minWidth="200.0" prefWidth="200.0" text="Port">
+                                                            <cellValueFactory>
+                                                                <PropertyValueFactory property="port" />
+                                                            </cellValueFactory>
+                                                        </TableColumn>
+                                                        <TableColumn minWidth="250.0" prefWidth="250.0" text="FilterType">
+                                                            <cellValueFactory>
+                                                                <PropertyValueFactory property="filterType" />
+                                                            </cellValueFactory>
+                                                        </TableColumn>
+                                                        <TableColumn minWidth="250.0" prefWidth="250.0" text="Date">
+                                                            <cellValueFactory>
+                                                                <PropertyValueFactory property="date" />
+                                                            </cellValueFactory>
+                                                        </TableColumn>
+                                                        <TableColumn minWidth="100.0" prefWidth="100.0" text="Wildcard">
+                                                            <cellValueFactory>
+                                                                <PropertyValueFactory property="wildcardStr" />
+                                                            </cellValueFactory>
+                                                        </TableColumn>
+                                                    </columns>
+                                                </TableView>
+                                            </children>
+                                        </AnchorPane>
+                                    </items>
+                                </SplitPane>
+                            </children>
+                        </AnchorPane>
+                    </content>
+                </Tab>
+              </tabs>
+            </TabPane>
          </children>
       </AnchorPane>
         <AnchorPane>

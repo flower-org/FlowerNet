@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.prefs.Preferences;
 
 import static com.flower.conntrack.AddressCheck.CONNECTION_PROHIBITED;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -65,6 +64,7 @@ public class ConnectionMonitorForm extends AnchorPane implements Refreshable, Co
 
     @Nullable Stage stage;
     @Nullable @FXML TableView<ConnectionInfoWrapper> connectionTable;
+    @Nullable @FXML CheckBox closeOnBlacklistCheckBox;
     final ObservableList<ConnectionInfoWrapper> connections;
     final ConcurrentHashMap<ConnectionId, ConnectionInfoWrapper> connectionMap;
     TrafficControlForm trafficControlForm;
@@ -194,12 +194,14 @@ public class ConnectionMonitorForm extends AnchorPane implements Refreshable, Co
     }
 
     public void checkBlacklistedHosts() {
-        for (ConnectionInfoWrapper info : connections) {
-            Destination dest = info.connectionInfo.destination;
+        if (checkNotNull(closeOnBlacklistCheckBox).selectedProperty().get()) {
+            for (ConnectionInfoWrapper info : connections) {
+                Destination dest = info.connectionInfo.destination;
 
-            if (dest != null) {
-                if (trafficControlForm.approveConnection(dest.host, dest.port, null) == CONNECTION_PROHIBITED) {
-                    info.connectionInfo.channel.close();
+                if (dest != null) {
+                    if (trafficControlForm.approveConnection(dest.host, dest.port, null) == CONNECTION_PROHIBITED) {
+                        info.connectionInfo.channel.close();
+                    }
                 }
             }
         }

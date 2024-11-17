@@ -63,6 +63,45 @@ public class WhitelistBlacklistConnectionFilter {
         wildcardHostRecords = new ConcurrentHashMap<>();
     }
 
+    public boolean isListOverrideRequired(AddressFilterList list) {
+        for (AddressRecord addressRecord : list.addressRecords()) {
+            if (isAddressRecordOverrideRequired(addressRecord)) { return true; }
+        }
+        for (HostRecord hostRecord : list.hostRecords()) {
+            if (isHostRecordOverrideRequired(hostRecord)) { return true; }
+        }
+        for (PortRecord portRecord : list.portRecords()) {
+            if (isPortRecordOverrideRequired(portRecord)) { return true; }
+        }
+        for (AddressRecord addressRecord : list.wildcardAddressRecords()) {
+            if (isAddressRecordOverrideRequired(addressRecord)) { return true; }
+        }
+        for (HostRecord hostRecord : list.wildcardHostRecords()) {
+            if (isHostRecordOverrideRequired(hostRecord)) { return true; }
+        }
+        return false;
+    }
+
+    boolean isAddressRecordOverrideRequired(AddressRecord addressRecord) {
+        Map<Integer, AddressRecord> portMap =
+                addressRecord.isWildcard() ?
+                        wildcardAddressRecords.computeIfAbsent(addressRecord.dstHost(), k -> new ConcurrentHashMap<>())
+                        : addressRecords.computeIfAbsent(addressRecord.dstHost(), k -> new ConcurrentHashMap<>());
+        AddressRecord oldRecord = portMap.get(addressRecord.dstPort());
+        return oldRecord != null && !AddressRecord.recordsEqual(addressRecord, oldRecord);
+    }
+
+    boolean isHostRecordOverrideRequired(HostRecord hostRecord) {
+        final Map<String, HostRecord> hostRecords = hostRecord.isWildcard() ? this.wildcardHostRecords : this.hostRecords;
+        HostRecord oldRecord = hostRecords.get(hostRecord.dstHost());
+        return oldRecord != null && !HostRecord.recordsEqual(hostRecord, oldRecord);
+    }
+
+    boolean isPortRecordOverrideRequired(PortRecord portRecord) {
+        PortRecord oldRecord = portRecords.get(portRecord.dstPort());
+        return oldRecord != null && !PortRecord.recordsEqual(portRecord, oldRecord);
+    }
+
     public void addList(AddressFilterList list, boolean overrideExisting) {
         for (AddressRecord addressRecord : list.addressRecords()) {
             addAddressRecord(addressRecord, overrideExisting);

@@ -55,12 +55,12 @@
                                        <children>
                                           <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                              <items>
-                                                <Button mnemonicParsing="false" onAction="#newRule" text="New rule" />
-                                                <Button mnemonicParsing="false" onAction="#removeRule" text="Remove rule" />
-                                                <Button mnemonicParsing="false" onAction="#clearRules" text="Clear rules" />
-                                                <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                                <Button mnemonicParsing="false" onAction="#deriveRule" text="Derive rule" />
                                                 <Button mnemonicParsing="false" onAction="#flipRule" text="Flip rule" />
+                                                <Button mnemonicParsing="false" onAction="#removeRule" text="Remove rule" />
+                                                <Button mnemonicParsing="false" onAction="#deriveRule" text="Derive rule" />
+                                                <Separator orientation="VERTICAL" prefHeight="200.0" />
+                                                <Button mnemonicParsing="false" onAction="#newRule" text="New rule" />
+                                                <Button mnemonicParsing="false" onAction="#clearRules" text="Clear rules" />
                                                 <Separator orientation="VERTICAL" prefHeight="200.0" />
                                                 <Button mnemonicParsing="false" onAction="#saveRules" text="Save rules to file" />
                                                 <Button mnemonicParsing="false" onAction="#loadRules" text="Load rules from file" />
@@ -117,7 +117,7 @@
                                             <children>
                                                 <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                                                     <items>
-                                                <ComboBox fx:id="activateComboBox" prefWidth="150.0" value="Inactive" onAction="#filterListModeChange" >
+                                                <ComboBox fx:id="activateComboBox" onAction="#filterListModeChange" prefWidth="150.0" value="Inactive">
                                                     <items>
                                                         <FXCollections fx:factory="observableArrayList">
                                                             <String fx:value="Inactive" />
@@ -127,11 +127,11 @@
                                                     </items>
                                                 </ComboBox>
                                                 <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                                        <Button mnemonicParsing="false" onAction="#newTmpRule" text="New tmp rule" />
+                                                        <Button mnemonicParsing="false" onAction="#flipTmpRule" text="Flip tmp rule" />
                                                         <Button mnemonicParsing="false" onAction="#removeTmpRule" text="Remove tmp rule" />
-                                                        <Button mnemonicParsing="false" onAction="#clearTmpRules" text="Clear tmp rules" />
+                                                        <Button mnemonicParsing="false" onAction="#deriveTmpRule" text="Derive tmp rule" />
                                                         <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                                <ComboBox fx:id="autoAddComboBox" prefWidth="150.0" value="No auto-add" >
+                                                <ComboBox fx:id="autoAddComboBox" prefWidth="150.0" value="No auto-add">
                                                     <items>
                                                         <FXCollections fx:factory="observableArrayList">
                                                             <String fx:value="No auto-add" />
@@ -140,10 +140,13 @@
                                                         </FXCollections>
                                                     </items>
                                                 </ComboBox>
-                                                        <Button mnemonicParsing="false" onAction="#deriveTmpRule" text="Derive tmp rule" />
-                                                        <Button mnemonicParsing="false" onAction="#flipTmpRule" text="Flip tmp rule" />
-                                                        <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                                        <Button mnemonicParsing="false" onAction="#mergeTmpRules" text="Merge to main list" />
+                                                <Separator orientation="VERTICAL" prefHeight="200.0" />
+                                                        <Button mnemonicParsing="false" onAction="#mergeTmpRules" text="Merge list" />
+                                                <Separator orientation="VERTICAL" prefHeight="200.0" />
+                                                        <Button mnemonicParsing="false" onAction="#newTmpRule" text="New tmp rule" />
+                                                        <Button mnemonicParsing="false" onAction="#clearTmpRules" text="Clear tmp rules" />
+                                                        <Button mnemonicParsing="false" onAction="#clearWhitelistTmpRules" text="Clear Whitelist" />
+                                                        <Button mnemonicParsing="false" onAction="#clearBlacklistTmpRules" text="Clear Blacklist" />
                                                     </items>
                                                 </ToolBar>
                                             </children>

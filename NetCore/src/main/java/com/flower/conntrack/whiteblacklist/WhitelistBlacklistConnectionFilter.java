@@ -18,15 +18,15 @@ public class WhitelistBlacklistConnectionFilter {
     final List<Pair<AddressFilterList, Boolean>> addressLists;
 
     //Priority 0
-    final Map<String, Map<Integer, AddressRecord>> addressRecords;
+    final ConcurrentHashMap<String, ConcurrentHashMap<Integer, AddressRecord>> addressRecords;
     //Priority 1
-    final Map<String, HostRecord> hostRecords;
+    final ConcurrentHashMap<String, HostRecord> hostRecords;
     //Priority 2
-    final Map<String, Map<Integer, AddressRecord>> wildcardAddressRecords;
+    final ConcurrentHashMap<String, ConcurrentHashMap<Integer, AddressRecord>> wildcardAddressRecords;
     //Priority 3
-    final Map<String, HostRecord> wildcardHostRecords;
+    final ConcurrentHashMap<String, HostRecord> wildcardHostRecords;
     //Priority 4
-    final Map<Integer, PortRecord> portRecords;
+    final ConcurrentHashMap<Integer, PortRecord> portRecords;
 
     public WhitelistBlacklistConnectionFilter(List<Pair<AddressFilterList, Boolean>> addressLists) {
         this();
@@ -35,23 +35,23 @@ public class WhitelistBlacklistConnectionFilter {
         }
     }
 
-    public Map<String, Map<Integer, AddressRecord>> getAddressRecords() {
+    public ConcurrentHashMap<String, ConcurrentHashMap<Integer, AddressRecord>> getAddressRecords() {
         return addressRecords;
     }
 
-    public Map<String, HostRecord> getHostRecords() {
+    public ConcurrentHashMap<String, HostRecord> getHostRecords() {
         return hostRecords;
     }
 
-    public Map<String, Map<Integer, AddressRecord>> getWildcardAddressRecords() {
+    public ConcurrentHashMap<String, ConcurrentHashMap<Integer, AddressRecord>> getWildcardAddressRecords() {
         return wildcardAddressRecords;
     }
 
-    public Map<String, HostRecord> getWildcardHostRecords() {
+    public ConcurrentHashMap<String, HostRecord> getWildcardHostRecords() {
         return wildcardHostRecords;
     }
 
-    public Map<Integer, PortRecord> getPortRecords() { return portRecords; }
+    public ConcurrentHashMap<Integer, PortRecord> getPortRecords() { return portRecords; }
 
 
     public WhitelistBlacklistConnectionFilter() {
@@ -173,7 +173,6 @@ public class WhitelistBlacklistConnectionFilter {
     }
 
     public void clear() {
-        addressLists.clear();
         addressRecords.clear();
         hostRecords.clear();
         portRecords.clear();
@@ -181,12 +180,47 @@ public class WhitelistBlacklistConnectionFilter {
         wildcardHostRecords.clear();
     }
 
+    public void clearFilterType(FilterType filterType) {
+        for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> addressRecord : addressRecords.entrySet()) {
+            ConcurrentHashMap<Integer, AddressRecord> portMap = addressRecord.getValue();
+            for (Map.Entry<Integer, AddressRecord> portRecord : portMap.entrySet()) {
+                if (portRecord.getValue().filterType() == filterType) {
+                    portMap.remove(portRecord.getKey());
+                }
+            }
+        }
+        for (Map.Entry<String, HostRecord> hostRecord : hostRecords.entrySet()) {
+            if (hostRecord.getValue().filterType() == filterType) {
+                hostRecords.remove(hostRecord.getKey());
+            }
+        }
+        for (Map.Entry<Integer, PortRecord> portRecord : portRecords.entrySet()) {
+            if (portRecord.getValue().filterType() == filterType) {
+                portRecords.remove(portRecord.getKey());
+            }
+        }
+        for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> wildcardAddressRecord : wildcardAddressRecords.entrySet()) {
+            ConcurrentHashMap<Integer, AddressRecord> portMap = wildcardAddressRecord.getValue();
+            for (Map.Entry<Integer, AddressRecord> portRecord : portMap.entrySet()) {
+                if (portRecord.getValue().filterType() == filterType) {
+                    portMap.remove(portRecord.getKey());
+                }
+            }
+        }
+        for (Map.Entry<String, HostRecord> wildcardHostRecord : wildcardHostRecords.entrySet()) {
+            if (wildcardHostRecord.getValue().filterType() == filterType) {
+                wildcardHostRecords.remove(wildcardHostRecord.getKey());
+            }
+        }
+    }
+
+
     public AddressFilterList getFullList() {
         List<AddressRecord> addressRecords = new ArrayList<>();
         List<HostRecord> hostRecords = new ArrayList<>();
         List<PortRecord> portRecords = new ArrayList<>();
 
-        for (Map.Entry<String, Map<Integer, AddressRecord>> addressEntry : this.addressRecords.entrySet()) {
+        for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> addressEntry : this.addressRecords.entrySet()) {
             for (Map.Entry<Integer, AddressRecord> addressPortEntry : addressEntry.getValue().entrySet()) {
                 addressRecords.add(addressPortEntry.getValue());
             }
@@ -201,7 +235,7 @@ public class WhitelistBlacklistConnectionFilter {
         List<AddressRecord> wildcardAddressRecords = new ArrayList<>();
         List<HostRecord> wildcardHostRecords = new ArrayList<>();
 
-        for (Map.Entry<String, Map<Integer, AddressRecord>> addressEntry : this.wildcardAddressRecords.entrySet()) {
+        for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> addressEntry : this.wildcardAddressRecords.entrySet()) {
             for (Map.Entry<Integer, AddressRecord> addressPortEntry : addressEntry.getValue().entrySet()) {
                 wildcardAddressRecords.add(addressPortEntry.getValue());
             }
@@ -219,7 +253,7 @@ public class WhitelistBlacklistConnectionFilter {
                 .build();
     }
 
-    public AddressFilterList getLocalUpdatesDiff(List<AddressFilterList> baseLists) {
+    public AddressFilterList getLocalUpdatesDiff() {
         WhitelistBlacklistConnectionFilter otherFilter = new WhitelistBlacklistConnectionFilter();
         for (Pair<AddressFilterList, Boolean> filterListEntry : addressLists) {
             otherFilter.addList(filterListEntry.getKey(), filterListEntry.getValue());
@@ -228,6 +262,15 @@ public class WhitelistBlacklistConnectionFilter {
         return getNewOrUpdatedRecords(this, otherFilter, true);
     }
 
+/*    public AddressFilterList getUpdatesDiff(List<AddressFilterList> baseLists) {
+        WhitelistBlacklistConnectionFilter otherFilter = new WhitelistBlacklistConnectionFilter();
+        for (AddressFilterList filterList : baseLists) {
+            otherFilter.addList(filterList, false);
+        }
+
+        return getNewOrUpdatedRecords(this, otherFilter, true);
+    }*/
+
     public static AddressFilterList getNewOrUpdatedRecords(WhitelistBlacklistConnectionFilter fromThisFilter,
                                                     WhitelistBlacklistConnectionFilter diffFromThatFilter,
                                                     boolean includeUpdated) {
@@ -235,7 +278,7 @@ public class WhitelistBlacklistConnectionFilter {
         List<HostRecord> hostRecords = new ArrayList<>();
         List<PortRecord> portRecords = new ArrayList<>();
 
-        for (Map.Entry<String, Map<Integer, AddressRecord>> addressEntry : fromThisFilter.addressRecords.entrySet()) {
+        for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> addressEntry : fromThisFilter.addressRecords.entrySet()) {
             Map<Integer, AddressRecord> addressRecordByPortMap = addressEntry.getValue();
             Map<Integer, AddressRecord> otherMap = diffFromThatFilter.addressRecords.get(addressEntry.getKey());
 
@@ -278,7 +321,7 @@ public class WhitelistBlacklistConnectionFilter {
         List<AddressRecord> wildcardAddressRecords = new ArrayList<>();
         List<HostRecord> wildcardHostRecords = new ArrayList<>();
 
-        for (Map.Entry<String, Map<Integer, AddressRecord>> wildcardAddressEntry : fromThisFilter.wildcardAddressRecords.entrySet()) {
+        for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> wildcardAddressEntry : fromThisFilter.wildcardAddressRecords.entrySet()) {
             Map<Integer, AddressRecord> addressRecordByPortMap = wildcardAddressEntry.getValue();
             Map<Integer, AddressRecord> otherMap = diffFromThatFilter.wildcardAddressRecords.get(wildcardAddressEntry.getKey());
 

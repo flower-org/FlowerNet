@@ -104,9 +104,31 @@ public abstract class RuleManager {
         refreshAndRestoreCursor();
     }
 
+    protected String clearRulesMsg() { return "Delete all rules?"; }
+
     public void clearRules() {
-        if (JavaFxUtils.showYesNoDialog("Delete all rules?") == JavaFxUtils.YesNo.YES) {
+        if (JavaFxUtils.showYesNoDialog(clearRulesMsg()) == JavaFxUtils.YesNo.YES) {
             innerFilter.clear();
+            refreshAndRestoreCursor();
+        }
+    }
+
+    protected String clearWhitelistRulesMsg() { return "Delete all Whitelist rules?"; }
+
+    public void clearWhitelistTmpRules() {
+        if (JavaFxUtils.showYesNoDialog(clearWhitelistRulesMsg()) == JavaFxUtils.YesNo.YES) {
+            innerFilter.clearFilterType(FilterType.WHITELIST);
+            refreshAndRestoreCursor();
+        }
+    }
+
+    protected String clearBlacklistRulesMsg() {
+        return "Delete all Blacklist rules?";
+    }
+
+    public void clearBlacklistTmpRules() {
+        if (JavaFxUtils.showYesNoDialog(clearBlacklistRulesMsg()) == JavaFxUtils.YesNo.YES) {
+            innerFilter.clearFilterType(FilterType.BLACKLIST);
             refreshAndRestoreCursor();
         }
     }

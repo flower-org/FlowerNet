@@ -179,6 +179,12 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
             @Override
             @Nullable Stage getStage() { return stage; }
+
+            @Override protected String clearRulesMsg() { return "Delete all temporary rules?"; }
+
+            @Override protected String clearWhitelistRulesMsg() { return "Delete all temporary Whitelist rules?"; }
+
+            @Override protected String clearBlacklistRulesMsg() { return "Delete all temporary Blacklist rules?"; }
         };
 
         refreshContent();
@@ -336,10 +342,10 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                         .creationTimestamp(System.currentTimeMillis())
                         .isWildcard(false)
                         .build();
-                AddressRecord oldRule = tmpRuleManager.innerFilter.addAddressRecord(addressRecord, true);
+                AddressRecord oldRule = tmpRuleManager.innerFilter.addAddressRecord(addressRecord, false);
 
                 // We need this check, because even when tmp list is inactive we still want to auto-add.
-                if (!AddressRecord.recordsEqual(addressRecord, oldRule)) {
+                if (oldRule == null) {
                     Platform.runLater(this::refreshContent);
                     return approveConnection(dstHost, dstPort, from);
                 }
@@ -761,6 +767,14 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
     public void clearTmpRules() {
         tmpRuleManager.clearRules();
+    }
+
+    public void clearWhitelistTmpRules() {
+        tmpRuleManager.clearWhitelistTmpRules();
+    }
+
+    public void clearBlacklistTmpRules() {
+        tmpRuleManager.clearBlacklistTmpRules();
     }
 
     public void deriveTmpRule() {

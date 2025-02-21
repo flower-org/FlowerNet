@@ -1,6 +1,7 @@
 package com.flower.socksserver;
 
-import com.flower.conntrack.ConnectionListenerAndFilter;
+import com.flower.conntrack.ConnectionFilter;
+import com.flower.conntrack.ConnectionListener;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.EventLoopGroup;
@@ -24,7 +25,8 @@ public final class SocksServer {
 
     final Supplier<Boolean> allowDirectAccessByIpAddress;
     final Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider;
-    final Deque<ConnectionListenerAndFilter> connectionListenerAndFilters;
+    final Deque<ConnectionFilter> connectionFilters;
+    final Deque<ConnectionListener> connectionListeners;
 
     @Nullable EventLoopGroup bossGroup;
     @Nullable EventLoopGroup workerGroup;
@@ -33,7 +35,8 @@ public final class SocksServer {
                        Supplier<SimpleChannelInboundHandler<SocksMessage>> connectHandlerProvider) {
         this.allowDirectAccessByIpAddress = allowDirectAccessByIpAddress;
         this.connectHandlerProvider = connectHandlerProvider;
-        this.connectionListenerAndFilters = new LinkedBlockingDeque<>();
+        this.connectionFilters = new LinkedBlockingDeque<>();
+        this.connectionListeners = new LinkedBlockingDeque<>();
     }
 
     public void shutdownServer() {
@@ -41,12 +44,20 @@ public final class SocksServer {
         checkNotNull(workerGroup).shutdownGracefully();
     }
 
-    public void addConnectionListenerAndFilter(ConnectionListenerAndFilter filter) {
-        connectionListenerAndFilters.add(filter);
+    public void addConnectionFilter(ConnectionFilter filter) {
+        connectionFilters.add(filter);
     }
 
-    public void removeConnectionListenerAndFilter(ConnectionListenerAndFilter filter) {
-        connectionListenerAndFilters.remove(filter);
+    public void removeConnectionFilter(ConnectionFilter filter) {
+        connectionFilters.remove(filter);
+    }
+
+    public void addConnectionListener(ConnectionListener listener) {
+        connectionListeners.add(listener);
+    }
+
+    public void removeConnectionListener(ConnectionListener listener) {
+        connectionListeners.remove(listener);
     }
 
     public ChannelFuture startServer(int port, @Nullable SslContext sslCtx) {
@@ -58,7 +69,7 @@ public final class SocksServer {
             .channel(NioServerSocketChannel.class)
             //.handler(new LoggingHandler(LogLevel.INFO))
             .childHandler(new SocksServerInitializer(connectHandlerProvider, allowDirectAccessByIpAddress, sslCtx,
-                    connectionListenerAndFilters));
+                    connectionFilters, connectionListeners));
         return b.bind(port);
     }
 }

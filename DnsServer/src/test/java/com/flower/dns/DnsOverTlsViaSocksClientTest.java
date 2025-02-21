@@ -19,7 +19,7 @@ import java.util.Random;
 import java.util.concurrent.locks.LockSupport;
 
 public final class DnsOverTlsViaSocksClientTest {
-    private static final String SOCKS_SERVER_ADDRESS = "192.168.1.203";
+    private static final String SOCKS_SERVER_ADDRESS = "127.0.0.1";
     private static final int SOCKS_SERVER_PORT = 1081;
     private static final String DNS_SERVER_ADDRESS = "1.1.1.1";
     private static final int DNS_SERVER_PORT = 853;

@@ -33,6 +33,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.flower.utils.ServerUtil;
 
+import static com.flower.socksserver.FlowerSslContextBuilder.TLS_CIPHERS;
+import static com.flower.socksserver.FlowerSslContextBuilder.TLS_PROTOCOLS;
 import static com.flower.trust.FlowerTrust.TRUST_MANAGER_WITH_SERVER_CA;
 
 public class SocksChainClient {
@@ -57,6 +59,8 @@ public class SocksChainClient {
         if (socksProtocolVersion == SocksProtocolVersion.SOCKS5s) {
             // Configure SSL.
             return SslContextBuilder.forClient()
+                    .protocols(TLS_PROTOCOLS)
+                    .ciphers(TLS_CIPHERS)
                     .keyManager(ETokenKeyManagerProvider.getManager())
                     .clientAuth(ClientAuth.REQUIRE)
                     .trustManager(TRUST_MANAGER_WITH_SERVER_CA)
@@ -184,6 +188,8 @@ public class SocksChainClient {
                 //System.out.println(showPipeline(outgoingChannel().pipeline()));
                 //System.out.println(showPipeline(inboundCtx.pipeline()));
 
+                //TODO: what if future is not a success?
+
                 //TODO: replace with `inboundChannel.pipeline`, get rid of ctx
                 //TODO: this is SOCKS5-specific, make it support other versions
                 try {
@@ -229,9 +235,14 @@ public class SocksChainClient {
 
     public void connectionFailed() {
         inboundChannel.writeAndFlush(downstreamResponseFailure);
-        ServerUtil.closeOnFlush(outgoingChannel());
-        if (outgoingChannel.get() != null) {
-            outgoingChannel().close();
+        ServerUtil.closeOnFlush(inboundChannel);
+
+        Channel outChannel = outgoingChannel.get();
+        if (outChannel != null) {
+            ServerUtil.closeOnFlush(outChannel);
+            if (outChannel != null) {
+                outChannel.close();
+            }
         }
     }
 }

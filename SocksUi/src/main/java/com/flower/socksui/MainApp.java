@@ -1,7 +1,8 @@
 package com.flower.socksui;
 
+import com.flower.socksui.forms.ConnectionMonitorForm;
 import com.flower.socksui.forms.ServerForm;
-import com.flower.socksui.forms.TrafficControlForm;
+import com.flower.socksui.forms.traffic.TrafficControlForm;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
@@ -17,11 +18,13 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class MainApp {
     @Nullable Stage mainStage;
 
+    @FXML @Nullable Label connectionsLabel;
     @FXML @Nullable Label serverInfoLabel;
     @FXML @Nullable TabPane tabs;
 
     @Nullable ServerForm serverForm;
     @Nullable TrafficControlForm trafficControlForm;
+    @Nullable ConnectionMonitorForm connectionMonitorForm;
 
     public MainApp() {
         //This form is created automatically.
@@ -39,9 +42,12 @@ public class MainApp {
     public void setStatusText(String text) {
         checkNotNull(serverInfoLabel).setText(text);
     }
+    public void setConnectionsText(String text) {
+        checkNotNull(connectionsLabel).setText(text);
+    }
 
     public void showAboutDialog() {
-        Alert alert = new Alert(Alert.AlertType.NONE, "Socks UI v 0.0.2", ButtonType.OK);
+        Alert alert = new Alert(Alert.AlertType.NONE, "Socks UI v 0.0.7", ButtonType.OK);
         alert.showAndWait();
     }
 
@@ -59,8 +65,10 @@ public class MainApp {
     public void showTabs() {
         openServerTab();
         openTrafficControlTab();
+        openConnectionsTab();
 
-        checkNotNull(serverForm).addConnectionListenerAndFilter(checkNotNull(trafficControlForm));
+        checkNotNull(serverForm).addConnectionFilter(checkNotNull(trafficControlForm));
+        checkNotNull(serverForm).addConnectionListener(checkNotNull(connectionMonitorForm));
 
         checkNotNull(tabs).getSelectionModel().select(0);
     }
@@ -75,9 +83,18 @@ public class MainApp {
     }
 
     public void openTrafficControlTab() {
-        trafficControlForm = new TrafficControlForm();
+        trafficControlForm = new TrafficControlForm(this);
         trafficControlForm.setStage(checkNotNull(mainStage));
         final Tab tab = new Tab("Traffic Control", trafficControlForm);
+        tab.setClosable(false);
+
+        addTab(tab);
+    }
+
+    public void openConnectionsTab() {
+        connectionMonitorForm = new ConnectionMonitorForm(this, checkNotNull(trafficControlForm));
+        connectionMonitorForm.setStage(checkNotNull(mainStage));
+        final Tab tab = new Tab("Connection Monitor", connectionMonitorForm);
         tab.setClosable(false);
 
         addTab(tab);

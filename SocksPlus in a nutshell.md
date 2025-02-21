@@ -15,3 +15,8 @@
         type = SELF, UDP, DoTLS, DoHTTPS
 
 ← dns_response | ip4_count | ip4 | ip_6_count | ip6
+
+
+Maybe:
+single_conn? - virtual connection closes, physical connection closes: useful for nodes in the middle of the chain.  
+remove_tls? - for speed-up, but might be impractical.

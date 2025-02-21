@@ -1,4 +1,4 @@
-package com.flower.socksui.forms;
+package com.flower.socksui.forms.traffic;
 
 import com.flower.conntrack.whiteblacklist.FilterType;
 import com.flower.conntrack.whiteblacklist.ImmutableAddressRecord;
@@ -7,8 +7,8 @@ import com.flower.conntrack.whiteblacklist.ImmutablePortRecord;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.Alert;
-import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
@@ -23,7 +23,6 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.flower.socksui.forms.TrafficControlForm.TrafficRule;
 
 public class TrafficRuleAddDialog extends VBox {
     final static Logger LOGGER = LoggerFactory.getLogger(TrafficRuleAddDialog.class);
@@ -34,12 +33,29 @@ public class TrafficRuleAddDialog extends VBox {
     @FXML @Nullable ComboBox<String> filterTypeComboBox;
     @FXML @Nullable TextField hostTextField;
     @FXML @Nullable TextField portTextField;
-    @FXML @Nullable Button addButton;
+    @FXML @Nullable CheckBox isWildcardRuleCheckBox;
 
     @Nullable Stage stage;
     @Nullable volatile TrafficRule trafficRule = null;
 
     public TrafficRuleAddDialog() {
+        this(null);
+    }
+
+    Boolean getIsWhitelist(TrafficRule trafficRule) {
+        return trafficRule.getFilterType() == FilterType.WHITELIST;
+    }
+    @Nullable String getHost(TrafficRule trafficRule) {
+        return StringUtils.defaultIfBlank(trafficRule.getHost(), null);
+    }
+    @Nullable Integer getPort(TrafficRule trafficRule) {
+        return trafficRule.getIntPort();
+    }
+    Boolean getIsWildcard(TrafficRule trafficRule) {
+        return trafficRule.isWildcard();
+    }
+
+    public TrafficRuleAddDialog(@Nullable TrafficRule trafficRule) {
         FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("TrafficRuleAddDialog.fxml"));
         fxmlLoader.setRoot(this);
         fxmlLoader.setController(this);
@@ -48,6 +64,18 @@ public class TrafficRuleAddDialog extends VBox {
             fxmlLoader.load();
         } catch (IOException exception) {
             throw new RuntimeException(exception);
+        }
+
+        if (trafficRule != null) {
+            Boolean isWhitelist = getIsWhitelist(trafficRule);
+            String host = getHost(trafficRule);
+            Integer port = getPort(trafficRule);
+            Boolean isWildcard = getIsWildcard(trafficRule);
+
+            checkNotNull(filterTypeComboBox).getSelectionModel().select(isWhitelist ? WHITELIST : BLACKLIST);
+            if (host != null) { checkNotNull(hostTextField).textProperty().set(host); }
+            if (port != null) { checkNotNull(portTextField).textProperty().set(port.toString()); }
+            checkNotNull(isWildcardRuleCheckBox).setSelected(isWildcard);
         }
     }
 
@@ -60,6 +88,34 @@ public class TrafficRuleAddDialog extends VBox {
             String filterTypeStr = checkNotNull(filterTypeComboBox).valueProperty().get();
             String host = checkNotNull(hostTextField).textProperty().get().trim();
             String portStr = checkNotNull(portTextField).textProperty().get().trim();
+            Boolean isWildcard = checkNotNull(isWildcardRuleCheckBox).selectedProperty().get();
+
+            if (!isWildcard && (host.contains("*") || host.contains("?"))) {
+                Alert alert = new Alert(Alert.AlertType.ERROR, "Non-wildcard rule can't have wildcards (*, ?)", ButtonType.OK);
+                alert.showAndWait();
+                return;
+            }
+
+            if (isWildcard) {
+                if (!host.contains("*") && !host.contains("?")) {
+                    Alert alert = new Alert(Alert.AlertType.ERROR, "Wildcard rule must have wildcards (*, ?)", ButtonType.OK);
+                    alert.showAndWait();
+                    return;
+                }
+
+                boolean hasNonWildcards = false;
+                for (char c : host.toCharArray()) {
+                    if (c != '*' && c != '?') {
+                        hasNonWildcards = true;
+                    }
+                }
+
+                if (!hasNonWildcards) {
+                    Alert alert = new Alert(Alert.AlertType.ERROR, "Wildcard rule must have non-wildcard characters (*, ?)", ButtonType.OK);
+                    alert.showAndWait();
+                    return;
+                }
+            }
 
             int port = 1000;
             if (!StringUtils.isBlank(portStr)) {
@@ -98,18 +154,23 @@ public class TrafficRuleAddDialog extends VBox {
                             .filterType(filterType)
                             .dstHost(host)
                             .dstPort(port)
+                            .isWildcard(isWildcard)
+                            .creationTimestamp(System.currentTimeMillis())
                             .build());
                     checkNotNull(stage).close();
                 } else if (!StringUtils.isBlank(host) && StringUtils.isBlank(portStr)) {
                     trafficRule = new TrafficRule(ImmutableHostRecord.builder()
                             .filterType(filterType)
                             .dstHost(host)
+                            .isWildcard(isWildcard)
+                            .creationTimestamp(System.currentTimeMillis())
                             .build());
                     checkNotNull(stage).close();
                 } else if (StringUtils.isBlank(host) && !StringUtils.isBlank(portStr)) {
                     trafficRule = new TrafficRule(ImmutablePortRecord.builder()
                             .filterType(filterType)
                             .dstPort(port)
+                            .creationTimestamp(System.currentTimeMillis())
                             .build());
                     checkNotNull(stage).close();
                 }

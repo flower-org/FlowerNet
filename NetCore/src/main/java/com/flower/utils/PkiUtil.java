@@ -1,10 +1,20 @@
 package com.flower.utils;
 
 import com.google.common.io.Resources;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLPeerUnverifiedException;
@@ -12,22 +22,31 @@ import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
+import javax.security.auth.x500.X500Principal;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.math.BigInteger;
 import java.net.URL;
+import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyFactory;
 import java.security.KeyManagementException;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.Provider;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.security.Security;
+import java.security.Signature;
+import java.security.SignatureException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
@@ -37,6 +56,7 @@ import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
+import java.util.Date;
 import java.util.Enumeration;
 
 public class PkiUtil {
@@ -73,18 +93,22 @@ public class PkiUtil {
     }
 
     public static X509Certificate getCertificateFromResource(String resourceName) {
-        try {
-            CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            return getCertificateFromStream(getStreamFromResource(resourceName));
-        } catch (CertificateException e) {
-            throw new RuntimeException(e);
-        }
+        return getCertificateFromStream(getStreamFromResource(resourceName));
     }
 
     public static X509Certificate getCertificateFromStream(InputStream certificateStream) {
         try {
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             return (X509Certificate) cf.generateCertificate(certificateStream);
+        } catch (CertificateException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static X509Certificate getCertificateFromString(String certStr) {
+        try {
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            return (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certStr.getBytes()));
         } catch (CertificateException e) {
             throw new RuntimeException(e);
         }
@@ -174,6 +198,21 @@ public class PkiUtil {
             return keyManagerFactory;
         } catch (NoSuchAlgorithmException | KeyStoreException | IOException | CertificateException |
                  InvalidKeySpecException | UnrecoverableKeyException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static KeyManagerFactory getKeyManagerFromCertAndPrivateKey(X509Certificate cert, PrivateKey privateKey) {
+        try {
+            KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            keyStore.load(null, null);
+            keyStore.setKeyEntry("myCert", privateKey, null, new Certificate[]{cert});
+
+            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            keyManagerFactory.init(keyStore, null);
+
+            return keyManagerFactory;
+        } catch (NoSuchAlgorithmException | KeyStoreException | IOException | CertificateException | UnrecoverableKeyException e) {
             throw new RuntimeException(e);
         }
     }
@@ -321,5 +360,72 @@ public class PkiUtil {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    public static KeyPair generateRsa2048KeyPair() throws NoSuchAlgorithmException {
+        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+        keyPairGenerator.initialize(2048);
+        return keyPairGenerator.generateKeyPair();
+    }
+
+    public static X509Certificate generateSelfSignedCertificate(KeyPair keyPair, X500Principal subject) throws OperatorCreationException, CertificateException {
+        Date startDate = new Date();
+        Date endDate = new Date(startDate.getTime() + (365L *24*60*60*1000));
+
+        BigInteger serialNumber = new BigInteger(160, new SecureRandom());
+        X509v3CertificateBuilder certificateBuilder =
+                new JcaX509v3CertificateBuilder(subject, serialNumber, startDate, endDate, subject, keyPair.getPublic());
+
+        ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSAEncryption").build(keyPair.getPrivate());
+        return new JcaX509CertificateConverter().getCertificate(certificateBuilder.build(signer));
+    }
+
+    public static String signData(String dataString, PrivateKey privateKey) throws NoSuchAlgorithmException, SignatureException, InvalidKeyException {
+        Signature signature = Signature.getInstance("SHA256WithRSA");
+        signature.initSign(privateKey);
+        signature.update(dataString.getBytes());
+        byte[] signedData = signature.sign();
+        return Base64.getEncoder().encodeToString(signedData);
+    }
+
+
+    public static boolean verifySignature(String dataString, String sign, PublicKey publicKey) throws NoSuchAlgorithmException, SignatureException, InvalidKeyException {
+        Signature signature = Signature.getInstance("SHA256WithRSA");
+        signature.initVerify(publicKey);
+        signature.update(dataString.getBytes());
+        byte[] decodedSignature = Base64.getDecoder().decode(sign);
+        return signature.verify(decodedSignature);
+    }
+
+    public static String encrypt(String plaintext, PublicKey publicKey)
+            throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.ENCRYPT_MODE, publicKey);
+        byte[] encryptedBytes = cipher.doFinal(plaintext.getBytes());
+        return Base64.getEncoder().encodeToString(encryptedBytes);
+    }
+
+    public static String decrypt(String encryptedText, PrivateKey privateKey)
+            throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.DECRYPT_MODE, privateKey);
+        byte[] decryptedBytes = cipher.doFinal(Base64.getDecoder().decode(encryptedText));
+        return new String(decryptedBytes);
+    }
+
+    public static String encrypt(String plaintext, PrivateKey privateKey)
+            throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.ENCRYPT_MODE, privateKey);
+        byte[] encryptedBytes = cipher.doFinal(plaintext.getBytes());
+        return Base64.getEncoder().encodeToString(encryptedBytes);
+    }
+
+    public static String decrypt(String encryptedText, PublicKey publicKey)
+            throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.DECRYPT_MODE, publicKey);
+        byte[] decryptedBytes = cipher.doFinal(Base64.getDecoder().decode(encryptedText));
+        return new String(decryptedBytes);
     }
 }

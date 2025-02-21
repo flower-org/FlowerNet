@@ -47,7 +47,8 @@ public final class Socks5sServer {
                 X509Certificate certificate = PkiUtil.generateSelfSignedCertificate(keyPair, subject);
 
                 // 2. Try to store a certificate in a wrapped token in Vault
-                CertificateToken certificateToken = CertificateToken.createToken(certificate, keyPair.getPrivate());
+                String podName = System.getenv("HOSTNAME");
+                CertificateToken certificateToken = CertificateToken.createToken(certificate, keyPair.getPrivate(), podName);
                 String certificateTokenStr = CertificateToken.createTokenString(certificateToken);
                 try {
                     String vaultToken = VaultRestClient.kubernetesAuth();

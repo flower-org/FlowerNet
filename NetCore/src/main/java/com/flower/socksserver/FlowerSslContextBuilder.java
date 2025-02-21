@@ -13,6 +13,7 @@ import javax.net.ssl.SSLException;
 import java.util.List;
 
 import static com.flower.trust.FlowerTrust.TRUST_MANAGER_WITH_CLIENT_CA;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 public class FlowerSslContextBuilder {
     final static Logger LOGGER = LoggerFactory.getLogger(FlowerSslContextBuilder.class);
@@ -48,6 +49,6 @@ public class FlowerSslContextBuilder {
     }
 
     public static SslContext buildSslContext() throws SSLException {
-        return buildSslContext(SERVER_KEY_MANAGER);
+        return buildSslContext(checkNotNull(SERVER_KEY_MANAGER));
     }
 }

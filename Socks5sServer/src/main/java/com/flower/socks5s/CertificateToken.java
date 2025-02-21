@@ -7,8 +7,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.flower.utils.PkiUtil;
+import org.apache.commons.lang3.StringUtils;
 import org.immutables.value.Value;
 
+import javax.annotation.Nullable;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
@@ -40,10 +42,10 @@ public interface CertificateToken {
     @JsonProperty
     String signature();
 
-    static CertificateToken createToken(X509Certificate certificate, PrivateKey privateKey)
+    static CertificateToken createToken(X509Certificate certificate, PrivateKey privateKey, @Nullable String pod)
             throws JsonProcessingException, CertificateEncodingException, NoSuchAlgorithmException, SignatureException, InvalidKeyException {
         ObjectMapper mapper = new ObjectMapper();
-        CertificateToken.ServerData serverData = CertificateToken.ServerData.create(certificate, "pod1");
+        CertificateToken.ServerData serverData = CertificateToken.ServerData.create(certificate, pod == null || StringUtils.isBlank(pod) ? "POD_NAME_UNKNOWN" : pod);
         String serverDataStr = mapper.writeValueAsString(serverData);
 
         String sign = PkiUtil.signData(serverDataStr, privateKey);

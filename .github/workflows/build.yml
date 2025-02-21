@@ -46,7 +46,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Tag Docker image with the repository name
-        run: docker tag socks5s johnamirov83/socks5s:latest
+        run: docker tag socks5s johnamirov83/socks5s:${{ github.sha }}
 
       - name: Push Docker image to Docker Hub
-        run: docker push johnamirov83/socks5s:latest
+        run: docker push johnamirov83/socks5s:${{ github.sha }}

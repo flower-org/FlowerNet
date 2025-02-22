@@ -6,7 +6,7 @@ Regular traffic:
 
 → ← data | conn_id | data_len | data
 
-→ ← close_conn | conn_id | close_code | reason_len | reason (idempotent)
+→ ← close_conn | conn_id | close_code | reason_len | reason
 
 ---
 
@@ -24,7 +24,7 @@ Address resolution:
     resolution_details = LOCAL_NAMESERVER
     resolution_details = LOCAL_OS
 
-← resolve_response | request_id | name_len | name_to_resolve | ip4_count | ip4 | ip_6_count | ip6
+← resolve_response | request_id | name_len | name_to_resolve | ip4_count | ip4[] | ip_6_count | ip6[]
 
 ---
 

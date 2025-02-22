@@ -6,7 +6,7 @@ It's possible to imagine 2 typical ways of Socks+ proxy usage:
 
 Those installations are technically the same, the difference is in how they are allowed to interact with local infrastructure.  
 For the option 1 we want the user to not know any details about how and where the proxy is hosted, and we don't want any 
-addresses or hostnames related to underlying cluster to be resolvable by the user.
+addresses or hostnames related to underlying cluster to be accessible or resolvable by the user.
 For the option 2, on the contrary, we want all the underlying infrastructure to be visible, addresses accessible, and 
 services discoverable by internal names.
 We should be able to support both installation options and provide practical ways to achieve those requirements.

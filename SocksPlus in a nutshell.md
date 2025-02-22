@@ -1,22 +1,36 @@
-→ open_conn | conn_id | host_length | host | port (idempotent)
+Regular traffic:
 
-← open_conn_ack | conn_id (idempotent)
+→ open_conn | conn_id | host_len | host | port
 
-→ ← incoming_data | conn_id | data_length | data (packet#, crc? - prob redundant since it's over TCP, test)
+← open_conn_ack | conn_id
 
-→ ← close_conn | conn_id | close_code | reason_length | reason (idempotent)
+→ ← data | conn_id | data_len | data
+
+→ ← close_conn | conn_id | close_code | reason_len | reason (idempotent)
 
 ---
 
-+ DNS resolution - (implementable spoofer DNS (like a special 192.169.*.*))
+Address resolution:
 
-→ resolve_dns | request_id | dns_details | host_length | host
-    dns_details = type | server_host_length | server_host | server_port
-        type = SELF, UDP, DoTLS, DoHTTPS
+→ resolve_ip | request_id | dns_details | host_len | host
 
-← dns_response | ip4_count | ip4 | ip_6_count | ip6
+    resolution_details = type | server_addr_len | server_addr | server_port | cert_match_type | cert_len | cert
+        type = DNS_UDP, DNS_TLS, DNS_HTTPS, LOCAL_NAMESERVER, LOCAL_OS
+        cert_match_type = NONE, ROOT, EXACT
+
+    resolution_details = DNS_UDP | server_addr_len | server_addr | server_port
+    resolution_details = DNS_TLS | server_addr_len | server_addr | server_port | cert_match_type | cert_len | cert
+    resolution_details = DNS_HTTPS | server_addr_len | server_addr | server_port | cert_match_type | cert_len | cert
+    resolution_details = LOCAL_NAMESERVER
+    resolution_details = LOCAL_OS
+
+← dns_response | request_id | ip4_count | ip4 | ip_6_count | ip6
+
+---
+
+Ideas (possibly bad):
+- single_conn? - virtual connection closes, physical connection closes: useful for nodes in the middle of the chain.
+- packet#, crc? - in data messages prob redundant since it's over TCP, test
+- run the protocol on QUIC for speedup? - really low prio
 
 
-Maybe:
-single_conn? - virtual connection closes, physical connection closes: useful for nodes in the middle of the chain.  
-remove_tls? - for speed-up, but might be impractical.

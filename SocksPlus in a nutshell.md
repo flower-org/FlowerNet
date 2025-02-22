@@ -12,7 +12,7 @@ Regular traffic:
 
 Address resolution:
 
-→ resolve_ip | request_id | dns_details | host_len | host
+→ resolve_name | request_id | resolution_details | name_len | name_to_resolve
 
     resolution_details = type | server_addr_len | server_addr | server_port | cert_match_type | cert_len | cert
         type = DNS_UDP, DNS_TLS, DNS_HTTPS, LOCAL_NAMESERVER, LOCAL_OS
@@ -24,7 +24,7 @@ Address resolution:
     resolution_details = LOCAL_NAMESERVER
     resolution_details = LOCAL_OS
 
-← dns_response | request_id | ip4_count | ip4 | ip_6_count | ip6
+← resolve_response | request_id | name_len | name_to_resolve | ip4_count | ip4 | ip_6_count | ip6
 
 ---
 

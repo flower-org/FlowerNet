@@ -43,6 +43,7 @@ dependencies {
 
     implementation 'com.google.guava:guava-testlib:31.1-jre'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-guava:2.13.4'
+    implementation 'commons-net:commons-net:3.9.0'
 
     implementation 'io.netty:netty-all:4.1.79.Final' // Use the latest version
     implementation 'javax.activation:activation:1.1' // Use the latest version

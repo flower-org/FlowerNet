@@ -21,7 +21,6 @@ import io.netty.handler.codec.dns.DatagramDnsQueryEncoder;
 import io.netty.handler.codec.dns.DatagramDnsResponse;
 import io.netty.handler.codec.dns.DatagramDnsResponseDecoder;
 import io.netty.handler.codec.dns.DefaultDnsQuestion;
-import io.netty.handler.codec.dns.DefaultDnsResponse;
 import io.netty.handler.codec.dns.DnsQuery;
 import io.netty.handler.codec.dns.DnsRecordType;
 import io.netty.handler.codec.dns.DnsResponse;
@@ -67,7 +66,7 @@ public class DnsOverUdpClient implements DnsClient {
             .channel(NioDatagramChannel.class)
             .handler(new ChannelInitializer<DatagramChannel>() {
                 @Override
-                protected void initChannel(DatagramChannel ch) throws Exception {
+                protected void initChannel(DatagramChannel ch) {
                     ChannelPipeline p = ch.pipeline();
                     p.addLast(new DatagramDnsQueryEncoder())
                             .addLast(new DatagramDnsResponseDecoder())

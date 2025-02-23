@@ -79,12 +79,12 @@
                                           </TableColumn>
                                           <TableColumn minWidth="150.0" prefWidth="150.0" text="Client cert">
                                              <cellValueFactory>
-                                                <PropertyValueFactory property="clientCertificate" />
+                                                <PropertyValueFactory property="clientCertificateStr" />
                                              </cellValueFactory>
                                           </TableColumn>
                                           <TableColumn minWidth="200.0" prefWidth="200.0" text="Server CA cert">
                                              <cellValueFactory>
-                                                <PropertyValueFactory property="rootServerCertificate" />
+                                                <PropertyValueFactory property="rootServerCertificateStr" />
                                              </cellValueFactory>
                                           </TableColumn>
                                        </columns>
@@ -137,12 +137,12 @@
                                             </TableColumn>
                                             <TableColumn minWidth="150.0" prefWidth="150.0" text="Client cert">
                                                 <cellValueFactory>
-                                                    <PropertyValueFactory property="clientCertificate" />
+                                                    <PropertyValueFactory property="clientCertificateStr" />
                                                 </cellValueFactory>
                                             </TableColumn>
                                             <TableColumn minWidth="200.0" prefWidth="200.0" text="Server CA cert">
                                                 <cellValueFactory>
-                                                    <PropertyValueFactory property="rootServerCertificate" />
+                                                    <PropertyValueFactory property="rootServerCertificateStr" />
                                                 </cellValueFactory>
                                             </TableColumn>
                                         </columns>

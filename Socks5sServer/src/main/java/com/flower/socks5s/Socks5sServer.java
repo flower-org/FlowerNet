@@ -35,7 +35,7 @@ public final class Socks5sServer {
             port = Integer.parseInt(args[2]);
         }
 
-        SslContext sslCtx = null;
+        SslContext sslCtx;
         if (isSocks5OverTls) {
             if (isSelfGenerateCert) {
                 // Set up TLS with generated self-signed server cert
@@ -61,12 +61,14 @@ public final class Socks5sServer {
                 }
 
                 KeyManagerFactory keyManager = PkiUtil.getKeyManagerFromCertAndPrivateKey(certificate, keyPair.getPrivate());
-                FlowerSslContextBuilder.buildSslContext(keyManager);
+                sslCtx = FlowerSslContextBuilder.buildSslContext(keyManager);
             } else {
                 // Set up TLS with embedded server cert
-                LOGGER.info("Initializing with embedded certificate");
-                FlowerSslContextBuilder.buildSslContext();
+                LOGGER.info("Initializing with embedded certificate (resources)");
+                sslCtx = FlowerSslContextBuilder.buildSslContext();
             }
+        } else {
+            sslCtx = null;
         }
 
         SocksServer server = new SocksServer(() -> ALLOW_DIRECT_IP_ACCESS, SocksServerConnectHandler::new);

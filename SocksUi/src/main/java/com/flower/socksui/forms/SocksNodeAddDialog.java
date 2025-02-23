@@ -14,12 +14,14 @@ import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.io.File;
 import java.io.IOException;
 
 public class SocksNodeAddDialog extends VBox {
@@ -33,6 +35,7 @@ public class SocksNodeAddDialog extends VBox {
     @FXML @Nullable ComboBox<String> socksTypeComboBox;
     @FXML @Nullable TextField hostTextField;
     @FXML @Nullable TextField portTextField;
+    @FXML @Nullable TextField certTextField;
     @FXML @Nullable Button addButton;
 
     @Nullable Stage stage;
@@ -74,11 +77,22 @@ public class SocksNodeAddDialog extends VBox {
         this.stage = stage;
     }
 
+    public void selectCert() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Certificate (*.crt)", "*.crt"));
+        fileChooser.setTitle("Load Certificate");
+        File certificatFile = fileChooser.showOpenDialog(checkNotNull(stage));
+        if (certificatFile != null) {
+            checkNotNull(certTextField).textProperty().set(certificatFile.getPath());
+        }
+    }
+
     public void okClose() {
         try {
             String socksType = checkNotNull(socksTypeComboBox).valueProperty().get();
             String host = checkNotNull(hostTextField).textProperty().get().trim();
             String portStr = checkNotNull(portTextField).textProperty().get().trim();
+            String filename = checkNotNull(certTextField).textProperty().get().trim();
             int port;
             try {
                 port = Integer.parseInt(portStr);
@@ -92,13 +106,16 @@ public class SocksNodeAddDialog extends VBox {
             } else if (StringUtils.isBlank(host)) {
                 Alert alert = new Alert(Alert.AlertType.INFORMATION, "Please specify host " + host, ButtonType.OK);
                 alert.showAndWait();
+            } else if (StringUtils.isBlank(filename)) {
+                Alert alert = new Alert(Alert.AlertType.INFORMATION, "Please specify certificate " + host, ButtonType.OK);
+                alert.showAndWait();
             } else if (port <= 0) {
                 Alert alert = new Alert(Alert.AlertType.INFORMATION, "Please specify integer port > 0 (specified:" + portStr + ")", ButtonType.OK);
                 alert.showAndWait();
             } else {
                 switch (socksType) {
                     case SOCKS_5S:
-                        returnSocksNode = SocksNode.of(SocksProtocolVersion.SOCKS5s, host, port);
+                        returnSocksNode = SocksNode.of(SocksProtocolVersion.SOCKS5s, host, port, filename);
                         checkNotNull(stage).close();
                         break;
                     case SOCKS_5:

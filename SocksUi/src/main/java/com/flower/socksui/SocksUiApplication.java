@@ -9,6 +9,9 @@ import javafx.stage.Stage;
 
 import java.io.IOException;
 
+/**
+ * INCORRECT, DON'T RUN THIS
+*/
 public class SocksUiApplication extends Application {
     /**
      * Don't use this method directly, use SocksUiClientLauncher.

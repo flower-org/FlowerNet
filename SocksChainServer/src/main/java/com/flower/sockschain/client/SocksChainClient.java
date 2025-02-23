@@ -27,6 +27,7 @@ import io.netty.handler.ssl.SslContextBuilder;
 
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLException;
+import javax.net.ssl.TrustManagerFactory;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -35,7 +36,6 @@ import com.flower.utils.ServerUtil;
 
 import static com.flower.socksserver.FlowerSslContextBuilder.TLS_CIPHERS;
 import static com.flower.socksserver.FlowerSslContextBuilder.TLS_PROTOCOLS;
-import static com.flower.trust.FlowerTrust.TRUST_MANAGER_WITH_SERVER_CA;
 
 public class SocksChainClient {
     private final ChannelHandlerContext inboundCtx;
@@ -55,7 +55,12 @@ public class SocksChainClient {
     }
 
     @Nullable
-    public SslContext sslCtx(SocksProtocolVersion socksProtocolVersion) throws SSLException {
+    public SslContext sslCtx(SocksNode socksNode) throws SSLException {
+        //TODO: This happens every connection, we need to cache TrustManagerFactory
+        SocksProtocolVersion socksProtocolVersion = socksNode.socksProtocolVersion();
+        socksNode.rootServerCertificate();
+        TrustManagerFactory trustManagerFactory = socksNode.buildTrustManagerFactory();
+
         if (socksProtocolVersion == SocksProtocolVersion.SOCKS5s) {
             // Configure SSL.
             return SslContextBuilder.forClient()
@@ -63,7 +68,7 @@ public class SocksChainClient {
                     .ciphers(TLS_CIPHERS)
                     .keyManager(ETokenKeyManagerProvider.getManager())
                     .clientAuth(ClientAuth.REQUIRE)
-                    .trustManager(TRUST_MANAGER_WITH_SERVER_CA)
+                    .trustManager(trustManagerFactory)
                     .build();
         } else {
             return null;
@@ -139,7 +144,7 @@ public class SocksChainClient {
             SocksNode nextNode = socksProxyChain.get(nodeIndex.get() + 1);
             if (currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5 || currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5s) {
                 SocksChainClientPipelineManager.initSocks5Pipeline(outgoingChannel(), nextNode.serverAddress(),
-                        nextNode.serverPort(), this, sslCtx(currentNode.socksProtocolVersion()), future -> {
+                        nextNode.serverPort(), this, sslCtx(currentNode), future -> {
                     //System.out.println("HANDSHAKE DONE! PROXY");
                     outgoingChannel().writeAndFlush(new DefaultSocks5InitialRequest(Socks5AuthMethod.NO_AUTH));
                 });
@@ -154,7 +159,7 @@ public class SocksChainClient {
                 if (inboundMessage instanceof Socks5CommandRequest) {
                     Socks5CommandRequest socks5Request = (Socks5CommandRequest) inboundMessage;
                     SocksChainClientPipelineManager.initSocks5Pipeline(outgoingChannel(), socks5Request.dstAddr(),
-                            socks5Request.dstPort(), this, sslCtx(currentNode.socksProtocolVersion()), future -> {
+                            socks5Request.dstPort(), this, sslCtx(currentNode), future -> {
                         //System.out.println("HANDSHAKE DONE! ENDPOINT");
                         outgoingChannel().writeAndFlush(new DefaultSocks5InitialRequest(Socks5AuthMethod.NO_AUTH));
                     });

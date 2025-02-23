@@ -25,6 +25,8 @@ import javax.net.ssl.X509TrustManager;
 import javax.security.auth.x500.X500Principal;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -132,6 +134,11 @@ public class PkiUtil {
 
     public static KeyStore loadTrustStore(String resourceName) {
         X509Certificate cert = getCertificateFromStream(getStreamFromResource(resourceName));
+        return loadTrustStore(cert);
+    }
+
+    public static KeyStore loadTrustStore(File file) throws FileNotFoundException {
+        X509Certificate cert = getCertificateFromStream(new FileInputStream(file));
         return loadTrustStore(cert);
     }
 

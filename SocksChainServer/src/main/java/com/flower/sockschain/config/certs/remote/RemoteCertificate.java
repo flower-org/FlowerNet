@@ -10,6 +10,7 @@ import org.immutables.value.Value;
 
 import javax.annotation.Nullable;
 
+/** One of */
 @Value.Immutable
 @JsonSerialize(as = ImmutableRemoteCertificate.class)
 @JsonDeserialize(as = ImmutableRemoteCertificate.class)

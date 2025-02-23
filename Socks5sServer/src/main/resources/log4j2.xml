@@ -9,7 +9,8 @@
         <Console name="console" target="SYSTEM_OUT" follow="true">
             <PatternLayout pattern="${LOG_PATTERN}"/>
         </Console>
-        <RollingFile name="file"
+        <!--Disabled due to RO filesystem in the container-->
+        <!--<RollingFile name="file"
                      fileName="${LOG_FOLDER}SocksServer.log"
                      filePattern="${LOG_FOLDER}SocksServer.%d{yyyy-MM-dd}.log"
                      immediateFlush="true"
@@ -18,12 +19,12 @@
             <Policies>
                 <TimeBasedTriggeringPolicy/>
             </Policies>
-        </RollingFile>
+        </RollingFile>-->
     </Appenders>
     <Loggers>
         <Root level="info">
             <AppenderRef ref="console"/>
-            <AppenderRef ref="file"/>
+            <!--<AppenderRef ref="file"/>-->
         </Root>
     </Loggers>
 </Configuration>

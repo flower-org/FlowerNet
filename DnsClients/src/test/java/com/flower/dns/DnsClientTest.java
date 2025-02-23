@@ -1,8 +1,9 @@
 package com.flower.dns;
 
-import com.flower.dns.client.DnsClient;
+import com.flower.dns.cache.DnsCache;
 import com.flower.dns.client.dnsovertls.DnsOverTlsClient;
 import com.flower.dns.client.dnsoverudp.DnsOverUdpClient;
+import com.flower.utils.DnsClient;
 import com.flower.utils.PkiUtil;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.dns.DefaultDnsResponse;
@@ -10,6 +11,7 @@ import io.netty.handler.codec.dns.DnsQuestion;
 import io.netty.handler.codec.dns.DnsRawRecord;
 import io.netty.handler.codec.dns.DnsRecord;
 import io.netty.handler.codec.dns.DnsRecordType;
+import io.netty.handler.codec.dns.DnsResponse;
 import io.netty.handler.codec.dns.DnsSection;
 import io.netty.util.NetUtil;
 import io.netty.util.concurrent.Promise;
@@ -29,10 +31,13 @@ public final class DnsClientTest {
 
     public static void main(String[] args) throws Exception {
         DnsClient client;
-        if (true) {
-            client = new DnsOverTlsClient(DNS_SERVER_ADDRESS, DNS_OVER_TLS_SERVER_PORT, TRUST_MANAGER);
-        } else {
-            client = new DnsOverUdpClient(DNS_SERVER_ADDRESS, DNS_OVER_UDP_SERVER_PORT);
+        int i = 3;
+        switch (i) {
+            case 1: client = new DnsOverTlsClient(DNS_SERVER_ADDRESS, DNS_OVER_TLS_SERVER_PORT, TRUST_MANAGER); break;
+            case 2: client = new DnsOverUdpClient(DNS_SERVER_ADDRESS, DNS_OVER_UDP_SERVER_PORT); break;
+            case 3: client = new DnsCache(new DnsOverTlsClient(DNS_SERVER_ADDRESS, DNS_OVER_TLS_SERVER_PORT, TRUST_MANAGER)); break;
+            case 4: client = new DnsCache(new DnsOverUdpClient(DNS_SERVER_ADDRESS, DNS_OVER_UDP_SERVER_PORT)); break;
+            default: throw new RuntimeException("Client type unknown: " + i);
         }
 
         testClient(client);
@@ -42,9 +47,10 @@ public final class DnsClientTest {
     }
 
     static void testClient(DnsClient client) {
-        Promise<DefaultDnsResponse> promise = client.query(QUERY_DOMAIN, 1000);
+        Promise<DnsResponse> promise = client.query(QUERY_DOMAIN, 1000);
         promise.addListener(future -> {
             if (future.isSuccess()) {
+                System.out.println("Success");
                 DefaultDnsResponse msg = (DefaultDnsResponse) future.get();
                 if (msg.count(DnsSection.QUESTION) > 0) {
                     DnsQuestion question = msg.recordAt(DnsSection.QUESTION, 0);
@@ -52,7 +58,7 @@ public final class DnsClientTest {
                 }
                 for (int i = 0, count = msg.count(DnsSection.ANSWER); i < count; i++) {
                     DnsRecord record = msg.recordAt(DnsSection.ANSWER, i);
-                    if (record.type() == DnsRecordType.A) {
+                    if (DnsRecordType.A.equals(record.type())) {
                         //just print the IP after query
                         DnsRawRecord raw = (DnsRawRecord) record;
                         System.out.println(NetUtil.bytesToIpAddress(ByteBufUtil.getBytes(raw.content())));

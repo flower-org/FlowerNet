@@ -1,7 +1,7 @@
 package com.flower.dns.client.dnsoverudp;
 
-import com.flower.dns.client.DnsClient;
-import com.flower.dns.client.utils.PromiseUtil;
+import com.flower.utils.DnsClient;
+import com.flower.utils.PromiseUtil;
 import com.flower.utils.ServerUtil;
 import com.flower.utils.evictlist.ConcurrentEvictListWithFixedTimeout;
 import com.flower.utils.evictlist.EvictLinkedList;
@@ -24,6 +24,7 @@ import io.netty.handler.codec.dns.DefaultDnsQuestion;
 import io.netty.handler.codec.dns.DefaultDnsResponse;
 import io.netty.handler.codec.dns.DnsQuery;
 import io.netty.handler.codec.dns.DnsRecordType;
+import io.netty.handler.codec.dns.DnsResponse;
 import io.netty.handler.codec.dns.DnsSection;
 import io.netty.util.concurrent.DefaultPromise;
 import io.netty.util.concurrent.Promise;
@@ -41,7 +42,7 @@ public class DnsOverUdpClient implements DnsClient {
 
     public static final Long DEFAULT_CALLBACK_EXPIRATION_TIMEOUT_MILLIS = 2500L;
 
-    private final EvictLinkedList<Pair<Integer, Promise<DefaultDnsResponse>>> callbacks;
+    private final EvictLinkedList<Pair<Integer, Promise<DnsResponse>>> callbacks;
 
     private final EventLoopGroup group;
     private final Bootstrap bootstrap;
@@ -96,31 +97,31 @@ public class DnsOverUdpClient implements DnsClient {
     }
 
     @Override
-    public Promise<DefaultDnsResponse> query(String hostname, long timeoutMillis) {
-        Promise<DefaultDnsResponse> promise = query(hostname);
-        return PromiseUtil.withTimeout(bootstrap.config().group().next(), promise, timeoutMillis);
+    public Promise<DnsResponse> query(String hostname, long promiseTimeoutMs) {
+        Promise<DnsResponse> promise = query(hostname);
+        return PromiseUtil.withTimeout(bootstrap.config().group().next(), promise, promiseTimeoutMs);
     }
 
     @Override
-    public Promise<DefaultDnsResponse> query(String hostname) {
+    public Promise<DnsResponse> query(String hostname) {
         DnsQuery query = new DatagramDnsQuery(null, dnsServerAddress, 1).setRecord(
                 DnsSection.QUESTION,
                 new DefaultDnsQuestion(hostname, DnsRecordType.A));
-        Promise<DefaultDnsResponse> channelPromise = new DefaultPromise<>(bootstrap.config().group().next());
+        Promise<DnsResponse> channelPromise = new DefaultPromise<>(bootstrap.config().group().next());
         callbacks.addElement(Pair.of(query.id(), channelPromise));
         udpSocket.writeAndFlush(query);
         return channelPromise;
     }
 
-    protected void handleQueryResp(DefaultDnsResponse msg) {
-        Promise<DefaultDnsResponse> promise = findCallback(msg.id());
+    protected void handleQueryResp(DnsResponse msg) {
+        Promise<DnsResponse> promise = findCallback(msg.id());
         if (promise != null && !promise.isDone()) { promise.setSuccess(msg); }
     }
 
-    protected @Nullable Promise<DefaultDnsResponse> findCallback(int queryId) {
-        Iterator<EvictLinkedNode<Pair<Integer, Promise<DefaultDnsResponse>>>> iterator = callbacks.iterator();
+    protected @Nullable Promise<DnsResponse> findCallback(int queryId) {
+        Iterator<EvictLinkedNode<Pair<Integer, Promise<DnsResponse>>>> iterator = callbacks.iterator();
         while (iterator.hasNext()) {
-            EvictLinkedNode<Pair<Integer, Promise<DefaultDnsResponse>>> cursor = iterator.next();
+            EvictLinkedNode<Pair<Integer, Promise<DnsResponse>>> cursor = iterator.next();
             if (cursor.value().getKey() == queryId) {
                 callbacks.markEvictable(cursor);
                 return cursor.value().getValue();

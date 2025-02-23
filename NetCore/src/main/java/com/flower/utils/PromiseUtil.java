@@ -1,4 +1,4 @@
-package com.flower.dns.client.utils;
+package com.flower.utils;
 
 import io.netty.util.concurrent.Promise;
 import io.netty.util.concurrent.ScheduledFuture;

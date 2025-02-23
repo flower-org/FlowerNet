@@ -1,9 +1,9 @@
 package com.flower.dns.client.dnsovertls;
 
-import com.flower.dns.client.DnsClient;
+import com.flower.utils.DnsClient;
 import com.flower.channelpool.AggressiveChannelPool;
 import com.flower.channelpool.ChannelPool;
-import com.flower.dns.client.utils.PromiseUtil;
+import com.flower.utils.PromiseUtil;
 import com.flower.utils.ServerUtil;
 import com.flower.utils.evictlist.ConcurrentEvictListWithFixedTimeout;
 import com.flower.utils.evictlist.EvictLinkedList;
@@ -27,6 +27,7 @@ import io.netty.handler.codec.dns.DefaultDnsResponse;
 import io.netty.handler.codec.dns.DnsOpCode;
 import io.netty.handler.codec.dns.DnsQuery;
 import io.netty.handler.codec.dns.DnsRecordType;
+import io.netty.handler.codec.dns.DnsResponse;
 import io.netty.handler.codec.dns.DnsSection;
 import io.netty.handler.codec.dns.TcpDnsQueryEncoder;
 import io.netty.handler.codec.dns.TcpDnsResponseDecoder;
@@ -58,7 +59,7 @@ public class DnsOverTlsClient implements DnsClient {
     public static final int DEFAULT_MAX_QUERY_RETRY_COUNT = 2;
 
     private final int maxQueryRetryCount;
-    private final EvictLinkedList<Pair<Integer, Promise<DefaultDnsResponse>>> callbacks;
+    private final EvictLinkedList<Pair<Integer, Promise<DnsResponse>>> callbacks;
     private final ChannelPool channelPool;
 
     private final EventLoopGroup group;
@@ -141,18 +142,18 @@ public class DnsOverTlsClient implements DnsClient {
     }
 
     @Override
-    public Promise<DefaultDnsResponse> query(String hostname, long timeoutMillis) {
-        Promise<DefaultDnsResponse> promise = query(hostname);
-        return PromiseUtil.withTimeout(bootstrap.config().group().next(), promise, timeoutMillis);
+    public Promise<DnsResponse> query(String hostname, long promiseTimeoutMs) {
+        Promise<DnsResponse> promise = query(hostname);
+        return PromiseUtil.withTimeout(bootstrap.config().group().next(), promise, promiseTimeoutMs);
     }
 
     @Override
-    public Promise<DefaultDnsResponse> query(String hostname) {
+    public Promise<DnsResponse> query(String hostname) {
         int randomID = new Random().nextInt(60000 - 1000) + 1000;
         DnsQuery query = new DefaultDnsQuery(randomID, DnsOpCode.QUERY)
                 .setRecord(DnsSection.QUESTION, new DefaultDnsQuestion(hostname, DnsRecordType.A));
 
-        Promise<DefaultDnsResponse> channelPromise = new DefaultPromise<>(bootstrap.config().group().next());
+        Promise<DnsResponse> channelPromise = new DefaultPromise<>(bootstrap.config().group().next());
         callbacks.addElement(Pair.of(query.id(), channelPromise));
         query(query, 0);
         return channelPromise;
@@ -185,15 +186,15 @@ public class DnsOverTlsClient implements DnsClient {
         });
     }
 
-    protected void handleQueryResp(DefaultDnsResponse msg) {
-        Promise<DefaultDnsResponse> promise = findCallback(msg.id());
+    protected void handleQueryResp(DnsResponse msg) {
+        Promise<DnsResponse> promise = findCallback(msg.id());
         if (promise != null && !promise.isDone()) { promise.setSuccess(msg); }
     }
 
-    protected @Nullable Promise<DefaultDnsResponse> findCallback(int queryId) {
-        Iterator<EvictLinkedNode<Pair<Integer, Promise<DefaultDnsResponse>>>> iterator = callbacks.iterator();
+    protected @Nullable Promise<DnsResponse> findCallback(int queryId) {
+        Iterator<EvictLinkedNode<Pair<Integer, Promise<DnsResponse>>>> iterator = callbacks.iterator();
         while (iterator.hasNext()) {
-            EvictLinkedNode<Pair<Integer, Promise<DefaultDnsResponse>>> cursor = iterator.next();
+            EvictLinkedNode<Pair<Integer, Promise<DnsResponse>>> cursor = iterator.next();
             if (cursor.value().getKey() == queryId) {
                 callbacks.markEvictable(cursor);
                 return cursor.value().getValue();

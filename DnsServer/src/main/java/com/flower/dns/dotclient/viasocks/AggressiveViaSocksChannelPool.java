@@ -1,25 +1,16 @@
 package com.flower.dns.dotclient.viasocks;
 
-import com.flower.dns.dotclient.AggressiveChannelPool;
-import com.flower.dns.dotclient.ChannelPool;
+import com.flower.channelpool.AggressiveChannelPool;
 import com.flower.dns.dotclient.DnsOverTlsClient;
 import com.flower.utils.evictlist.*;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
-import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.socksx.v5.*;
-import io.netty.handler.ssl.SslHandler;
 import io.netty.util.concurrent.*;
 
-import javax.annotation.Nullable;
-import javax.net.ssl.SSLException;
 import java.net.InetAddress;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Aggressively creates as many channels as it can until reaches `maxChannels`.

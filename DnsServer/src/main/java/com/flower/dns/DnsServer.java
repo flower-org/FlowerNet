@@ -2,7 +2,6 @@ package com.flower.dns;
 
 import com.flower.dns.dotclient.DnsOverTlsClient;
 import com.flower.utils.PkiUtil;
-import com.flower.utils.ServerUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -16,7 +15,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
-import java.net.InetAddress;
 
 public class DnsServer {
     final static Logger LOGGER = LoggerFactory.getLogger(DnsServer.class);

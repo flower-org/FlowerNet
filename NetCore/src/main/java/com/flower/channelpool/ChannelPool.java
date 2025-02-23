@@ -1,4 +1,4 @@
-package com.flower.dns.dotclient;
+package com.flower.channelpool;
 
 import com.flower.utils.evictlist.EvictLinkedNode;
 import io.netty.channel.Channel;

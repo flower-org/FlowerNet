@@ -1,9 +1,9 @@
-package com.flower.dns.dotclient;
+package com.flower.dns.client.dnsovertls;
 
+import com.flower.dns.client.DnsClient;
 import com.flower.channelpool.AggressiveChannelPool;
 import com.flower.channelpool.ChannelPool;
-import com.flower.dns.dotclient.viasocks.AggressiveViaSocksChannelPool;
-import com.flower.utils.EmptyPipelineChannelInitializer;
+import com.flower.dns.client.utils.PromiseUtil;
 import com.flower.utils.ServerUtil;
 import com.flower.utils.evictlist.ConcurrentEvictListWithFixedTimeout;
 import com.flower.utils.evictlist.EvictLinkedList;
@@ -14,7 +14,6 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -22,15 +21,20 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.channel.SimpleChannelInboundHandler;
 
+import io.netty.handler.codec.dns.DefaultDnsQuery;
+import io.netty.handler.codec.dns.DefaultDnsQuestion;
 import io.netty.handler.codec.dns.DefaultDnsResponse;
+import io.netty.handler.codec.dns.DnsOpCode;
 import io.netty.handler.codec.dns.DnsQuery;
-import io.netty.handler.codec.dns.DnsQuestion;
+import io.netty.handler.codec.dns.DnsRecordType;
 import io.netty.handler.codec.dns.DnsSection;
 import io.netty.handler.codec.dns.TcpDnsQueryEncoder;
 import io.netty.handler.codec.dns.TcpDnsResponseDecoder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.concurrent.DefaultPromise;
+import io.netty.util.concurrent.Promise;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,80 +44,41 @@ import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
 import java.net.InetAddress;
 import java.util.Iterator;
-import java.util.function.Consumer;
+import java.util.Random;
 
 import static com.flower.socksserver.FlowerSslContextBuilder.TLS_CIPHERS;
 import static com.flower.socksserver.FlowerSslContextBuilder.TLS_PROTOCOLS;
-import static com.google.common.base.Preconditions.checkNotNull;
 
-public class DnsOverTlsClient {
+public class DnsOverTlsClient implements DnsClient {
     static final Logger LOGGER = LoggerFactory.getLogger(DnsOverTlsClient.class);
 
-    static final Long SSL_HANDSHAKE_TIMEOUT_MILLIS = 1000L;
-    static final Long CALLBACK_EXPIRATION_TIMEOUT = 2500L;
-    static final int MAX_PARALLEL_CHANNELS = 3;
-    static final int MAX_QUERY_RETRY_COUNT = 2;
+    public static final Long DEFAULT_SSL_HANDSHAKE_TIMEOUT_MILLIS = 1000L;
+    public static final Long DEFAULT_CALLBACK_EXPIRATION_TIMEOUT_MILLIS = 2500L;
+    public static final int DEFAULT_MAX_PARALLEL_CONNECTIONS = 3;
+    public static final int DEFAULT_MAX_QUERY_RETRY_COUNT = 2;
 
-    @Nullable private final InetAddress socksServerAddress;
-    @Nullable private final Integer socksServerPort;
-    private final InetAddress dnsServerAddress;
-    private final int dnsServerPort;
+    private final int maxQueryRetryCount;
+    private final EvictLinkedList<Pair<Integer, Promise<DefaultDnsResponse>>> callbacks;
+    private final ChannelPool channelPool;
 
     private final EventLoopGroup group;
+    private final SslContext sslCtx;
     private final Bootstrap bootstrap;
 
-    private final ChannelPool channelPool;
-    private final EvictLinkedList<Pair<Integer, Pair<DnsQuestion, Consumer<DefaultDnsResponse>>>> callbacks;
-
-    private final boolean useCache;
-    @Nullable private final AnswerCache cache;
-
-    private final SslContext sslCtx;
-
-    public DnsOverTlsClient(String socksServerHost, int socksServerPort,
-                                    String dnsServerHost, int dnsServerPort,
-                                    TrustManagerFactory trustManager, boolean useCache) throws SSLException {
-        this.socksServerAddress = ServerUtil.getByName(socksServerHost);
-        this.socksServerPort = socksServerPort;
-
-        this.dnsServerAddress = ServerUtil.getByName(dnsServerHost);
-        this.dnsServerPort = dnsServerPort;
-
-        this.callbacks = new ConcurrentEvictListWithFixedTimeout<>(CALLBACK_EXPIRATION_TIMEOUT);
-
-        // Configure SSL.
-        this.sslCtx = SslContextBuilder
-                .forClient()
-                .protocols(TLS_PROTOCOLS)
-                .ciphers(TLS_CIPHERS)
-                .trustManager(trustManager)
-                .build();
-
-        group = new NioEventLoopGroup();
-        bootstrap = new Bootstrap();
-
-        bootstrap.group(group)
-                .channel(NioSocketChannel.class)
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
-                .option(ChannelOption.SO_KEEPALIVE, true)
-                .handler(new EmptyPipelineChannelInitializer());
-
-        this.channelPool = new AggressiveViaSocksChannelPool(bootstrap, socksServerAddress, socksServerPort,
-                dnsServerHost, dnsServerPort,
-                this,
-                MAX_PARALLEL_CHANNELS);
-
-        this.useCache = useCache;
-        if (useCache) { cache = new AnswerCache(); }
-                else  { cache = null; }
+    public DnsOverTlsClient(String dnsServerHost, int dnsServerPort, TrustManagerFactory trustManager) throws SSLException {
+        this(ServerUtil.getByName(dnsServerHost), dnsServerPort, trustManager);
     }
 
-    public DnsOverTlsClient(String dnsServerHost, int dnsServerPort, TrustManagerFactory trustManager, boolean useCache) throws SSLException {
-        this.socksServerAddress = null;
-        this.socksServerPort = null;
-        this.dnsServerAddress = ServerUtil.getByName(dnsServerHost);
-        this.dnsServerPort = dnsServerPort;
-        this.callbacks = new ConcurrentEvictListWithFixedTimeout<>(CALLBACK_EXPIRATION_TIMEOUT);
+    public DnsOverTlsClient(InetAddress dnsServerAddress, int dnsServerPort, TrustManagerFactory trustManager) throws SSLException {
+        this(dnsServerAddress, dnsServerPort, trustManager, DEFAULT_SSL_HANDSHAKE_TIMEOUT_MILLIS,
+                DEFAULT_CALLBACK_EXPIRATION_TIMEOUT_MILLIS, DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_QUERY_RETRY_COUNT);
+    }
+
+    public DnsOverTlsClient(InetAddress dnsServerAddress, int dnsServerPort, TrustManagerFactory trustManager,
+                            long sslHandshakeTimeoutMillis, long callbackExpirationTimeoutMillis, int maxParallelConnections,
+                            int maxQueryRetryCount) throws SSLException {
+        this.maxQueryRetryCount = maxQueryRetryCount;
+        this.callbacks = new ConcurrentEvictListWithFixedTimeout<>(callbackExpirationTimeoutMillis);
 
         // Configure SSL.
         this.sslCtx = SslContextBuilder
@@ -132,7 +97,7 @@ public class DnsOverTlsClient {
                 protected void initChannel(SocketChannel ch) {
                     ChannelPipeline p = ch.pipeline();
                     SslHandler sslHandler = sslCtx.newHandler(ch.alloc());
-                    sslHandler.setHandshakeTimeoutMillis(SSL_HANDSHAKE_TIMEOUT_MILLIS);
+                    sslHandler.setHandshakeTimeoutMillis(sslHandshakeTimeoutMillis);
                     sslHandler.handshakeFuture().addListener(
                         future -> {
                             if (!future.isSuccess()) {
@@ -167,30 +132,34 @@ public class DnsOverTlsClient {
                     });
                 }
             });
-        this.channelPool = new AggressiveChannelPool(bootstrap, dnsServerAddress, dnsServerPort, MAX_PARALLEL_CHANNELS);
-
-        this.useCache = useCache;
-        if (useCache) { cache = new AnswerCache(); }
-                else  { cache = null; }
+        this.channelPool = new AggressiveChannelPool(bootstrap, dnsServerAddress, dnsServerPort, maxParallelConnections);
     }
 
-    public void query(DnsQuery query, Consumer<DefaultDnsResponse> dnsResponseConsumer) {
-        DnsQuestion qQuestion = query.recordAt(DnsSection.QUESTION, 0);
-        if (useCache) {
-            DefaultDnsResponse response = checkNotNull(cache).getResponseIfPresent(qQuestion);
-            if (response != null) {
-                LOGGER.info("{} | Cache hit!", query.id());
-                dnsResponseConsumer.accept(response);
-                return;
-            }
-        }
+    @Override
+    public void shutdown() {
+        group.shutdownGracefully();
+    }
 
-        callbacks.addElement(Pair.of(query.id(), Pair.of(qQuestion, dnsResponseConsumer)));
+    @Override
+    public Promise<DefaultDnsResponse> query(String hostname, long timeoutMillis) {
+        Promise<DefaultDnsResponse> promise = query(hostname);
+        return PromiseUtil.withTimeout(bootstrap.config().group().next(), promise, timeoutMillis);
+    }
+
+    @Override
+    public Promise<DefaultDnsResponse> query(String hostname) {
+        int randomID = new Random().nextInt(60000 - 1000) + 1000;
+        DnsQuery query = new DefaultDnsQuery(randomID, DnsOpCode.QUERY)
+                .setRecord(DnsSection.QUESTION, new DefaultDnsQuestion(hostname, DnsRecordType.A));
+
+        Promise<DefaultDnsResponse> channelPromise = new DefaultPromise<>(bootstrap.config().group().next());
+        callbacks.addElement(Pair.of(query.id(), channelPromise));
         query(query, 0);
+        return channelPromise;
     }
 
     protected void query(DnsQuery query, int retry) {
-        if (retry > MAX_QUERY_RETRY_COUNT) {
+        if (retry > maxQueryRetryCount) {
             LOGGER.info("{} | DoT Server request failed after retry# {}", query.id(), retry);
             return;
         }
@@ -216,30 +185,15 @@ public class DnsOverTlsClient {
         });
     }
 
-    public void shutdown() {
-        group.shutdownGracefully();
+    protected void handleQueryResp(DefaultDnsResponse msg) {
+        Promise<DefaultDnsResponse> promise = findCallback(msg.id());
+        if (promise != null && !promise.isDone()) { promise.setSuccess(msg); }
     }
 
-    public SslContext getSslCtx() {
-        return sslCtx;
-    }
-
-    public void handleQueryResp(DefaultDnsResponse msg) {
-        Pair<DnsQuestion, Consumer<DefaultDnsResponse>> pair = findCallback(msg.id());
-        if (pair != null) {
-            Consumer<DefaultDnsResponse> responseListener = pair.getValue();
-            responseListener.accept(msg);
-            if (useCache) {
-                DnsQuestion question = pair.getKey();
-                checkNotNull(cache).putResponse(question, msg);
-            }
-        }
-    }
-
-    protected @Nullable Pair<DnsQuestion, Consumer<DefaultDnsResponse>> findCallback(int queryId) {
-        Iterator<EvictLinkedNode<Pair<Integer, Pair<DnsQuestion, Consumer<DefaultDnsResponse>>>>> iterator = callbacks.iterator();
+    protected @Nullable Promise<DefaultDnsResponse> findCallback(int queryId) {
+        Iterator<EvictLinkedNode<Pair<Integer, Promise<DefaultDnsResponse>>>> iterator = callbacks.iterator();
         while (iterator.hasNext()) {
-            EvictLinkedNode<Pair<Integer, Pair<DnsQuestion, Consumer<DefaultDnsResponse>>>> cursor = iterator.next();
+            EvictLinkedNode<Pair<Integer, Promise<DefaultDnsResponse>>> cursor = iterator.next();
             if (cursor.value().getKey() == queryId) {
                 callbacks.markEvictable(cursor);
                 return cursor.value().getValue();

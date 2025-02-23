@@ -5,6 +5,8 @@ import com.flower.utils.EmptyPipelineChannelInitializer;
 import com.google.common.base.Preconditions;
 import com.flower.sockschain.config.SocksNode;
 import com.flower.sockschain.config.SocksProtocolVersion;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -38,6 +40,11 @@ import static com.flower.socksserver.FlowerSslContextBuilder.TLS_CIPHERS;
 import static com.flower.socksserver.FlowerSslContextBuilder.TLS_PROTOCOLS;
 
 public class SocksChainClient {
+    public static final int TRUST_MANAGER_CACHE_CAPACITY = 256;
+    private final static Cache<SocksNode, TrustManagerFactory> TRUST_MANAGER_CACHE = Caffeine.newBuilder()
+                .maximumSize(TRUST_MANAGER_CACHE_CAPACITY)
+                .build();
+    
     private final ChannelHandlerContext inboundCtx;
     private final Channel inboundChannel;
     private final SocksMessage inboundMessage;
@@ -56,11 +63,15 @@ public class SocksChainClient {
 
     @Nullable
     public SslContext sslCtx(SocksNode socksNode) throws SSLException {
-        //TODO: This happens every connection, we need to cache TrustManagerFactory
-        SocksProtocolVersion socksProtocolVersion = socksNode.socksProtocolVersion();
-        socksNode.rootServerCertificate();
-        TrustManagerFactory trustManagerFactory = socksNode.buildTrustManagerFactory();
+        TrustManagerFactory trustManagerFactory = TRUST_MANAGER_CACHE.getIfPresent(socksNode);
+        if (trustManagerFactory == null) {
+            socksNode.rootServerCertificate();
+            trustManagerFactory = socksNode.buildTrustManagerFactory();
 
+            TRUST_MANAGER_CACHE.put(socksNode, trustManagerFactory);
+        }
+
+        SocksProtocolVersion socksProtocolVersion = socksNode.socksProtocolVersion();
         if (socksProtocolVersion == SocksProtocolVersion.SOCKS5s) {
             // Configure SSL.
             return SslContextBuilder.forClient()

@@ -1,8 +1,8 @@
 package com.flower.dns.dotclient;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalListener;
 import io.netty.handler.codec.dns.DefaultDnsResponse;
 import io.netty.handler.codec.dns.DnsQuestion;
 import io.netty.handler.codec.dns.DnsRecord;
@@ -42,12 +42,12 @@ public class AnswerCache {
     }
 
     public AnswerCache() {
-        cache = CacheBuilder.newBuilder()
+        cache = Caffeine.newBuilder()
                 .maximumSize(MAXIMUM_CACHE_SIZE)
                 .expireAfterAccess(CACHE_ENTRY_TIMEOUT_AFTER_ACCESS_MS, TimeUnit.MILLISECONDS)
                 .removalListener(
-                        (RemovalListener<DnsQuestionWrapper, DefaultDnsResponse>) notification ->
-                                notification.getValue().release())
+                        (RemovalListener<DnsQuestionWrapper, DefaultDnsResponse>) (key, value, cause) -> value.release()
+                )
                 .build();
     }
 

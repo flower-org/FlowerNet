@@ -5,7 +5,7 @@ import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.net.Socket;
 
-public class SSLCertificateFetcher {
+public class SSLCertificateExtractor {
     public static void main(String[] args) {
         String host = "1.1.1.1"; // Change to your server
         int port = 853; // Change to your port

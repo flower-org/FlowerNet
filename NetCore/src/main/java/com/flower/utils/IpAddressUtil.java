@@ -1,6 +1,10 @@
 package com.flower.utils;
 
-public class NonDnsHostnameChecker {
+import javax.annotation.Nullable;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
+public class IpAddressUtil {
     public static boolean isIPv4Address(String input) {
         String[] parts = input.split("\\.");
         if (parts.length != 4) {
@@ -48,5 +52,18 @@ public class NonDnsHostnameChecker {
 
     public static boolean isIPAddress(String input) {
         return isIPv4Address(input) || isIPv6Address(input);
+    }
+
+    @Nullable
+    public static InetAddress fromString(String ipAddress) {
+        try {
+            if (isIPAddress(ipAddress)) {
+                return InetAddress.getByName(ipAddress);
+            } else {
+                return null;
+            }
+        } catch (UnknownHostException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

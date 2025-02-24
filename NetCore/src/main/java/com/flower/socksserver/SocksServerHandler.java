@@ -6,7 +6,7 @@ import com.flower.conntrack.ConnectionInfo;
 import com.flower.conntrack.ConnectionId;
 import com.flower.conntrack.ConnectionListener;
 import com.flower.conntrack.Destination;
-import com.flower.utils.NonDnsHostnameChecker;
+import com.flower.utils.IpAddressUtil;
 import com.flower.utils.ServerUtil;
 import com.google.common.base.Preconditions;
 import io.netty.channel.ChannelFutureListener;
@@ -165,7 +165,7 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
 
     public AddressCheck approveConnection(String dstHost, int dstPort, SocketAddress from) {
         if (!allowDirectAccessByIpAddress.get()) {
-            if (NonDnsHostnameChecker.isIPAddress(dstHost)) {
+            if (IpAddressUtil.isIPAddress(dstHost)) {
                 LOGGER.error("CONNECTION_PROHIBITED: no direct IP access allowed {}:{} from {}", dstHost, dstPort, from);
                 return AddressCheck.CONNECTION_PROHIBITED;
             }

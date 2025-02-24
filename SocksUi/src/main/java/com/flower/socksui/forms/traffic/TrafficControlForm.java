@@ -15,7 +15,7 @@ import com.flower.socksui.JavaFxUtils;
 import com.flower.socksui.MainApp;
 import com.flower.socksui.forms.ConnectionMonitorForm;
 import com.flower.socksui.forms.Refreshable;
-import com.flower.utils.NonDnsHostnameChecker;
+import com.flower.utils.IpAddressUtil;
 import com.google.common.collect.Streams;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -302,7 +302,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
             checkResult = AddressCheck.CONNECTION_ALLOWED;
         } else {
             boolean isDirectIpAccessAllowed = checkNotNull(allowDirectIpAccessCheckBox).selectedProperty().get();
-            if (!isDirectIpAccessAllowed && NonDnsHostnameChecker.isIPAddress(dstHost)) {
+            if (!isDirectIpAccessAllowed && IpAddressUtil.isIPAddress(dstHost)) {
                 isDirectIpBlock = true;
                 isRuleMatched = false;
                 checkResult = AddressCheck.CONNECTION_PROHIBITED;

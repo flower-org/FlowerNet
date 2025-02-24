@@ -72,9 +72,11 @@ is deployed, LOCAL_NAMESERVER and LOCAL_OS, the point being that those may end u
   - LOCAL_OS will resolve all names, including local service names, including in GKE environments 
         (unlike LOCAL_NAMESERVER), but it's a blocking operation in Java.
   - Useful if we want to use our proxy as a gateway to our K8s environment.
-  - To optimize the blocking part, we should run LOCAL_NAMESERVER first 
-    (non-blocking) and fall back to the blocking method IFF LOCAL_NAMESERVER fails.
-    - Would be great to implement a non-blocking version eventually, but low prio, since LOCAL_OS is for restrictive installations primarily - like infrastructure gateways, authorized personnel-only.
+  - ~~To optimize the blocking part, we should run LOCAL_NAMESERVER first
+    (non-blocking) and fall back to the blocking method IFF LOCAL_NAMESERVER fails.~~
+    - On the second thought, even blocking local lookup should be sufficiently fast, so why bother.
+    - That's a cleaner approach, too.
+  - Still, it would be great to figure a non-blocking version eventually, but low prio, since LOCAL_OS is for restrictive installations primarily - like infrastructure gateways, authorized personnel-only.
 
 
 - LOCAL_OS and LOCAL_NAMESERVER should be disabled in direct name resolution requests from users by default.

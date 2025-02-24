@@ -1,8 +1,7 @@
 package com.flower.dns.client.dnsoverudp;
 
-import com.flower.utils.DnsClient;
+import com.flower.dns.DnsClient;
 import com.flower.utils.PromiseUtil;
-import com.flower.utils.ServerUtil;
 import com.flower.utils.evictlist.ConcurrentEvictListWithFixedTimeout;
 import com.flower.utils.evictlist.EvictLinkedList;
 import com.flower.utils.evictlist.EvictLinkedNode;
@@ -48,10 +47,6 @@ public class DnsOverUdpClient implements DnsClient {
     private final InetSocketAddress dnsServerAddress;
     private final Channel udpSocket;
 
-    public DnsOverUdpClient(String dnsServerHost, int dnsServerPort) throws InterruptedException {
-        this(ServerUtil.getByName(dnsServerHost), dnsServerPort);
-    }
-
     public DnsOverUdpClient(InetAddress dnsServerAddress, int dnsServerPort) throws InterruptedException {
         this(dnsServerAddress, dnsServerPort, DEFAULT_CALLBACK_EXPIRATION_TIMEOUT_MILLIS);
     }
@@ -78,11 +73,7 @@ public class DnsOverUdpClient implements DnsClient {
 
                                 @Override
                                 protected void channelRead0(ChannelHandlerContext ctx, DatagramDnsResponse msg) {
-                                    try {
-                                        handleQueryResp(msg);
-                                    } finally {
-                                        ctx.close();
-                                    }
+                                    handleQueryResp(msg);
                                 }
                             });
                 }

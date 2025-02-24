@@ -1,10 +1,9 @@
 package com.flower.dns.client.dnsovertls;
 
-import com.flower.utils.DnsClient;
+import com.flower.dns.DnsClient;
 import com.flower.channelpool.AggressiveChannelPool;
 import com.flower.channelpool.ChannelPool;
 import com.flower.utils.PromiseUtil;
-import com.flower.utils.ServerUtil;
 import com.flower.utils.evictlist.ConcurrentEvictListWithFixedTimeout;
 import com.flower.utils.evictlist.EvictLinkedList;
 import com.flower.utils.evictlist.EvictLinkedNode;
@@ -66,10 +65,6 @@ public class DnsOverTlsClient implements DnsClient {
     private final SslContext sslCtx;
     private final Bootstrap bootstrap;
 
-    public DnsOverTlsClient(String dnsServerHost, int dnsServerPort, TrustManagerFactory trustManager) throws SSLException {
-        this(ServerUtil.getByName(dnsServerHost), dnsServerPort, trustManager);
-    }
-
     public DnsOverTlsClient(InetAddress dnsServerAddress, int dnsServerPort, TrustManagerFactory trustManager) throws SSLException {
         this(dnsServerAddress, dnsServerPort, trustManager, DEFAULT_SSL_HANDSHAKE_TIMEOUT_MILLIS,
                 DEFAULT_CALLBACK_EXPIRATION_TIMEOUT_MILLIS, DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_QUERY_RETRY_COUNT);
@@ -124,11 +119,7 @@ public class DnsOverTlsClient implements DnsClient {
 
                         @Override
                         protected void channelRead0(ChannelHandlerContext ctx, DefaultDnsResponse msg) {
-                            try {
-                                handleQueryResp(msg);
-                            } finally {
-                                ctx.close();
-                            }
+                            handleQueryResp(msg);
                         }
                     });
                 }
@@ -167,6 +158,7 @@ public class DnsOverTlsClient implements DnsClient {
 
         channelPool.getChannel().addListener(channelFuture -> {
             if (channelFuture.isSuccess()) {
+                @SuppressWarnings("unchecked")
                 EvictLinkedNode<Channel> channelRecord = (EvictLinkedNode<Channel>)channelFuture.get();
                 final Channel ch = channelRecord.value();
                 ch.writeAndFlush(query)

@@ -1,0 +1,52 @@
+{
+  "Status": 0,
+  "TC": false,
+  "RD": true,
+  "RA": true,
+  "AD": true,
+  "CD": false,
+  "Question": [
+    {
+      "name": "example.com",
+      "type": 1
+    }
+  ],
+  "Answer": [
+    {
+      "name": "example.com",
+      "type": 1,
+      "TTL": 258,
+      "data": "96.7.128.175"
+    },
+    {
+      "name": "example.com",
+      "type": 1,
+      "TTL": 258,
+      "data": "23.215.0.138"
+    },
+    {
+      "name": "example.com",
+      "type": 1,
+      "TTL": 258,
+      "data": "96.7.128.198"
+    },
+    {
+      "name": "example.com",
+      "type": 1,
+      "TTL": 258,
+      "data": "23.192.228.80"
+    },
+    {
+      "name": "example.com",
+      "type": 1,
+      "TTL": 258,
+      "data": "23.192.228.84"
+    },
+    {
+      "name": "example.com",
+      "type": 28,
+      "TTL": 258,
+      "data": "2606:2800:220:1:248:1893:25c8:1946"
+    }
+  ]
+}

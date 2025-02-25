@@ -97,7 +97,7 @@ public class DnsOverHttps2Client implements DnsClient {
         bootstrap.group(group)
             .channel(NioSocketChannel.class)
             .option(ChannelOption.SO_KEEPALIVE, true)
-            .handler(new Http2ClientInitializer(sslCtx, Integer.MAX_VALUE, dnsServerAddress, dnsServerPort,
+            .handler(new Http2ClientInitializer(sslCtx, Integer.MAX_VALUE, sslHandshakeTimeoutMillis, dnsServerAddress, dnsServerPort,
                     () -> new SimpleChannelInboundHandler<>() {
                         @Override
                         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
@@ -107,9 +107,6 @@ public class DnsOverHttps2Client implements DnsClient {
                         @Override
                         protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse response) throws Exception {
                             String responseContent = response.content().toString(StandardCharsets.UTF_8);
-                            System.out.println("Response: " + responseContent);
-                            System.out.println("IpAddresses: " + DnsUtils.extractIpAddresses(responseContent));
-                            ctx.close();
 
                             Pair<String, List<InetAddress>> resp = DnsUtils.extractIpAddresses(responseContent);
                             DnsResponse msg = DnsUtils.dnsResponseFromAddresses(resp.getKey(), resp.getValue());
@@ -140,7 +137,6 @@ public class DnsOverHttps2Client implements DnsClient {
         cf.addListener(future -> {
             if (future.isSuccess()) {
                 Channel channel = cf.channel();
-                System.out.println("Connected to [" + dnsServerAddress + ':' + dnsServerAddress + ']');
 
                 // Wait for the HTTP/2 upgrade to occur.
                 // This synchronization is actually important, requests won't go through until it's done

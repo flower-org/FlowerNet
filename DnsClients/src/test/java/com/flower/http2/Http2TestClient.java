@@ -75,7 +75,7 @@ public final class Http2TestClient {
             b.group(workerGroup);
             b.channel(NioSocketChannel.class);
             b.option(ChannelOption.SO_KEEPALIVE, true);
-            b.handler(new Http2ClientInitializer(sslCtx, Integer.MAX_VALUE, ServerUtil.getByName(host), port,
+            b.handler(new Http2ClientInitializer(sslCtx, Integer.MAX_VALUE, 2500L, ServerUtil.getByName(host), port,
                     () -> new SimpleChannelInboundHandler<>() {
                         @Override
                         protected void channelRead0(ChannelHandlerContext c, FullHttpResponse msg) throws Exception {

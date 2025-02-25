@@ -17,6 +17,7 @@ import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.Promise;
 
@@ -32,16 +33,19 @@ public class Http2ClientInitializer extends ChannelInitializer<SocketChannel> {
 
     private final SslContext sslCtx;
     private final int maxContentLength;
+    private final long sslHandshakeTimeoutMillis;
     private final Supplier<SimpleChannelInboundHandler<FullHttpResponse>> responseHandlerFactory;
     final InetAddress address;
     final int port;
 
-    public Http2ClientInitializer(SslContext sslCtx, int maxContentLength, InetAddress address, int port,
+    public Http2ClientInitializer(SslContext sslCtx, int maxContentLength, long sslHandshakeTimeoutMillis,
+                                  InetAddress address, int port,
                                   Supplier<SimpleChannelInboundHandler<FullHttpResponse>> responseHandlerFactory) {
         this.address = address;
         this.port = port;
         this.sslCtx = sslCtx;
         this.maxContentLength = maxContentLength;
+        this.sslHandshakeTimeoutMillis = sslHandshakeTimeoutMillis;
         this.responseHandlerFactory = responseHandlerFactory;
     }
 
@@ -57,7 +61,17 @@ public class Http2ClientInitializer extends ChannelInitializer<SocketChannel> {
     private void configurePipeline(SocketChannel ch) {
         ChannelPipeline pipeline = ch.pipeline();
         // Specify Host in SSLContext New Handler to add TLS SNI Extension
-        pipeline.addLast(sslCtx.newHandler(ch.alloc()));
+        SslHandler sslHandler = sslCtx.newHandler(ch.alloc());
+        sslHandler.setHandshakeTimeoutMillis(sslHandshakeTimeoutMillis);
+        sslHandler.handshakeFuture().addListener(
+                future -> {
+                    if (!future.isSuccess()) {
+                        ch.attr(SETTINGS_FUTURE_KEY).get().setFailure(future.cause());
+                    }
+                }
+        );
+
+        pipeline.addLast(sslHandler);
         pipeline.addLast(new ApplicationProtocolNegotiationHandler("") {
             @Override
             protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {

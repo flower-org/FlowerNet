@@ -4,8 +4,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import javax.crypto.SecretKey;
 import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
@@ -16,9 +14,7 @@ class CryptorTest {
     @BeforeAll
     static void setup() throws Exception {
         // Generate RSA key pair
-        KeyPairGenerator keyPairGen = KeyPairGenerator.getInstance("RSA");
-        keyPairGen.initialize(2048);
-        KEY_PAIR = keyPairGen.generateKeyPair();
+        KEY_PAIR = Cryptor.generateRSAKeyPair();
 
         // Generate AES key
         AES_KEY = Cryptor.generateAESKey();
@@ -45,14 +41,21 @@ class CryptorTest {
     @Test
     void testEncryptDecryptAES() throws Exception {
         String plaintext = "Hello, AES!";
-        byte[] iv = Cryptor.generateIV();
-        byte[] encrypted = Cryptor.encrypt(plaintext.getBytes(), iv, AES_KEY);
+        byte[] iv = Cryptor.generateAESIV();
+        byte[] encrypted = Cryptor.encryptAESRaw(plaintext.getBytes(), AES_KEY.getEncoded(), iv);
+        byte[] decrypted = Cryptor.decryptAESRaw(encrypted, AES_KEY.getEncoded(), iv);
 
-        // Extract IV from encrypted data
-        byte[] extractedIV = Arrays.copyOfRange(encrypted, 0, 16);
-        byte[] encryptedData = Arrays.copyOfRange(encrypted, 16, encrypted.length);
+        assertArrayEquals(plaintext.getBytes(), decrypted, "AES decryption should return the original plaintext");
+    }
 
-        byte[] decrypted = Cryptor.decrypt(encryptedData, AES_KEY.getEncoded(), extractedIV);
+    @Test
+    void testEncryptDecryptAES2() throws Exception {
+        String plaintext = "Hello, AES!";
+        byte[] iv = Cryptor.generateAESIV();
+        byte[] key = Cryptor.generateAESKeyRaw();
+
+        byte[] encrypted = Cryptor.encryptAESRaw(plaintext.getBytes(), key, iv);
+        byte[] decrypted = Cryptor.decryptAESRaw(encrypted, key, iv);
 
         assertArrayEquals(plaintext.getBytes(), decrypted, "AES decryption should return the original plaintext");
     }

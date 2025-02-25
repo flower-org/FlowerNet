@@ -2,6 +2,7 @@ package com.flower.sockschain.client;
 
 import com.flower.handlers.RelayHandler;
 import com.flower.utils.EmptyPipelineChannelInitializer;
+import com.flower.utils.IpAddressUtil;
 import com.google.common.base.Preconditions;
 import com.flower.sockschain.config.SocksNode;
 import com.flower.sockschain.config.SocksProtocolVersion;
@@ -30,6 +31,7 @@ import io.netty.handler.ssl.SslContextBuilder;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
+import java.net.InetAddress;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -129,7 +131,11 @@ public class SocksChainClient {
                 .option(ChannelOption.SO_KEEPALIVE, true)
                 .handler(new EmptyPipelineChannelInitializer());
 
-        b.connect(entryNode.serverAddress(), entryNode.serverPort()).addListener((ChannelFutureListener) future -> {
+        //TODO: the following restricts connections to IP only. What if we need name resolution here?
+        // Chicken and egg problem of sorts. We can manually resolve IPs in UI via one of Socks+ servers or via specified DNS.
+        // But it has to be manual, no automatic resolution.
+        InetAddress address = IpAddressUtil.fromString(entryNode.serverAddress());
+        b.connect(address, entryNode.serverPort()).addListener((ChannelFutureListener) future -> {
             if (future.isSuccess()) {
                 // Connection established, send initial request
                 outgoingChannel.set(future.channel());

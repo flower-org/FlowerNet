@@ -1,14 +1,20 @@
 package com.flower.socks5s;
 
+import com.flower.dns.DnsClient;
+import com.flower.dns.cache.DnsCache;
+import com.flower.dns.client.dnsoverhttps2.DnsOverHttps2Client;
 import com.flower.socksserver.FlowerSslContextBuilder;
 import com.flower.socksserver.SocksServer;
+import com.flower.utils.IpAddressUtil;
 import com.flower.utils.PkiUtil;
 import io.netty.handler.ssl.SslContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
 import javax.security.auth.x500.X500Principal;
+import java.net.InetAddress;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import com.flower.utils.VaultRestClient;
@@ -33,6 +39,15 @@ public final class Socks5sServer {
         }
         if (args.length > 2) {
             port = Integer.parseInt(args[2]);
+        }
+
+        final DnsClient dnsClient;
+        {
+            final int dnsOverHttpsServerPort = 443;
+            final InetAddress dnsServerAddress = IpAddressUtil.fromString("1.1.1.1");
+            final String dnsServerPathPrefix = "/dns-query?name=";
+            final TrustManagerFactory trustManager = PkiUtil.getTrustManagerForCertificateResource("oneone_cert.pem");
+            dnsClient = new DnsCache(new DnsOverHttps2Client(dnsServerAddress, dnsOverHttpsServerPort, dnsServerPathPrefix, trustManager));
         }
 
         SslContext sslCtx;
@@ -71,7 +86,7 @@ public final class Socks5sServer {
             sslCtx = null;
         }
 
-        SocksServer server = new SocksServer(() -> ALLOW_DIRECT_IP_ACCESS, SocksServerConnectHandler::new);
+        SocksServer server = new SocksServer(() -> ALLOW_DIRECT_IP_ACCESS, () -> new SocksServerConnectHandler(dnsClient));
         try {
             LOGGER.info("Starting on port {} TLS: {}", port, isSocks5OverTls);
             server.startServer(port, sslCtx)

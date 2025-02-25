@@ -16,8 +16,11 @@
 package com.flower.socks5s;
 
 import com.flower.handlers.RelayHandler;
+import com.flower.utils.ImmediateFuture;
+import com.flower.utils.IpAddressUtil;
 import com.flower.utils.ServerUtil;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -26,6 +29,11 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.dns.DnsRawRecord;
+import io.netty.handler.codec.dns.DnsRecord;
+import io.netty.handler.codec.dns.DnsRecordType;
+import io.netty.handler.codec.dns.DnsResponse;
+import io.netty.handler.codec.dns.DnsSection;
 import io.netty.handler.codec.socksx.SocksMessage;
 import io.netty.handler.codec.socksx.v4.DefaultSocks4CommandResponse;
 import io.netty.handler.codec.socksx.v4.Socks4CommandRequest;
@@ -36,21 +44,35 @@ import io.netty.handler.codec.socksx.v5.Socks5CommandRequestDecoder;
 import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
 import io.netty.handler.codec.socksx.v5.Socks5InitialRequestDecoder;
 import io.netty.handler.codec.socksx.v5.Socks5ServerEncoder;
+import io.netty.util.NetUtil;
+import io.netty.util.concurrent.DefaultPromise;
+import io.netty.util.concurrent.EventExecutor;
+import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
 import io.netty.util.concurrent.Promise;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static com.flower.conntrack.ConnectionAttributes.getConnectionInfo;
 import static com.flower.utils.ServerUtil.showPipeline;
+import com.flower.dns.DnsClient;
 
 @ChannelHandler.Sharable
 public final class SocksServerConnectHandler extends SimpleChannelInboundHandler<SocksMessage> {
     final static Logger LOGGER = LoggerFactory.getLogger(SocksServerConnectHandler.class);
 
     private final Bootstrap b = new Bootstrap();
+    private final DnsClient dnsClient;
+
+    public SocksServerConnectHandler(DnsClient dnsClient) {
+        this.dnsClient = dnsClient;
+    }
 
     @Override
     public void channelRead0(final ChannelHandlerContext ctx, final SocksMessage message) {
@@ -86,18 +108,31 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                     .option(ChannelOption.SO_KEEPALIVE, true)
                     .handler(new DirectClientHandler(promise));
 
-            b.connect(request.dstAddr(), request.dstPort()).addListener((ChannelFutureListener) future -> {
-                if (future.isSuccess()) {
-                    // Connection established use handler provided results
-                } else {
-                    // Close the connection if the connection attempt has failed.
-                    ctx.channel().writeAndFlush(
-                            new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED)
-                    );
-                    LOGGER.error("DISCONNECTED {} connection failed", getConnectionInfo(ctx));
-                    ServerUtil.closeOnFlush(ctx.channel());
+            String hostname = request.dstAddr();
+            resolve(hostname, ctx.executor()).addListener(
+                resolveFuture -> {
+                    if (resolveFuture.isSuccess()) {
+                        InetAddress addr = (InetAddress) resolveFuture.getNow();
+                        b.connect(addr, request.dstPort()).addListener((ChannelFutureListener) future -> {
+                            if (future.isSuccess()) {
+                                // Connection established use handler provided results
+                            } else {
+                                // Close the connection if the connection attempt has failed.
+                                ctx.channel().writeAndFlush(
+                                        new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED)
+                                );
+                                LOGGER.error("DISCONNECTED {} connection failed", getConnectionInfo(ctx));
+                                ServerUtil.closeOnFlush(ctx.channel());
+                            }
+                        });
+                    } else {
+                        // Close the connection if the connection attempt has failed.
+                        ctx.channel().writeAndFlush(new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED));
+                        LOGGER.error("DISCONNECTED {} name resolution failed {}", getConnectionInfo(ctx), hostname);
+                        ServerUtil.closeOnFlush(ctx.channel());
+                    }
                 }
-            });
+            );
         } else if (message instanceof Socks5CommandRequest) {
             final Socks5CommandRequest request = (Socks5CommandRequest)message;
             Promise<Channel> promise = ctx.executor().newPromise();
@@ -137,9 +172,6 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                                     ctx.pipeline().addLast(new RelayHandler(outboundChannel));
 
                                     LOGGER.info("CONNECTED {}", getConnectionInfo(ctx));
-
-//                                System.out.println(showPipeline(ctx.pipeline()));
-//                                System.out.println(showPipeline(outboundChannel.pipeline()));
                                 });
                             }
                         } else {
@@ -157,20 +189,71 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                     .option(ChannelOption.SO_KEEPALIVE, true)
                     .handler(new DirectClientHandler(promise));
 
-            b.connect(request.dstAddr(), request.dstPort()).addListener((ChannelFutureListener) future -> {
-                if (future.isSuccess()) {
-                    // Connection established use handler provided results
-                } else {
-                    LOGGER.error("DISCONNECTED {} connection failed", getConnectionInfo(ctx));
-                    // Close the connection if the connection attempt has failed.
-                    ctx.channel().writeAndFlush(
-                            new DefaultSocks5CommandResponse(Socks5CommandStatus.FAILURE, request.dstAddrType()));
-                    ServerUtil.closeOnFlush(ctx.channel());
+            String hostname = request.dstAddr();
+            resolve(hostname, ctx.executor()).addListener(
+                resolveFuture -> {
+                    if (resolveFuture.isSuccess()) {
+                        InetAddress addr = (InetAddress) resolveFuture.getNow();
+                        b.connect(addr, request.dstPort()).addListener((ChannelFutureListener) future -> {
+                            if (future.isSuccess()) {
+                                // Connection established use handler provided results
+                            } else {
+                                LOGGER.error("DISCONNECTED {} connection failed", getConnectionInfo(ctx));
+                                // Close the connection if the connection attempt has failed.
+                                ctx.channel().writeAndFlush(
+                                        new DefaultSocks5CommandResponse(Socks5CommandStatus.FAILURE, request.dstAddrType()));
+                                ServerUtil.closeOnFlush(ctx.channel());
+                            }
+                        });
+                    } else {
+                        LOGGER.error("DISCONNECTED {} name resolution failed {}", getConnectionInfo(ctx), hostname);
+                        // Close the connection if the connection attempt has failed.
+                        ctx.channel().writeAndFlush(
+                                new DefaultSocks5CommandResponse(Socks5CommandStatus.FAILURE, request.dstAddrType()));
+                        ServerUtil.closeOnFlush(ctx.channel());
+                    }
                 }
-            });
+            );
         } else {
             LOGGER.error("DISCONNECTED {} unknown protocol", getConnectionInfo(ctx));
             ctx.close();
+        }
+    }
+
+    Future<InetAddress> resolve(String address, EventExecutor executor) {
+        if (IpAddressUtil.isIPAddress(address)) {
+            return ImmediateFuture.of(IpAddressUtil.fromString(address));
+        } else {
+            Promise<InetAddress> transformedPromise = new DefaultPromise<>(executor);
+            Future<DnsResponse> originalFuture = dnsClient.query(address, 2500);
+            originalFuture.addListener((Future<DnsResponse> f) -> {
+                if (f.isSuccess()) {
+                    DnsResponse msg = f.getNow();
+
+                    List<InetAddress> addresses = new ArrayList<>();
+                    for (int i = 0, count = msg.count(DnsSection.ANSWER); i < count; i++) {
+                        DnsRecord record = msg.recordAt(DnsSection.ANSWER, i);
+                        if (DnsRecordType.A.equals(record.type())) {
+                            //just print the IP after query
+                            DnsRawRecord raw = (DnsRawRecord) record;
+                            addresses.add(IpAddressUtil.fromString(NetUtil.bytesToIpAddress(ByteBufUtil.getBytes(raw.content()))));
+                        } else if (DnsRecordType.AAAA.equals(record.type())) {
+                            //just print the IP after query
+                            DnsRawRecord raw = (DnsRawRecord) record;
+                            addresses.add(IpAddressUtil.fromString(NetUtil.bytesToIpAddress(ByteBufUtil.getBytes(raw.content()))));
+                        }
+                    }
+                    if (!addresses.isEmpty()) {
+                        transformedPromise.setSuccess(addresses.get(ThreadLocalRandom.current().nextInt(addresses.size())));
+                    } else {
+                        transformedPromise.setFailure(f.cause());
+                    }
+                } else {
+                    transformedPromise.setFailure(f.cause());
+                }
+            });
+
+            return transformedPromise;
         }
     }
 

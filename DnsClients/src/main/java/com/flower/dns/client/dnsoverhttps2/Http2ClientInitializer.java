@@ -96,7 +96,7 @@ public class Http2ClientInitializer extends ChannelInitializer<SocketChannel> {
                         }
                     });
                     p.addLast(responseHandlerFactory.get());
-                    p.addLast(new LoggingHandler(LogLevel.ERROR));
+//                    p.addLast(new LoggingHandler(LogLevel.DEBUG));
                     return;
                 }
                 ctx.close();

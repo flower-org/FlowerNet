@@ -88,6 +88,8 @@ public class DnsOverTlsClient implements DnsClient {
         bootstrap = new Bootstrap();
         bootstrap.group(group)
             .channel(NioSocketChannel.class)
+                //TODO: test this
+//            .option(ChannelOption.SO_KEEPALIVE, true)
             .handler(new ChannelInitializer<SocketChannel>() {
                 @Override
                 protected void initChannel(SocketChannel ch) {

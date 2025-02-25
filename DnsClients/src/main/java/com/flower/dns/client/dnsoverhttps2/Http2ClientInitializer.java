@@ -1,4 +1,4 @@
-package com.flower.http2;
+package com.flower.dns.client.dnsoverhttps2;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
@@ -10,63 +10,45 @@ import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
 import io.netty.handler.codec.http2.Http2Connection;
 import io.netty.handler.codec.http2.Http2Settings;
-import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
 import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder;
 import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapterBuilder;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
+import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.Promise;
 
-import javax.annotation.Nullable;
 import java.net.InetAddress;
-
-import static com.google.common.base.Preconditions.checkNotNull;
+import java.util.function.Supplier;
 
 /**
  * Configures the client pipeline to support HTTP/2 frames.
  */
 public class Http2ClientInitializer extends ChannelInitializer<SocketChannel> {
+    public static final AttributeKey<Promise<Http2Settings>> SETTINGS_FUTURE_KEY =
+            AttributeKey.valueOf("settings_future");
+
     private final SslContext sslCtx;
     private final int maxContentLength;
-    private final SimpleChannelInboundHandler<FullHttpResponse> responseHandler;
+    private final Supplier<SimpleChannelInboundHandler<FullHttpResponse>> responseHandlerFactory;
     final InetAddress address;
     final int port;
-    final HttpToHttp2ConnectionHandler connectionHandler;
-    @Nullable Promise<Http2Settings> settingsPromise;
 
     public Http2ClientInitializer(SslContext sslCtx, int maxContentLength, InetAddress address, int port,
-                                  SimpleChannelInboundHandler<FullHttpResponse> responseHandler) {
+                                  Supplier<SimpleChannelInboundHandler<FullHttpResponse>> responseHandlerFactory) {
         this.address = address;
         this.port = port;
         this.sslCtx = sslCtx;
         this.maxContentLength = maxContentLength;
-        this.responseHandler = responseHandler;
-
-        // TODO: why does the next line look like cancer to me?
-        final Http2Connection connection = new DefaultHttp2Connection(false);
-        this.connectionHandler = new HttpToHttp2ConnectionHandlerBuilder()
-                .frameListener(new DelegatingDecompressorFrameListener(
-                        connection,
-                        new InboundHttp2ToHttpAdapterBuilder(connection)
-                                .maxContentLength(maxContentLength)
-                                .propagateSettings(true)
-                                .build()))
-                .connection(connection)
-                .build();
+        this.responseHandlerFactory = responseHandlerFactory;
     }
 
     @Override
     public void initChannel(SocketChannel ch) {
-        settingsPromise = ch.eventLoop().newPromise();
+        ch.attr(SETTINGS_FUTURE_KEY).set(ch.eventLoop().newPromise());
         configurePipeline(ch);
-    }
-
-    /** We must wait for the handshake to finish and the protocol to be negotiated before configuring
-     *  the HTTP/2 components of the pipeline.
-     */
-    public @Nullable Promise<Http2Settings> settingsPromise() {
-        return settingsPromise;
     }
 
     /**
@@ -81,16 +63,26 @@ public class Http2ClientInitializer extends ChannelInitializer<SocketChannel> {
             protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
                 if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
                     ChannelPipeline p = ctx.pipeline();
-                    p.addLast(connectionHandler);
+                    final Http2Connection connection = new DefaultHttp2Connection(false);
+                    p.addLast(new HttpToHttp2ConnectionHandlerBuilder()
+                            .frameListener(new DelegatingDecompressorFrameListener(
+                                    connection,
+                                    new InboundHttp2ToHttpAdapterBuilder(connection)
+                                            .maxContentLength(maxContentLength)
+                                            .propagateSettings(true)
+                                            .build()))
+                            .connection(connection)
+                            .build());
                     p.addLast(new SimpleChannelInboundHandler<Http2Settings>() {
                         @Override
                         protected void channelRead0(ChannelHandlerContext ctx, Http2Settings msg) {
-                            checkNotNull(settingsPromise).setSuccess(msg);
+                            ctx.channel().attr(SETTINGS_FUTURE_KEY).get().setSuccess(msg);
                             // Only care about the first settings message
                             ctx.pipeline().remove(this);
                         }
                     });
-                    p.addLast(responseHandler);
+                    p.addLast(responseHandlerFactory.get());
+                    p.addLast(new LoggingHandler(LogLevel.ERROR));
                     return;
                 }
                 ctx.close();

@@ -65,6 +65,8 @@ public class DnsOverHttps1Client implements DnsClient {
     public static final Long DEFAULT_CALLBACK_EXPIRATION_TIMEOUT_MILLIS = 2500L;
     public static final Long DEFAULT_SSL_HANDSHAKE_TIMEOUT_MILLIS = 1000L;
 
+    // TODO: matching by hostname is suboptimal. Implement more robust matching
+    //  (mb. embed callback in channel using ChannelAttributes)
     private final EvictLinkedList<Pair<String, Promise<DnsResponse>>> callbacks;
 
     private final EventLoopGroup group;

@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Aggressively creates as many channels as it can until reaches `maxChannels`.
- * Never close the channels, evicting when they will be closed by the peer.
+ * Never close the channels, evicting when they are closed by the peer.
  */
 public class AggressiveChannelPool implements ChannelPool {
     protected final int maxChannels;

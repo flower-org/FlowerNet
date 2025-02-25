@@ -1,5 +1,7 @@
 package com.flower.dns.client.dnsoverhttps2;
 
+import com.flower.channelpool.AggressiveChannelPool;
+import com.flower.channelpool.ChannelPool;
 import com.flower.dns.DnsClient;
 import com.flower.dns.utils.DnsUtils;
 import com.flower.utils.PromiseUtil;
@@ -8,7 +10,6 @@ import com.flower.utils.evictlist.EvictLinkedList;
 import com.flower.utils.evictlist.EvictLinkedNode;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
@@ -53,6 +54,8 @@ public class DnsOverHttps2Client implements DnsClient {
 
     public static final Long DEFAULT_CALLBACK_EXPIRATION_TIMEOUT_MILLIS = 2500L;
     public static final Long DEFAULT_SSL_HANDSHAKE_TIMEOUT_MILLIS = 1000L;
+    public static final int DEFAULT_MAX_PARALLEL_CONNECTIONS = 3;
+    public static final int DEFAULT_MAX_QUERY_RETRY_COUNT = 2;
 
     // TODO: matching by hostname is suboptimal. Implement more robust matching
     //  (streamId, when Netty will fix https://github.com/netty/netty/issues/14856)
@@ -62,18 +65,23 @@ public class DnsOverHttps2Client implements DnsClient {
     private final Bootstrap bootstrap;
     private final InetSocketAddress dnsServerAddress;
     private final String dnsServerPathPrefix;
+    private final ChannelPool channelPool;
+    private final int maxQueryRetryCount;
 
     public DnsOverHttps2Client(InetAddress dnsServerAddress, int dnsServerPort, String dnsServerPathPrefix,
                                TrustManagerFactory trustManager) throws SSLException {
         this(dnsServerAddress, dnsServerPort, dnsServerPathPrefix, DEFAULT_CALLBACK_EXPIRATION_TIMEOUT_MILLIS,
-                DEFAULT_SSL_HANDSHAKE_TIMEOUT_MILLIS, trustManager);
+                DEFAULT_SSL_HANDSHAKE_TIMEOUT_MILLIS, DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_QUERY_RETRY_COUNT,
+                trustManager);
     }
 
     public DnsOverHttps2Client(InetAddress dnsServerAddress, int dnsServerPort, String dnsServerPathPrefix,
                                long callbackExpirationTimeoutMillis, long sslHandshakeTimeoutMillis,
+                               int maxParallelConnections, int maxQueryRetryCount,
                                TrustManagerFactory trustManager) throws SSLException {
         this.dnsServerAddress = new InetSocketAddress(dnsServerAddress, dnsServerPort);
         this.dnsServerPathPrefix = dnsServerPathPrefix;
+        this.maxQueryRetryCount = maxQueryRetryCount;
         this.callbacks = new ConcurrentEvictListWithFixedTimeout<>(callbackExpirationTimeoutMillis);
 
         // Configure SSL.
@@ -113,6 +121,7 @@ public class DnsOverHttps2Client implements DnsClient {
                             handleQueryResp(resp.getKey(), msg);
                         }
                     }));
+        this.channelPool = new AggressiveChannelPool(bootstrap, dnsServerAddress, dnsServerPort, maxParallelConnections);
     }
 
     @Override
@@ -128,41 +137,59 @@ public class DnsOverHttps2Client implements DnsClient {
 
     @Override
     public Promise<DnsResponse> query(String hostname) {
+        String dnsServerIpAddressStr = dnsServerAddress.getAddress().getHostAddress();
+        FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, GET,
+                dnsServerPathPrefix + hostname + "&type=A");
+        request.headers().set(HttpHeaderNames.HOST, dnsServerIpAddressStr);
+        request.headers().set(HttpHeaderNames.ACCEPT, "application/dns-json");
+        request.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), HttpScheme.HTTPS.name());
+        request.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/dns-json");
+        request.headers().set(HttpHeaderNames.CONTENT_LENGTH, request.content().readableBytes());
+
         Promise<DnsResponse> channelPromise = new DefaultPromise<>(bootstrap.config().group().next());
         callbacks.addElement(Pair.of(hostname, channelPromise));
+        query(channelPromise, request, 0);
+        return channelPromise;
+    }
 
-        String dnsServerIpAddressStr = dnsServerAddress.getAddress().getHostAddress();
+    protected void query(Promise<DnsResponse> channelPromise, FullHttpRequest request, int retry) {
+        if (retry > maxQueryRetryCount) {
+            channelPromise.setFailure(new RuntimeException(
+                    String.format("DoHTTPS2 Server request failed after retry# %d", retry)));
+            return;
+        }
 
-        ChannelFuture cf = bootstrap.connect(dnsServerAddress.getAddress(), dnsServerAddress.getPort());
-        cf.addListener(future -> {
-            if (future.isSuccess()) {
-                Channel channel = cf.channel();
+        channelPool.getChannel().addListener(channelFuture -> {
+            if (channelFuture.isSuccess()) {
+                @SuppressWarnings("unchecked")
+                EvictLinkedNode<Channel> channelRecord = (EvictLinkedNode<Channel>)channelFuture.get();
+                final Channel channel = channelRecord.value();
 
                 // Wait for the HTTP/2 upgrade to occur.
                 // This synchronization is actually important, requests won't go through until it's done
                 Promise<Http2Settings> settingsFuturePromise = channel.attr(SETTINGS_FUTURE_KEY).get();
                 PromiseUtil.withTimeout(channel.eventLoop(), settingsFuturePromise, 5000)
-                    .addListener(future2 -> {
-                        if (future2.isSuccess()) {
-                            FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, GET,
-                                    dnsServerPathPrefix + hostname + "&type=A");
-                            request.headers().set(HttpHeaderNames.HOST, dnsServerIpAddressStr);
-                            request.headers().set(HttpHeaderNames.ACCEPT, "application/dns-json");
-                            request.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), HttpScheme.HTTPS.name());
-                            request.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/dns-json");
-                            request.headers().set(HttpHeaderNames.CONTENT_LENGTH, request.content().readableBytes());
-
-                            channel.writeAndFlush(request);
-                        } else {
-                            channelPromise.setFailure(future2.cause());
-                        }
-                    });
+                        .addListener(future2 -> {
+                            if (future2.isSuccess()) {
+                                channel.writeAndFlush(request)
+                                    .addListener(
+                                        writeFuture -> {
+                                            if (!writeFuture.isSuccess()) {
+                                                channelPool.returnFailedChannel(channelRecord);
+                                                query(channelPromise, request, retry + 1);
+                                            } else {
+                                                channelPool.returnChannel(channelRecord);
+                                            }
+                                        }
+                                    );
+                            } else {
+                                channelPromise.setFailure(future2.cause());
+                            }
+                        });
             } else {
-                channelPromise.setFailure(future.cause());
+                channelPromise.setFailure(channelFuture.cause());
             }
         });
-
-        return channelPromise;
     }
 
     protected void handleQueryResp(String hostname, DnsResponse msg) {

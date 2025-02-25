@@ -67,12 +67,13 @@ public class DnsOverTlsClient implements DnsClient {
 
     public DnsOverTlsClient(InetAddress dnsServerAddress, int dnsServerPort, TrustManagerFactory trustManager) throws SSLException {
         this(dnsServerAddress, dnsServerPort, trustManager, DEFAULT_SSL_HANDSHAKE_TIMEOUT_MILLIS,
-                DEFAULT_CALLBACK_EXPIRATION_TIMEOUT_MILLIS, DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_QUERY_RETRY_COUNT);
+                DEFAULT_CALLBACK_EXPIRATION_TIMEOUT_MILLIS, DEFAULT_MAX_PARALLEL_CONNECTIONS,
+                DEFAULT_MAX_QUERY_RETRY_COUNT);
     }
 
     public DnsOverTlsClient(InetAddress dnsServerAddress, int dnsServerPort, TrustManagerFactory trustManager,
-                            long sslHandshakeTimeoutMillis, long callbackExpirationTimeoutMillis, int maxParallelConnections,
-                            int maxQueryRetryCount) throws SSLException {
+                            long sslHandshakeTimeoutMillis, long callbackExpirationTimeoutMillis,
+                            int maxParallelConnections, int maxQueryRetryCount) throws SSLException {
         this.maxQueryRetryCount = maxQueryRetryCount;
         this.callbacks = new ConcurrentEvictListWithFixedTimeout<>(callbackExpirationTimeoutMillis);
 
@@ -88,8 +89,8 @@ public class DnsOverTlsClient implements DnsClient {
         bootstrap = new Bootstrap();
         bootstrap.group(group)
             .channel(NioSocketChannel.class)
-                //TODO: test this
-//            .option(ChannelOption.SO_KEEPALIVE, true)
+            //TODO: try this
+            //.option(ChannelOption.SO_KEEPALIVE, true)
             .handler(new ChannelInitializer<SocketChannel>() {
                 @Override
                 protected void initChannel(SocketChannel ch) {
@@ -148,13 +149,14 @@ public class DnsOverTlsClient implements DnsClient {
 
         Promise<DnsResponse> channelPromise = new DefaultPromise<>(bootstrap.config().group().next());
         callbacks.addElement(Pair.of(query.id(), channelPromise));
-        query(query, 0);
+        query(channelPromise, query, 0);
         return channelPromise;
     }
 
-    protected void query(DnsQuery query, int retry) {
+    protected void query(Promise<DnsResponse> channelPromise, DnsQuery query, int retry) {
         if (retry > maxQueryRetryCount) {
-            LOGGER.info("{} | DoT Server request failed after retry# {}", query.id(), retry);
+            channelPromise.setFailure(new RuntimeException(
+                String.format("%d | DoT Server request failed after retry# %d", query.id(), retry)));
             return;
         }
 
@@ -168,14 +170,16 @@ public class DnsOverTlsClient implements DnsClient {
                         writeFuture -> {
                             if (!writeFuture.isSuccess()) {
                                 channelPool.returnFailedChannel(channelRecord);
-                                query(query, retry + 1);
+                                query(channelPromise, query, retry + 1);
                             } else {
                                 channelPool.returnChannel(channelRecord);
                             }
                         }
                     );
             } else {
-                LOGGER.info("{} | DoT Server request failed to get channel", query.id());
+                channelPromise.setFailure(new RuntimeException(
+                        String.format("%d | DoT Server request failed to get channel", query.id()),
+                        channelFuture.cause()));
             }
         });
     }

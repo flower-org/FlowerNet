@@ -76,13 +76,14 @@ public class DnsOverHttps1Client implements DnsClient {
 
     private final SslContext sslCtx;
 
-    public DnsOverHttps1Client(InetAddress dnsServerAddress, int dnsServerPort, String dnsServerPathPrefix, TrustManagerFactory trustManager) throws InterruptedException, SSLException {
+    public DnsOverHttps1Client(InetAddress dnsServerAddress, int dnsServerPort, String dnsServerPathPrefix, TrustManagerFactory trustManager) throws SSLException {
         this(dnsServerAddress, dnsServerPort, dnsServerPathPrefix, DEFAULT_CALLBACK_EXPIRATION_TIMEOUT_MILLIS,
                 DEFAULT_SSL_HANDSHAKE_TIMEOUT_MILLIS, trustManager);
     }
 
-    public DnsOverHttps1Client(InetAddress dnsServerAddress, int dnsServerPort, String dnsServerPathPrefix, long callbackExpirationTimeoutMillis,
-                               long sslHandshakeTimeoutMillis, TrustManagerFactory trustManager) throws InterruptedException, SSLException {
+    public DnsOverHttps1Client(InetAddress dnsServerAddress, int dnsServerPort, String dnsServerPathPrefix,
+                               long callbackExpirationTimeoutMillis, long sslHandshakeTimeoutMillis,
+                               TrustManagerFactory trustManager) throws SSLException {
         this.dnsServerAddress = new InetSocketAddress(dnsServerAddress, dnsServerPort);
         this.dnsServerPathPrefix = dnsServerPathPrefix;
         this.callbacks = new ConcurrentEvictListWithFixedTimeout<>(callbackExpirationTimeoutMillis);
@@ -100,7 +101,7 @@ public class DnsOverHttps1Client implements DnsClient {
             .channel(NioSocketChannel.class)
             .handler(new ChannelInitializer<>() {
                 @Override
-                protected void initChannel(Channel ch) throws Exception {
+                protected void initChannel(Channel ch) {
                     SslHandler sslHandler = sslCtx.newHandler(ch.alloc());
                     sslHandler.setHandshakeTimeoutMillis(sslHandshakeTimeoutMillis);
                     sslHandler.handshakeFuture().addListener(
@@ -180,7 +181,8 @@ public class DnsOverHttps1Client implements DnsClient {
         Iterator<EvictLinkedNode<Pair<String, Promise<DnsResponse>>>> iterator = callbacks.iterator();
         while (iterator.hasNext()) {
             EvictLinkedNode<Pair<String, Promise<DnsResponse>>> cursor = iterator.next();
-            if (cursor.value().getKey().equals(hostname)) {
+            String key = cursor.value().getKey();
+            if (key.equals(hostname) || (key+".").equals(hostname)) {
                 callbacks.markEvictable(cursor);
                 return cursor.value().getValue();
             }

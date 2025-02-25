@@ -1,8 +1,8 @@
 package com.flower.utils;
 
-import javax.annotation.Nullable;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.channels.UnsupportedAddressTypeException;
 
 public class IpAddressUtil {
     public static boolean isIPv4Address(String input) {
@@ -54,13 +54,12 @@ public class IpAddressUtil {
         return isIPv4Address(input) || isIPv6Address(input);
     }
 
-    @Nullable
-    public static InetAddress fromString(String ipAddress) {
+    public static InetAddress fromString(String ipAddress) throws UnsupportedAddressTypeException {
         try {
             if (isIPAddress(ipAddress)) {
                 return InetAddress.getByName(ipAddress);
             } else {
-                return null;
+                throw new UnsupportedAddressTypeException();
             }
         } catch (UnknownHostException e) {
             throw new RuntimeException(e);

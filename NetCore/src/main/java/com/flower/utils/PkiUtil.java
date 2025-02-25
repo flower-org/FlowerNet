@@ -1,6 +1,7 @@
 package com.flower.utils;
 
 import com.google.common.io.Resources;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
@@ -173,6 +174,10 @@ public class PkiUtil {
 
     public static TrustManagerFactory getUntrustingManager() {
         return new UntrustingTrustManagerFactory();
+    }
+
+    public static TrustManagerFactory getInsecureTrustManagerFactory() {
+        return InsecureTrustManagerFactory.INSTANCE;
     }
 
     // --------------------------------------------------

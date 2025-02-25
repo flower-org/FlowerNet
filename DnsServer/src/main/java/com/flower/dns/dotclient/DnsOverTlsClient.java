@@ -240,7 +240,7 @@ public class DnsOverTlsClient {
         Iterator<EvictLinkedNode<Pair<Integer, Pair<DnsQuestion, Consumer<DefaultDnsResponse>>>>> iterator = callbacks.iterator();
         while (iterator.hasNext()) {
             EvictLinkedNode<Pair<Integer, Pair<DnsQuestion, Consumer<DefaultDnsResponse>>>> cursor = iterator.next();
-            if (cursor.value().getKey() == queryId) {
+            if (cursor.value().getKey().equals(queryId)) {
                 callbacks.markEvictable(cursor);
                 return cursor.value().getValue();
             }

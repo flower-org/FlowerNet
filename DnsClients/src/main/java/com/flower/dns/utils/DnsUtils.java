@@ -62,8 +62,18 @@ public class DnsUtils {
     public static Pair<String, List<InetAddress>> extractIpAddresses(String dnsOverHttpsJsonResponse) throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         JsonNode rootNode = mapper.readTree(dnsOverHttpsJsonResponse);
-        List<InetAddress> hostnames = new ArrayList<>();
 
+        String hostname = "N/A";
+        if (rootNode.has("Question")) {
+            for (JsonNode question : rootNode.get("Question")) {
+                if (question.has("name")) {
+                    hostname = question.get("name").asText();
+                    break;
+                }
+            }
+        }
+
+        List<InetAddress> ipAddresses = new ArrayList<>();
         if (rootNode.has("Answer")) {
             for (JsonNode answer : rootNode.get("Answer")) {
                 if (answer.has("type")) {
@@ -73,13 +83,13 @@ public class DnsUtils {
                             String ipAddress = answer.get("data").asText();
                             InetAddress address = IpAddressUtil.fromString(ipAddress);
                             if (address != null) {
-                                hostnames.add(address);
+                                ipAddresses.add(address);
                             }
                         }
                     }
                 }
             }
         }
-        return Pair.of("", hostnames);
+        return Pair.of(hostname, ipAddresses);
     }
 }

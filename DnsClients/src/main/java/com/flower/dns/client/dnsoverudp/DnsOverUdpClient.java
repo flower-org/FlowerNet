@@ -112,7 +112,7 @@ public class DnsOverUdpClient implements DnsClient {
         Iterator<EvictLinkedNode<Pair<Integer, Promise<DnsResponse>>>> iterator = callbacks.iterator();
         while (iterator.hasNext()) {
             EvictLinkedNode<Pair<Integer, Promise<DnsResponse>>> cursor = iterator.next();
-            if (cursor.value().getKey() == queryId) {
+            if (cursor.value().getKey().equals(queryId)) {
                 callbacks.markEvictable(cursor);
                 return cursor.value().getValue();
             }

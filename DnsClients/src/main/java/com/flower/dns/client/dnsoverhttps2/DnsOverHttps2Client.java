@@ -119,6 +119,7 @@ public class DnsOverHttps2Client implements DnsClient {
                             Pair<String, List<InetAddress>> resp = DnsUtils.extractIpAddresses(responseContent);
                             DnsResponse msg = DnsUtils.dnsResponseFromAddresses(resp.getKey(), resp.getValue());
                             handleQueryResp(resp.getKey(), msg);
+                            //LOGGER.info("Resolved by chn {} - {}", ctx.channel(), resp);
                         }
                     }));
         this.channelPool = new AggressiveChannelPool(bootstrap, dnsServerAddress, dnsServerPort, maxParallelConnections);

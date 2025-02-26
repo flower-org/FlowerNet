@@ -5,7 +5,7 @@ plugins {
 }
 
 application {
-    mainClass = 'com.flower.socks5s.Socks5sServer'
+    mainClass = 'com.flower.net.socks5s.Socks5sServer'
 }
 
 compileJava {
@@ -89,10 +89,10 @@ tasks.withType(JavaCompile) {
     }
 }
 
-shadowJar { manifest { attributes 'Main-Class': 'com.flower.socks5s.Socks5sServer' } }
+shadowJar { manifest { attributes 'Main-Class': 'com.flower.net.socks5s.Socks5sServer' } }
 
 jar {
     manifest {
-        attributes 'Main-Class': 'com.flower.socks5s.Socks5sServer'
+        attributes 'Main-Class': 'com.flower.net.socks5s.Socks5sServer'
     }
 }

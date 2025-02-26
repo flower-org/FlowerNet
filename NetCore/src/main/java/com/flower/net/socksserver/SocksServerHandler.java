@@ -14,12 +14,16 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.socksx.SocksMessage;
+import io.netty.handler.codec.socksx.v4.DefaultSocks4CommandResponse;
 import io.netty.handler.codec.socksx.v4.Socks4CommandRequest;
+import io.netty.handler.codec.socksx.v4.Socks4CommandStatus;
 import io.netty.handler.codec.socksx.v4.Socks4CommandType;
+import io.netty.handler.codec.socksx.v5.DefaultSocks5CommandResponse;
 import io.netty.handler.codec.socksx.v5.DefaultSocks5InitialResponse;
 import io.netty.handler.codec.socksx.v5.Socks5AuthMethod;
 import io.netty.handler.codec.socksx.v5.Socks5CommandRequest;
 import io.netty.handler.codec.socksx.v5.Socks5CommandRequestDecoder;
+import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
 import io.netty.handler.codec.socksx.v5.Socks5CommandType;
 import io.netty.handler.codec.socksx.v5.Socks5InitialRequest;
 import io.netty.handler.codec.socksx.v5.Socks5InitialRequestDecoder;
@@ -85,7 +89,8 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
                         ctx.fireChannelRead(socksRequest);
                     } else {
                         LOGGER.error("DISCONNECTED {} connection prohibited", getConnectionInfo(ctx));
-                        ctx.close();
+                        ctx.channel().writeAndFlush(new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED));
+                        ServerUtil.closeOnFlush(ctx.channel());
                     }
                 } else {
                     LOGGER.error("DISCONNECTED {} unknown command", getConnectionInfo(ctx));
@@ -131,20 +136,19 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
                             ctx.fireChannelRead(socksRequest);
                         } else {
                             LOGGER.error("DISCONNECTED {} connection prohibited", getConnectionInfo(ctx));
-                            ctx.close();
+                            ctx.channel().writeAndFlush(new DefaultSocks5CommandResponse(Socks5CommandStatus.FORBIDDEN, socks5CmdRequest.dstAddrType()));
+                            ServerUtil.closeOnFlush(ctx.channel());
                         }
                     } else {
                         LOGGER.error("DISCONNECTED {} unknown command", getConnectionInfo(ctx));
                         ctx.close();
                     }
                 } else {
-                    //TODO: close feedback
                     LOGGER.error("DISCONNECTED {} unknown request", getConnectionInfo(ctx));
                     ctx.close();
                 }
                 break;
             case UNKNOWN:
-                //TODO: close feedback
                 LOGGER.error("DISCONNECTED {} unknown protocol", getConnectionInfo(ctx));
                 Preconditions.checkNotNull(ctx).close();
                 break;

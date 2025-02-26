@@ -112,32 +112,42 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                     .handler(new DirectClientHandler(promise));
 
             String hostname = request.dstAddr();
-            validateHostname(hostname);
-            resolve(hostname, ctx.executor()).addListener(
-                resolveFuture -> {
-                    if (resolveFuture.isSuccess()) {
-                        InetAddress addr = (InetAddress) resolveFuture.getNow();
-                        validateIpAddress(addr);
-                        b.connect(addr, request.dstPort()).addListener((ChannelFutureListener) future -> {
-                            if (future.isSuccess()) {
-                                // Connection established use handler provided results
-                            } else {
-                                // Close the connection if the connection attempt has failed.
-                                ctx.channel().writeAndFlush(
-                                        new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED)
-                                );
-                                LOGGER.error("DISCONNECTED {} connection failed", getConnectionInfo(ctx));
+            if (hostnameProhibited(hostname)) {
+                LOGGER.error("DISCONNECTED {} hostname prohibited. " + hostname, getConnectionInfo(ctx));
+                ctx.channel().writeAndFlush(new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED));
+                ServerUtil.closeOnFlush(ctx.channel());
+            } else {
+                resolve(hostname, ctx.executor()).addListener(
+                    resolveFuture -> {
+                        if (resolveFuture.isSuccess()) {
+                            InetAddress addr = (InetAddress) resolveFuture.getNow();
+                            if (ipAddressProhibited(addr)) {
+                                LOGGER.error("DISCONNECTED {} IpAddress prohibited. " + addr, getConnectionInfo(ctx));
+                                ctx.channel().writeAndFlush(new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED));
                                 ServerUtil.closeOnFlush(ctx.channel());
+                            } else {
+                                b.connect(addr, request.dstPort()).addListener((ChannelFutureListener) future -> {
+                                    if (future.isSuccess()) {
+                                        // Connection established use handler provided results
+                                    } else {
+                                        // Close the connection if the connection attempt has failed.
+                                        ctx.channel().writeAndFlush(
+                                                new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED)
+                                        );
+                                        LOGGER.error("DISCONNECTED {} connection failed", getConnectionInfo(ctx));
+                                        ServerUtil.closeOnFlush(ctx.channel());
+                                    }
+                                });
                             }
-                        });
-                    } else {
-                        // Close the connection if the connection attempt has failed.
-                        ctx.channel().writeAndFlush(new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED));
-                        LOGGER.error("DISCONNECTED {} name resolution failed {}", getConnectionInfo(ctx), hostname);
-                        ServerUtil.closeOnFlush(ctx.channel());
+                        } else {
+                            // Close the connection if the connection attempt has failed.
+                            ctx.channel().writeAndFlush(new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED));
+                            LOGGER.error("DISCONNECTED {} name resolution failed {}", getConnectionInfo(ctx), hostname);
+                            ServerUtil.closeOnFlush(ctx.channel());
+                        }
                     }
-                }
-            );
+                );
+            }
         } else if (message instanceof Socks5CommandRequest) {
             final Socks5CommandRequest request = (Socks5CommandRequest)message;
             Promise<Channel> promise = ctx.executor().newPromise();
@@ -195,32 +205,44 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                     .handler(new DirectClientHandler(promise));
 
             String hostname = request.dstAddr();
-            validateHostname(hostname);
-            resolve(hostname, ctx.executor()).addListener(
-                resolveFuture -> {
-                    if (resolveFuture.isSuccess()) {
-                        InetAddress addr = (InetAddress) resolveFuture.getNow();
-                        validateIpAddress(addr);
-                        b.connect(addr, request.dstPort()).addListener((ChannelFutureListener) future -> {
-                            if (future.isSuccess()) {
-                                // Connection established use handler provided results
-                            } else {
-                                LOGGER.error("DISCONNECTED {} connection failed", getConnectionInfo(ctx), future.cause());
-                                // Close the connection if the connection attempt has failed.
+            if (hostnameProhibited(hostname)) {
+                LOGGER.error("DISCONNECTED {} hostname prohibited. " + hostname, getConnectionInfo(ctx));
+                ctx.channel().writeAndFlush(
+                        new DefaultSocks5CommandResponse(Socks5CommandStatus.FORBIDDEN, request.dstAddrType()));
+                ServerUtil.closeOnFlush(ctx.channel());
+            } else {
+                resolve(hostname, ctx.executor()).addListener(
+                    resolveFuture -> {
+                        if (resolveFuture.isSuccess()) {
+                            InetAddress addr = (InetAddress) resolveFuture.getNow();
+                            if (ipAddressProhibited(addr)) {
+                                LOGGER.error("DISCONNECTED {} IpAddress prohibited. " + addr, getConnectionInfo(ctx));
                                 ctx.channel().writeAndFlush(
-                                        new DefaultSocks5CommandResponse(Socks5CommandStatus.FAILURE, request.dstAddrType()));
+                                        new DefaultSocks5CommandResponse(Socks5CommandStatus.FORBIDDEN, request.dstAddrType()));
                                 ServerUtil.closeOnFlush(ctx.channel());
+                            } else {
+                                b.connect(addr, request.dstPort()).addListener((ChannelFutureListener) future -> {
+                                    if (future.isSuccess()) {
+                                        // Connection established use handler provided results
+                                    } else {
+                                        LOGGER.error("DISCONNECTED {} connection failed", getConnectionInfo(ctx), future.cause());
+                                        // Close the connection if the connection attempt has failed.
+                                        ctx.channel().writeAndFlush(
+                                                new DefaultSocks5CommandResponse(Socks5CommandStatus.FAILURE, request.dstAddrType()));
+                                        ServerUtil.closeOnFlush(ctx.channel());
+                                    }
+                                });
                             }
-                        });
-                    } else {
-                        LOGGER.error("DISCONNECTED {} name resolution failed {}", getConnectionInfo(ctx), hostname, resolveFuture.cause());
-                        // Close the connection if the connection attempt has failed.
-                        ctx.channel().writeAndFlush(
-                                new DefaultSocks5CommandResponse(Socks5CommandStatus.FAILURE, request.dstAddrType()));
-                        ServerUtil.closeOnFlush(ctx.channel());
+                        } else {
+                            LOGGER.error("DISCONNECTED {} name resolution failed {}", getConnectionInfo(ctx), hostname, resolveFuture.cause());
+                            // Close the connection if the connection attempt has failed.
+                            ctx.channel().writeAndFlush(
+                                    new DefaultSocks5CommandResponse(Socks5CommandStatus.FAILURE, request.dstAddrType()));
+                            ServerUtil.closeOnFlush(ctx.channel());
+                        }
                     }
-                }
-            );
+                );
+            }
         } else {
             LOGGER.error("DISCONNECTED {} unknown protocol " + message.getClass(), getConnectionInfo(ctx));
             ctx.close();
@@ -264,16 +286,12 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
         }
     }
 
-    public void validateHostname(String name) {
-        if (!accessManager.isAllowed(name)) {
-            throw new RuntimeException("Access Control: name not allowed: " + name);
-        }
+    public boolean hostnameProhibited(String name) {
+        return !accessManager.isAllowed(name);
     }
 
-    public void validateIpAddress(InetAddress addr) {
-        if (!accessManager.isAllowed(addr)) {
-            throw new RuntimeException("Access Control: ip not allowed: " + addr);
-        }
+    public boolean ipAddressProhibited(InetAddress addr) {
+        return !accessManager.isAllowed(addr);
     }
 
     @Override

@@ -17,7 +17,7 @@ package com.flower.net.sockschain.server;
 
 import com.flower.net.utils.ServerUtil;
 import com.flower.net.sockschain.client.SocksChainClient;
-import com.flower.net.config.ProxyChainProvider;
+import com.flower.net.config.chainconf.ProxyChainProvider;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;

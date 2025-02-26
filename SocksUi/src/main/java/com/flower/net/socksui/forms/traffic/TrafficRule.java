@@ -7,8 +7,7 @@ import javax.annotation.Nullable;
 import java.util.Date;
 
 public class TrafficRule {
-    @Nullable
-    final AddressFilterList.AddressRecord addressRecord;
+    @Nullable final AddressFilterList.AddressRecord addressRecord;
     @Nullable final AddressFilterList.HostRecord hostRecord;
     @Nullable final AddressFilterList.PortRecord portRecord;
 
@@ -37,7 +36,6 @@ public class TrafficRule {
 
     public FilterType getFilterType() {
         if (addressRecord != null) {
-
             return addressRecord.filterType();
         } else if (hostRecord != null) {
             return hostRecord.filterType();

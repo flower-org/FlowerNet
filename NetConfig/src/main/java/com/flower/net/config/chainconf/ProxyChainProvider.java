@@ -1,4 +1,4 @@
-package com.flower.net.config;
+package com.flower.net.config.chainconf;
 
 import java.util.List;
 

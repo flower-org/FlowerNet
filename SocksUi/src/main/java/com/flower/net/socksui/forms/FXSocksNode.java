@@ -1,7 +1,7 @@
 package com.flower.net.socksui.forms;
 
-import com.flower.net.config.SocksNode;
-import com.flower.net.config.SocksProtocolVersion;
+import com.flower.net.config.chainconf.SocksNode;
+import com.flower.net.config.chainconf.SocksProtocolVersion;
 import com.flower.net.config.certs.local.LocalCertificate;
 import com.flower.net.config.certs.remote.RemoteCertificate;
 

@@ -1,4 +1,4 @@
-package com.flower.net.config;
+package com.flower.net.config.serverconf;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;

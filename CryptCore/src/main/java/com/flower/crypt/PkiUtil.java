@@ -388,11 +388,11 @@ public class PkiUtil {
         X509v3CertificateBuilder certificateBuilder =
                 new JcaX509v3CertificateBuilder(subject, serialNumber, startDate, endDate, subject, keyPair.getPublic());
 
-        ContentSigner signer = null;
+        final ContentSigner signer;
         try {
             signer = new JcaContentSignerBuilder("SHA256WithRSAEncryption").build(keyPair.getPrivate());
         } catch (OperatorCreationException e) {
-            throw new RuntimeException(e);
+            throw new CertificateException(e);
         }
         return new JcaX509CertificateConverter().getCertificate(certificateBuilder.build(signer));
     }

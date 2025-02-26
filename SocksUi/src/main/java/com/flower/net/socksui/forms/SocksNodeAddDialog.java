@@ -2,8 +2,8 @@ package com.flower.net.socksui.forms;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.flower.net.config.SocksNode;
-import com.flower.net.config.SocksProtocolVersion;
+import com.flower.net.config.chainconf.SocksNode;
+import com.flower.net.config.chainconf.SocksProtocolVersion;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.Alert;

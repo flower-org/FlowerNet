@@ -1,6 +1,6 @@
 package com.flower.pkitool;
 
-import com.flower.utils.PkiUtil;
+import com.flower.net.utils.PkiUtil;
 
 import java.security.cert.X509Certificate;
 

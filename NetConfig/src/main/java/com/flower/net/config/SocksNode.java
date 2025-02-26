@@ -1,14 +1,14 @@
-package com.flower.net.sockschain.config;
+package com.flower.net.config;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.flower.net.sockschain.config.certs.local.LocalCertificate;
-import com.flower.net.sockschain.config.certs.remote.ImmutableRemoteCertificate;
-import com.flower.net.sockschain.config.certs.remote.ImmutableRemoteCertificateFileConfig;
-import com.flower.net.sockschain.config.certs.remote.RemoteCertificate;
-import com.flower.net.utils.PkiUtil;
+import com.flower.net.config.certs.local.LocalCertificate;
+import com.flower.net.config.certs.remote.ImmutableRemoteCertificate;
+import com.flower.net.config.certs.remote.ImmutableRemoteCertificateFileConfig;
+import com.flower.net.config.certs.remote.RemoteCertificate;
+import com.flower.pkitool.PkiUtil;
 import org.immutables.value.Value;
 
 import javax.annotation.Nullable;

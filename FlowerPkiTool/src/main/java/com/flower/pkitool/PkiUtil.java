@@ -1,4 +1,4 @@
-package com.flower.net.utils;
+package com.flower.pkitool;
 
 import com.google.common.io.Resources;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;

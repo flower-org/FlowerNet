@@ -1,4 +1,4 @@
-package com.flower.net.utils;
+package com.flower.pkitool;
 
 import javax.net.ssl.ManagerFactoryParameters;
 import javax.net.ssl.TrustManager;

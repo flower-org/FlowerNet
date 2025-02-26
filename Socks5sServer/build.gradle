@@ -28,7 +28,9 @@ repositories {
 }
 
 dependencies {
+    implementation project(':FlowerPkiTool')
     implementation project(':NetCore')
+    implementation project(':NetConfig')
     implementation project(':DnsClients')
 
     annotationProcessor "org.immutables:value:2.9.2"

@@ -1,6 +1,4 @@
-package com.flower.net.sockschain.client;
-
-import com.flower.net.utils.PkiUtil;
+package com.flower.pkitool;
 
 import javax.annotation.Nullable;
 import javax.net.ssl.KeyManagerFactory;
@@ -12,7 +10,8 @@ public class ETokenKeyManagerProvider {
     @Nullable private static KeyManagerFactory PKCS11_KEY_MANAGER = null;
     private static ReentrantLock LOCK = new ReentrantLock();
 
-    static KeyManagerFactory getManager() {
+    //TODO: unhardcode
+    public static KeyManagerFactory getManager() {
         if (PKCS11_KEY_MANAGER == null) {
             try {
                 LOCK.lock();

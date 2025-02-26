@@ -48,6 +48,7 @@ sourceSets {
 }
 
 dependencies {
+    implementation project(':NetConfig')
     implementation project(':NetCore')
     implementation project(':SocksChainServer')
 

@@ -1,8 +1,8 @@
 package com.flower.net.sockschain.server;
 
-import com.flower.net.sockschain.config.ProxyChainProvider;
-import com.flower.net.sockschain.config.SocksNode;
-import com.flower.net.sockschain.config.SocksProtocolVersion;
+import com.flower.net.config.ProxyChainProvider;
+import com.flower.net.config.SocksNode;
+import com.flower.net.config.SocksProtocolVersion;
 import com.flower.net.socksserver.FlowerSslContextBuilder;
 import com.flower.net.socksserver.SocksServer;
 import io.netty.handler.ssl.SslContext;

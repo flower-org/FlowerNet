@@ -1,6 +1,6 @@
 package com.flower.net.trust;
 
-import com.flower.net.utils.PkiUtil;
+import com.flower.pkitool.PkiUtil;
 
 import javax.net.ssl.TrustManagerFactory;
 import java.security.KeyStore;

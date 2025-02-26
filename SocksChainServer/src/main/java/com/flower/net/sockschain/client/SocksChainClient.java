@@ -1,11 +1,12 @@
 package com.flower.net.sockschain.client;
 
+import com.flower.pkitool.ETokenKeyManagerProvider;
 import com.flower.net.handlers.RelayHandler;
 import com.flower.net.utils.EmptyPipelineChannelInitializer;
 import com.flower.net.utils.IpAddressUtil;
 import com.google.common.base.Preconditions;
-import com.flower.net.sockschain.config.SocksNode;
-import com.flower.net.sockschain.config.SocksProtocolVersion;
+import com.flower.net.config.SocksNode;
+import com.flower.net.config.SocksProtocolVersion;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.netty.bootstrap.Bootstrap;

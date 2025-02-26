@@ -1,4 +1,4 @@
-package com.flower.net.socks5s;
+package com.flower.net.config;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -6,7 +6,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.flower.net.utils.PkiUtil;
+import com.flower.pkitool.PkiUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.immutables.value.Value;
 

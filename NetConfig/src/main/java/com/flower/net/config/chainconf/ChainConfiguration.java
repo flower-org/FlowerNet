@@ -1,19 +1,22 @@
-package com.flower.net.sockschain.config.certs.local;
+package com.flower.net.config.chainconf;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.flower.net.config.SocksNode;
 import org.immutables.value.Value;
 
+import java.util.List;
+
 @Value.Immutable
-@JsonSerialize(as = ImmutableLocalCertificateFileConfig.class)
-@JsonDeserialize(as = ImmutableLocalCertificateFileConfig.class)
+@JsonSerialize(as = ImmutableChainConfiguration.class)
+@JsonDeserialize(as = ImmutableChainConfiguration.class)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public interface LocalCertificateFileConfig {
+public interface ChainConfiguration {
     @JsonProperty
-    String certificateFile();
+    List<SocksNode> knownProxyServers();
 
     @JsonProperty
-    String privateKeyFile();
+    List<SocksNode> proxyChain();
 }

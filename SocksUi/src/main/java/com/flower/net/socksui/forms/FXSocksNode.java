@@ -1,9 +1,9 @@
 package com.flower.net.socksui.forms;
 
-import com.flower.net.sockschain.config.SocksNode;
-import com.flower.net.sockschain.config.SocksProtocolVersion;
-import com.flower.net.sockschain.config.certs.local.LocalCertificate;
-import com.flower.net.sockschain.config.certs.remote.RemoteCertificate;
+import com.flower.net.config.SocksNode;
+import com.flower.net.config.SocksProtocolVersion;
+import com.flower.net.config.certs.local.LocalCertificate;
+import com.flower.net.config.certs.remote.RemoteCertificate;
 
 import javax.annotation.Nullable;
 

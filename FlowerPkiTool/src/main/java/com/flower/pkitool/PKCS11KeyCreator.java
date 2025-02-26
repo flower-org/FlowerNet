@@ -6,8 +6,8 @@ import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
 
-import static com.flower.net.utils.PkiUtil.loadPKCS11KeyStore;
-import static com.flower.net.utils.PkiUtil.loadPKCS11Provider;
+import static com.flower.pkitool.PkiUtil.loadPKCS11KeyStore;
+import static com.flower.pkitool.PkiUtil.loadPKCS11Provider;
 
 public class PKCS11KeyCreator {
     public static void main(String[] args) throws NoSuchAlgorithmException {

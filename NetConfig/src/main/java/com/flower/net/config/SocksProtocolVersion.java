@@ -1,4 +1,4 @@
-package com.flower.net.sockschain.config;
+package com.flower.net.config;
 
 public enum SocksProtocolVersion {
     SOCKS4a,

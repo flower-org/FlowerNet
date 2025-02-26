@@ -1,6 +1,6 @@
 package com.flower.net.socksserver;
 
-import com.flower.net.utils.PkiUtil;
+import com.flower.pkitool.PkiUtil;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import javax.net.ssl.KeyManagerFactory;

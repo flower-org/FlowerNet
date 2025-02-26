@@ -23,6 +23,7 @@ repositories {
 }
 
 dependencies {
+    implementation project(':FlowerPkiTool')
     implementation project(':NetCore')
 
     annotationProcessor "org.immutables:value:2.9.2"

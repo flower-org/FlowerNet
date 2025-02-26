@@ -6,10 +6,11 @@ import com.flower.net.dns.client.dnsoverhttps2.DnsOverHttps2Client;
 import com.flower.net.socksserver.FlowerSslContextBuilder;
 import com.flower.net.socksserver.SocksServer;
 import com.flower.net.utils.IpAddressUtil;
-import com.flower.net.utils.PkiUtil;
+import com.flower.pkitool.PkiUtil;
 import io.netty.handler.ssl.SslContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.flower.net.config.CertificateToken;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;

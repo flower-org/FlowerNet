@@ -1,7 +1,5 @@
 package com.flower.pkitool;
 
-import com.flower.net.utils.PkiUtil;
-
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;

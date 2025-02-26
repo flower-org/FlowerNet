@@ -45,9 +45,9 @@ public interface ServerConfig {
 
     @JsonProperty
     @Nullable
-    DnsServerConfig serverNameResolution();
+    DnsServerConfig dns();
 
     @JsonProperty
     @Nullable
-    List<DnsType> userNameResolutionTypes();
+    List<DnsType> userDns();
 }

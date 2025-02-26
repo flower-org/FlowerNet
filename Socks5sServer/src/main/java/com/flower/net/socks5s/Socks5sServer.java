@@ -40,7 +40,7 @@ public final class Socks5sServer {
                 serverConfig.directIpAccess() == null ? DEFAULT_ALLOW_DIRECT_IP_ACCESS : serverConfig.directIpAccess();
 
         AccessManager accessManager = buildAccessManager(serverConfig.accessConfig());
-        DnsClient dnsClient = buildDnsClient(serverConfig.serverNameResolution());
+        DnsClient dnsClient = buildDnsClient(serverConfig.dns());
         SslContext sslCtx = ConfigSslContextBuilder.buildSslContext(serverConfig);
 
         SocksServer server = new SocksServer(() -> allowDirectIpAccess,

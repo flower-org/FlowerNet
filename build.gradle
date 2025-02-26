@@ -1,0 +1,7 @@
+plugins {
+    id 'com.autonomousapps.dependency-analysis' version '1.20.0'
+}
+
+subprojects {
+    apply plugin: 'com.autonomousapps.dependency-analysis'
+}

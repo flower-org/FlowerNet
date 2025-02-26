@@ -380,7 +380,7 @@ public class PkiUtil {
         return keyPairGenerator.generateKeyPair();
     }
 
-    public static X509Certificate generateSelfSignedCertificate(KeyPair keyPair, X500Principal subject) throws OperatorCreationException, CertificateException {
+    public static X509Certificate generateSelfSignedCertificate(KeyPair keyPair, X500Principal subject) throws CertificateException {
         Date startDate = new Date();
         Date endDate = new Date(startDate.getTime() + (365L *24*60*60*1000));
 
@@ -388,7 +388,12 @@ public class PkiUtil {
         X509v3CertificateBuilder certificateBuilder =
                 new JcaX509v3CertificateBuilder(subject, serialNumber, startDate, endDate, subject, keyPair.getPublic());
 
-        ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSAEncryption").build(keyPair.getPrivate());
+        ContentSigner signer = null;
+        try {
+            signer = new JcaContentSignerBuilder("SHA256WithRSAEncryption").build(keyPair.getPrivate());
+        } catch (OperatorCreationException e) {
+            throw new RuntimeException(e);
+        }
         return new JcaX509CertificateConverter().getCertificate(certificateBuilder.build(signer));
     }
 

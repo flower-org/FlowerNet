@@ -8,7 +8,7 @@ import com.flower.net.config.certs.local.LocalCertificate;
 import com.flower.net.config.certs.remote.ImmutableRemoteCertificate;
 import com.flower.net.config.certs.remote.ImmutableRemoteCertificateFileConfig;
 import com.flower.net.config.certs.remote.RemoteCertificate;
-import com.flower.pkitool.PkiUtil;
+import com.flower.crypt.PkiUtil;
 import org.immutables.value.Value;
 
 import javax.annotation.Nullable;

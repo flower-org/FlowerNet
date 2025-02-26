@@ -1,7 +1,7 @@
 package com.flower.dns;
 
 import com.flower.net.dns.dotclient.DnsOverTlsClient;
-import com.flower.pkitool.PkiUtil;
+import com.flower.crypt.PkiUtil;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.handler.codec.dns.DefaultDnsQuery;
 import io.netty.handler.codec.dns.DefaultDnsQuestion;

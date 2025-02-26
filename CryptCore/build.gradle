@@ -5,7 +5,7 @@ plugins {
 }
 
 application {
-    mainClass = 'com.flower.pkitool.Pkcs11CsrSigner'
+    mainClass = 'com.flower.crypt.Pkcs11CsrSigner'
 }
 
 compileJava {
@@ -84,10 +84,10 @@ tasks.withType(JavaCompile) {
     }
 }
 
-shadowJar { manifest { attributes 'Main-Class': 'com.flower.pkitool.Pkcs11CsrSigner' } }
+shadowJar { manifest { attributes 'Main-Class': 'com.flower.crypt.Pkcs11CsrSigner' } }
 
 jar {
     manifest {
-        attributes 'Main-Class': 'com.flower.pkitool.Pkcs11CsrSigner'
+        attributes 'Main-Class': 'com.flower.crypt.Pkcs11CsrSigner'
     }
 }

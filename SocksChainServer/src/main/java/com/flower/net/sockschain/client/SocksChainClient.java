@@ -1,6 +1,6 @@
 package com.flower.net.sockschain.client;
 
-import com.flower.pkitool.ETokenKeyManagerProvider;
+import com.flower.crypt.ETokenKeyManagerProvider;
 import com.flower.net.handlers.RelayHandler;
 import com.flower.net.utils.EmptyPipelineChannelInitializer;
 import com.flower.net.utils.IpAddressUtil;

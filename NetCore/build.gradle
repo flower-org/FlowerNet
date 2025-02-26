@@ -23,7 +23,7 @@ repositories {
 }
 
 dependencies {
-    implementation project(':FlowerPkiTool')
+    implementation project(':CryptCore')
 
     annotationProcessor "org.immutables:value:2.9.2"
 

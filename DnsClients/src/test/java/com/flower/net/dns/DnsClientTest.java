@@ -7,7 +7,7 @@ import com.flower.net.dns.client.dnsovertls.DnsOverTlsClient;
 import com.flower.net.dns.client.dnsoverudp.DnsOverUdpClient;
 import com.flower.net.dns.client.os.RawOsResolver;
 import com.flower.net.utils.IpAddressUtil;
-import com.flower.pkitool.PkiUtil;
+import com.flower.crypt.PkiUtil;
 import io.netty.handler.codec.dns.DefaultDnsResponse;
 import io.netty.handler.codec.dns.DnsResponse;
 import io.netty.util.concurrent.Future;

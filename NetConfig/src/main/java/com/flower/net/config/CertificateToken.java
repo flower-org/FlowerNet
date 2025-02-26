@@ -6,7 +6,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.flower.pkitool.PkiUtil;
+import com.flower.crypt.PkiUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.immutables.value.Value;
 

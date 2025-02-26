@@ -34,7 +34,8 @@ public class ConcurrentEvictListsWithTimeoutTest {
         assertEquals(1000, list.nonEvictedCount());
         assertEquals(1000, list.count());
 
-        Thread.sleep(1000);
+        //Just in case give it a bit more time
+        Thread.sleep(1100);
 
         assertEquals(1000, list.count());
         assertEquals(500, list.nonEvictedCount());

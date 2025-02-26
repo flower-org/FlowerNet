@@ -1,7 +1,7 @@
 package com.flower.net.dns;
 
 import com.flower.net.dns.dotclient.DnsOverTlsClient;
-import com.flower.pkitool.PkiUtil;
+import com.flower.crypt.PkiUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;

@@ -1,5 +1,6 @@
 package com.flower.net.sockschain.server;
 
+import com.flower.crypt.PkiUtil;
 import com.flower.net.config.chainconf.ProxyChainProvider;
 import com.flower.net.config.chainconf.SocksNode;
 import com.flower.net.config.chainconf.SocksProtocolVersion;
@@ -9,7 +10,11 @@ import io.netty.handler.ssl.SslContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLException;
 import java.util.List;
+
+import static com.flower.net.trust.FlowerTrust.TRUST_MANAGER_WITH_CLIENT_CA;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 public final class SocksChainServer {
     final static Logger LOGGER = LoggerFactory.getLogger(SocksChainServer.class);
@@ -33,7 +38,7 @@ public final class SocksChainServer {
         if (args.length > 1) {
             port = Integer.parseInt(args[1]);
         }
-        SslContext sslCtx = isSocks5OverTls ? FlowerSslContextBuilder.buildSslContext() : null;
+        SslContext sslCtx = isSocks5OverTls ? buildSslContext() : null;
 
         SocksServer server = new SocksServer(() -> ALLOW_DIRECT_IP_ACCESS,
                 () -> new SocksChainServerConnectHandler(HARDCODED_CHAIN_PROVIDER));
@@ -44,5 +49,10 @@ public final class SocksChainServer {
         } finally {
             server.shutdownServer();
         }
+    }
+    public static SslContext buildSslContext() throws SSLException {
+        return FlowerSslContextBuilder.buildSslContext(
+                checkNotNull(PkiUtil.getKeyManagerFromResources("socks5s_server.crt",
+                "socks5s_server.key", "")), TRUST_MANAGER_WITH_CLIENT_CA);
     }
 }

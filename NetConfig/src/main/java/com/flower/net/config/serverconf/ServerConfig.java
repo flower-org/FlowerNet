@@ -8,6 +8,7 @@ import com.flower.net.config.access.AccessConfig;
 import com.flower.net.config.dns.DnsServerConfig;
 import com.flower.net.config.dns.DnsType;
 import com.flower.net.config.pki.CertificateConfig;
+import com.flower.net.config.pki.Source;
 import org.immutables.value.Value;
 
 import javax.annotation.Nullable;
@@ -20,6 +21,14 @@ import java.util.List;
 public interface ServerConfig {
     @JsonProperty
     @Nullable
+    Integer port();
+
+    @JsonProperty
+    @Nullable
+    Boolean tls();
+
+    @JsonProperty
+    @Nullable
     Boolean directIpAccess();
 
     @JsonProperty
@@ -28,17 +37,17 @@ public interface ServerConfig {
 
     @JsonProperty
     @Nullable
-    Boolean selfGeneratedCertificate();
-
-    @JsonProperty
-    @Nullable
     CertificateConfig certificate();
 
     @JsonProperty
     @Nullable
-    DnsServerConfig defaultNameResolution();
+    Source clientCertificate();
 
     @JsonProperty
     @Nullable
-    List<DnsType> allowedNameResolutionType();
+    DnsServerConfig serverNameResolution();
+
+    @JsonProperty
+    @Nullable
+    List<DnsType> userNameResolutionTypes();
 }

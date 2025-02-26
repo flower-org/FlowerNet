@@ -65,7 +65,8 @@ public class AggressiveChannelPool implements ChannelPool {
                             channelPromise.setSuccess(addChannel(channelFuture.channel()));
                         } else {
                             failOnChannelPromise();
-                            channelPromise.setFailure(channelPromise.cause());
+                            channelPromise.setFailure(channelPromise.cause() == null ?
+                                    new Exception("Unknown Exception " + channelFuture) : channelPromise.cause());
                         }
                     }
                 );

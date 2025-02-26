@@ -1,93 +1,50 @@
 package com.flower.net.socks5s;
 
+import com.flower.crypt.PkiUtil;
+import com.flower.net.access.AccessManager;
+import com.flower.net.config.access.AccessConfig;
+import com.flower.net.config.dns.DnsServerConfig;
+import com.flower.net.config.dns.DnsType;
+import com.flower.net.config.exception.ConfigurationException;
+import com.flower.net.config.serverconf.ServerConfig;
 import com.flower.net.dns.DnsClient;
 import com.flower.net.dns.cache.DnsCache;
+import com.flower.net.dns.client.dnsoverhttps1.DnsOverHttps1Client;
 import com.flower.net.dns.client.dnsoverhttps2.DnsOverHttps2Client;
-import com.flower.net.socksserver.FlowerSslContextBuilder;
+import com.flower.net.dns.client.dnsovertls.DnsOverTlsClient;
+import com.flower.net.dns.client.dnsoverudp.DnsOverUdpClient;
+import com.flower.net.dns.client.os.RawOsResolver;
 import com.flower.net.socksserver.SocksServer;
 import com.flower.net.utils.IpAddressUtil;
-import com.flower.crypt.PkiUtil;
 import io.netty.handler.ssl.SslContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.flower.crypt.CertificateToken;
 
-import javax.net.ssl.KeyManagerFactory;
+import javax.annotation.Nullable;
+import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
-import javax.security.auth.x500.X500Principal;
+import java.io.FileNotFoundException;
 import java.net.InetAddress;
-import java.security.KeyPair;
-import java.security.cert.X509Certificate;
-import com.flower.net.utils.VaultRestClient;
 
 public final class Socks5sServer {
     final static Logger LOGGER = LoggerFactory.getLogger(Socks5sServer.class);
 
     static final boolean DEFAULT_IS_SOCKS5_OVER_TLS = true;
-    static final boolean DEFAULT_SELF_GENERATE_CERT = true;
     static final int DEFAULT_PORT = 8443;
-    static final boolean ALLOW_DIRECT_IP_ACCESS = true;
+    static final boolean DEFAULT_ALLOW_DIRECT_IP_ACCESS = true;
 
-    public static void main(String[] args) throws Exception {
-        boolean isSocks5OverTls = DEFAULT_IS_SOCKS5_OVER_TLS;
-        boolean isSelfGenerateCert = DEFAULT_SELF_GENERATE_CERT;
-        int port = DEFAULT_PORT;
-        if (args.length > 0) {
-            isSocks5OverTls = Boolean.parseBoolean(args[0]);
-        }
-        if (args.length > 1) {
-            isSelfGenerateCert = Boolean.parseBoolean(args[1]);
-        }
-        if (args.length > 2) {
-            port = Integer.parseInt(args[2]);
-        }
+    public static void run(ServerConfig serverConfig) throws Exception {
+        int port = serverConfig.port() == null ? DEFAULT_PORT : serverConfig.port();
+        boolean isSocks5OverTls = serverConfig.tls() == null ? DEFAULT_IS_SOCKS5_OVER_TLS : serverConfig.tls();
+        boolean allowDirectIpAccess =
+                serverConfig.directIpAccess() == null ? DEFAULT_ALLOW_DIRECT_IP_ACCESS : serverConfig.directIpAccess();
 
-        final DnsClient dnsClient;
-        {
-            final int dnsOverHttpsServerPort = 443;
-            final InetAddress dnsServerAddress = IpAddressUtil.fromString("1.1.1.1");
-            final String dnsServerPathPrefix = "/dns-query?name=";
-            final TrustManagerFactory trustManager = PkiUtil.getTrustManagerForCertificateResource("oneone_cert.pem");
-            dnsClient = new DnsCache(new DnsOverHttps2Client(dnsServerAddress, dnsOverHttpsServerPort, dnsServerPathPrefix, trustManager));
-        }
+        AccessManager accessManager = buildAccessManager(serverConfig.accessConfig());
+        DnsClient dnsClient = buildDnsClient(serverConfig.serverNameResolution());
+        SslContext sslCtx = ConfigSslContextBuilder.buildSslContext(serverConfig);
 
-        SslContext sslCtx;
-        if (isSocks5OverTls) {
-            if (isSelfGenerateCert) {
-                // Set up TLS with generated self-signed server cert
-                LOGGER.info("Initializing with self-signed certificate");
-
-                // 1. Generate self-signed server cert
-                KeyPair keyPair = PkiUtil.generateRsa2048KeyPair();
-                X500Principal subject = new X500Principal("CN=Socks Server Certificate");
-                X509Certificate certificate = PkiUtil.generateSelfSignedCertificate(keyPair, subject);
-
-                // 2. Try to store a certificate in a wrapped token in Vault
-                String podName = System.getenv("HOSTNAME");
-                CertificateToken certificateToken = CertificateToken.createToken(certificate, keyPair.getPrivate(), podName);
-                String certificateTokenStr = CertificateToken.createTokenString(certificateToken);
-                try {
-                    String vaultToken = VaultRestClient.kubernetesAuth();
-                    String wrappedToken = VaultRestClient.createWrappedToken(vaultToken, certificateTokenStr);
-                    LOGGER.info("Wrapped token created (900)\n{}", wrappedToken);
-                } catch(Exception e) {
-                    LOGGER.info("Failed to save wrapped token", e);
-                    LOGGER.info("Outputting raw certificate token\n{}", certificateTokenStr);
-                    System.out.println(certificateToken.serverData().cert());
-                }
-
-                KeyManagerFactory keyManager = PkiUtil.getKeyManagerFromCertAndPrivateKey(certificate, keyPair.getPrivate());
-                sslCtx = FlowerSslContextBuilder.buildSslContext(keyManager);
-            } else {
-                // Set up TLS with embedded server cert
-                LOGGER.info("Initializing with embedded certificate (resources)");
-                sslCtx = FlowerSslContextBuilder.buildSslContext();
-            }
-        } else {
-            sslCtx = null;
-        }
-
-        SocksServer server = new SocksServer(() -> ALLOW_DIRECT_IP_ACCESS, () -> new SocksServerConnectHandler(dnsClient));
+        SocksServer server = new SocksServer(() -> allowDirectIpAccess,
+                () -> new SocksServerConnectHandler(accessManager, dnsClient));
         try {
             LOGGER.info("Starting on port {} TLS: {}", port, isSocks5OverTls);
             server.startServer(port, sslCtx)
@@ -95,5 +52,55 @@ public final class Socks5sServer {
         } finally {
             server.shutdownServer();
         }
+    }
+
+    static AccessManager buildAccessManager(@Nullable AccessConfig accessConfig) {
+        return accessConfig == null ? AccessManager.allowAll() : AccessManager.of(accessConfig);
+    }
+
+    static DnsClient buildDnsClient(@Nullable DnsServerConfig serverNameResolution) throws SSLException, InterruptedException, FileNotFoundException {
+        if (serverNameResolution == null) {
+            throw new ConfigurationException("DnsServer not configured (serverNameResolution)");
+        }
+
+        DnsClient rawClient;
+        DnsType dnsType = serverNameResolution.dnsType();
+        if (dnsType == DnsType.LOCAL_OS) {
+            rawClient = new RawOsResolver();
+        } else if (dnsType == DnsType.LOCAL_NAMESERVER) {
+            throw new ConfigurationException("Loading default DNS config not implemented");
+            //TODO: load default DNS config
+            /*InetAddress dnsServerAddress;
+            int port;
+            rawClient = new DnsOverUdpClient(dnsServerAddress, port);*/
+        } else {
+            if (serverNameResolution.host() == null) { throw new ConfigurationException("DNS server host not specified for DnsType " + dnsType); }
+            if (serverNameResolution.port() == null) { throw new ConfigurationException("DNS server port not specified for DnsType " + dnsType); }
+
+            InetAddress dnsServerAddress = IpAddressUtil.fromString(serverNameResolution.host());
+            int port = serverNameResolution.port();
+
+            if (dnsType == DnsType.DNS_UDP) {
+                rawClient = new DnsOverUdpClient(dnsServerAddress, port);
+            } else {
+                TrustManagerFactory trustManager = ConfigSslContextBuilder.createTrustManagerFactory(serverNameResolution.certificate());
+                if (trustManager == null) { trustManager = PkiUtil.getSystemTrustManager(); }
+                if (dnsType == DnsType.DNS_TLS) {
+                    rawClient = new DnsOverTlsClient(dnsServerAddress, port, trustManager);
+                } else {
+                    if (serverNameResolution.httpPath() == null) { throw new ConfigurationException("HttpPath not specified for DnsType " + dnsType); }
+                    String httpPath = serverNameResolution.httpPath();
+                    if (dnsType == DnsType.DNS_HTTPS_1) {
+                        rawClient = new DnsOverHttps1Client(dnsServerAddress, port, httpPath, trustManager);
+                    } else if (dnsType == DnsType.DNS_HTTPS_2) {
+                        rawClient = new DnsOverHttps2Client(dnsServerAddress, port, httpPath, trustManager);
+                    } else {
+                        throw new ConfigurationException("Unknown DNS type: " + serverNameResolution.dnsType());
+                    }
+                }
+            }
+        }
+
+        return new DnsCache(rawClient);
     }
 }

@@ -1,15 +1,12 @@
 package com.flower.net.socksserver;
 
-import com.flower.crypt.PkiUtil;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
+import javax.net.ssl.TrustManagerFactory;
 
 import java.util.List;
-
-import static com.flower.net.trust.FlowerTrust.TRUST_MANAGER_WITH_CLIENT_CA;
-import static com.google.common.base.Preconditions.checkNotNull;
 
 public class FlowerSslContextBuilder {
     public static final List<String> TLS_PROTOCOLS = List.of("TLSv1.3", "TLSv1.2");
@@ -27,14 +24,18 @@ public class FlowerSslContextBuilder {
                 .forServer(serverKeyManager)
                 .protocols(TLS_PROTOCOLS)
                 .ciphers(TLS_CIPHERS)
-                .trustManager(TRUST_MANAGER_WITH_CLIENT_CA)
                 .clientAuth(ClientAuth.REQUIRE)
                 .build();
     }
 
-    public static SslContext buildSslContext() throws SSLException {
-        KeyManagerFactory embeddedServerKeyManager =
-                PkiUtil.getKeyManagerFromResources("socks5s_server.crt", "socks5s_server.key", "");
-        return buildSslContext(checkNotNull(embeddedServerKeyManager));
+    public static SslContext buildSslContext(KeyManagerFactory serverKeyManager,
+                                             TrustManagerFactory trustManagerFactory) throws SSLException {
+        return io.netty.handler.ssl.SslContextBuilder
+                .forServer(serverKeyManager)
+                .protocols(TLS_PROTOCOLS)
+                .ciphers(TLS_CIPHERS)
+                .trustManager(trustManagerFactory)
+                .clientAuth(ClientAuth.REQUIRE)
+                .build();
     }
 }

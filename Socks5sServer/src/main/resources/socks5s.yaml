@@ -1,0 +1,16 @@
+port: 8443
+tls: true
+directIpAccess: true
+#accessConfig
+certificate:
+  generated: true
+clientCertificate:
+  resourceName: "client_CA.crt"
+serverNameResolution:
+  dnsType: DNS_HTTPS_2
+  host: "1.1.1.1"
+  port: 443
+  httpPath: "/dns-query?name="
+  certificate:
+    resourceName: "oneone_cert.pem"
+#userNameResolutionTypes();

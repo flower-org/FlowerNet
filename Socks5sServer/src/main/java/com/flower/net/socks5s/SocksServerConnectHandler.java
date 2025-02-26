@@ -15,6 +15,7 @@
  */
 package com.flower.net.socks5s;
 
+import com.flower.net.access.AccessManager;
 import com.flower.net.handlers.RelayHandler;
 import com.flower.net.utils.ImmediateFuture;
 import com.flower.net.utils.IpAddressUtil;
@@ -68,9 +69,11 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
     final static Logger LOGGER = LoggerFactory.getLogger(SocksServerConnectHandler.class);
 
     private final Bootstrap b = new Bootstrap();
+    private final AccessManager accessManager;
     private final DnsClient dnsClient;
 
-    public SocksServerConnectHandler(DnsClient dnsClient) {
+    public SocksServerConnectHandler(AccessManager accessManager, DnsClient dnsClient) {
+        this.accessManager = accessManager;
         this.dnsClient = dnsClient;
     }
 
@@ -109,10 +112,12 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                     .handler(new DirectClientHandler(promise));
 
             String hostname = request.dstAddr();
+            validateHostname(hostname);
             resolve(hostname, ctx.executor()).addListener(
                 resolveFuture -> {
                     if (resolveFuture.isSuccess()) {
                         InetAddress addr = (InetAddress) resolveFuture.getNow();
+                        validateIpAddress(addr);
                         b.connect(addr, request.dstPort()).addListener((ChannelFutureListener) future -> {
                             if (future.isSuccess()) {
                                 // Connection established use handler provided results
@@ -171,11 +176,11 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                                     ctx.pipeline().addLast(new InactiveChannelHandler());
                                     ctx.pipeline().addLast(new RelayHandler(outboundChannel));
 
-                                    LOGGER.info("CONNECTED {}", getConnectionInfo(ctx));
+                                    LOGGER.info("CONNECTED {} {}", getConnectionInfo(ctx), outboundChannel.remoteAddress());
                                 });
                             }
                         } else {
-                            LOGGER.error("DISCONNECTED {} connection failed", getConnectionInfo(ctx));
+                            LOGGER.error("DISCONNECTED {} connection failed", getConnectionInfo(ctx), future.cause());
                             ctx.channel().writeAndFlush(new DefaultSocks5CommandResponse(
                                     Socks5CommandStatus.FAILURE, request.dstAddrType()));
                             ServerUtil.closeOnFlush(ctx.channel());
@@ -190,15 +195,17 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                     .handler(new DirectClientHandler(promise));
 
             String hostname = request.dstAddr();
+            validateHostname(hostname);
             resolve(hostname, ctx.executor()).addListener(
                 resolveFuture -> {
                     if (resolveFuture.isSuccess()) {
                         InetAddress addr = (InetAddress) resolveFuture.getNow();
+                        validateIpAddress(addr);
                         b.connect(addr, request.dstPort()).addListener((ChannelFutureListener) future -> {
                             if (future.isSuccess()) {
                                 // Connection established use handler provided results
                             } else {
-                                LOGGER.error("DISCONNECTED {} connection failed", getConnectionInfo(ctx));
+                                LOGGER.error("DISCONNECTED {} connection failed", getConnectionInfo(ctx), future.cause());
                                 // Close the connection if the connection attempt has failed.
                                 ctx.channel().writeAndFlush(
                                         new DefaultSocks5CommandResponse(Socks5CommandStatus.FAILURE, request.dstAddrType()));
@@ -206,7 +213,7 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                             }
                         });
                     } else {
-                        LOGGER.error("DISCONNECTED {} name resolution failed {}", getConnectionInfo(ctx), hostname);
+                        LOGGER.error("DISCONNECTED {} name resolution failed {}", getConnectionInfo(ctx), hostname, resolveFuture.cause());
                         // Close the connection if the connection attempt has failed.
                         ctx.channel().writeAndFlush(
                                 new DefaultSocks5CommandResponse(Socks5CommandStatus.FAILURE, request.dstAddrType()));
@@ -215,7 +222,7 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                 }
             );
         } else {
-            LOGGER.error("DISCONNECTED {} unknown protocol", getConnectionInfo(ctx));
+            LOGGER.error("DISCONNECTED {} unknown protocol " + message.getClass(), getConnectionInfo(ctx));
             ctx.close();
         }
     }
@@ -254,6 +261,18 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
             });
 
             return transformedPromise;
+        }
+    }
+
+    public void validateHostname(String name) {
+        if (!accessManager.isAllowed(name)) {
+            throw new RuntimeException("Access Control: name not allowed: " + name);
+        }
+    }
+
+    public void validateIpAddress(InetAddress addr) {
+        if (!accessManager.isAllowed(addr)) {
+            throw new RuntimeException("Access Control: ip not allowed: " + addr);
         }
     }
 

@@ -188,7 +188,9 @@ public class DnsOverHttps2Client implements DnsClient {
                             }
                         });
             } else {
-                channelPromise.setFailure(channelFuture.cause());
+                if (!channelPromise.isDone()) {
+                    channelPromise.setFailure(channelFuture.cause());
+                }
             }
         });
     }

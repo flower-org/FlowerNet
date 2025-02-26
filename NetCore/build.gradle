@@ -24,6 +24,7 @@ repositories {
 
 dependencies {
     implementation project(':CryptCore')
+    implementation project(':NetConfig')
 
     annotationProcessor "org.immutables:value:2.9.2"
 

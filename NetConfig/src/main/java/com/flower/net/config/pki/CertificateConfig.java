@@ -14,6 +14,11 @@ import javax.annotation.Nullable;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public interface CertificateConfig {
     @JsonProperty
+    @Nullable
+    Boolean generated();
+
+    @JsonProperty
+    @Nullable
     Source certificate();
 
     @JsonProperty

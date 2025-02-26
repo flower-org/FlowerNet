@@ -1,6 +1,7 @@
 package com.flower.net.sockschain.client;
 
 import com.flower.crypt.ETokenKeyManagerProvider;
+import com.flower.crypt.PkiUtil;
 import com.flower.net.handlers.RelayHandler;
 import com.flower.net.utils.EmptyPipelineChannelInitializer;
 import com.flower.net.utils.IpAddressUtil;
@@ -32,7 +33,10 @@ import io.netty.handler.ssl.SslContextBuilder;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.net.InetAddress;
+import java.security.KeyStore;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -69,7 +73,7 @@ public class SocksChainClient {
         TrustManagerFactory trustManagerFactory = TRUST_MANAGER_CACHE.getIfPresent(socksNode);
         if (trustManagerFactory == null) {
             socksNode.rootServerCertificate();
-            trustManagerFactory = socksNode.buildTrustManagerFactory();
+            trustManagerFactory = buildTrustManagerFactory(socksNode);
 
             TRUST_MANAGER_CACHE.put(socksNode, trustManagerFactory);
         }
@@ -87,6 +91,29 @@ public class SocksChainClient {
         } else {
             return null;
         }
+    }
+
+    static TrustManagerFactory buildTrustManagerFactory(SocksNode socksNode) {
+        if (socksNode.rootServerCertificate() != null) {
+            if (socksNode.rootServerCertificate().fileConfig() != null) {
+                File certificateFile = new File(socksNode.rootServerCertificate().fileConfig().certificateFile());
+                try {
+                    KeyStore keyStore = PkiUtil.loadTrustStore(certificateFile);
+                    return PkiUtil.getTrustManagerForKeyStore(keyStore);
+                } catch (FileNotFoundException e) {
+                    throw new RuntimeException("Configured certificate File not found", e);
+                }
+            } else if (socksNode.rootServerCertificate().resourceConfig() != null) {
+                KeyStore keyStore = PkiUtil.loadTrustStore(socksNode.rootServerCertificate().resourceConfig().certificateResourceName());
+                return PkiUtil.getTrustManagerForKeyStore(keyStore);
+            } else if (socksNode.rootServerCertificate().pkcs11Config() != null) {
+                throw new UnsupportedOperationException("PKCS#11 config not supported yet");
+            } else if (socksNode.rootServerCertificate().bksConfig() != null) {
+                throw new UnsupportedOperationException("BKS config not supported yet");
+            }
+        }
+
+        throw new RuntimeException("Certificate File config not found");
     }
 
     public SocksChainClient(final ChannelHandlerContext inboundCtx, final SocksMessage inboundMessage, List<SocksNode> socksProxyChain) {

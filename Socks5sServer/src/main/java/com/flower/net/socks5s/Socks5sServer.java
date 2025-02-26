@@ -10,7 +10,7 @@ import com.flower.crypt.PkiUtil;
 import io.netty.handler.ssl.SslContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.flower.net.config.serverconf.CertificateToken;
+import com.flower.crypt.CertificateToken;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;

@@ -1,4 +1,4 @@
-package com.flower.net.config.serverconf;
+package com.flower.crypt;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -6,7 +6,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.flower.crypt.PkiUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.immutables.value.Value;
 
@@ -45,7 +44,7 @@ public interface CertificateToken {
     static CertificateToken createToken(X509Certificate certificate, PrivateKey privateKey, @Nullable String pod)
             throws JsonProcessingException, CertificateEncodingException, NoSuchAlgorithmException, SignatureException, InvalidKeyException {
         ObjectMapper mapper = new ObjectMapper();
-        CertificateToken.ServerData serverData = CertificateToken.ServerData.create(certificate, pod == null || StringUtils.isBlank(pod) ? "POD_NAME_UNKNOWN" : pod);
+        ServerData serverData = ServerData.create(certificate, pod == null || StringUtils.isBlank(pod) ? "POD_NAME_UNKNOWN" : pod);
         String serverDataStr = mapper.writeValueAsString(serverData);
 
         String sign = PkiUtil.signData(serverDataStr, privateKey);
@@ -62,7 +61,7 @@ public interface CertificateToken {
             throws JsonProcessingException, NoSuchAlgorithmException, SignatureException, InvalidKeyException {
         ObjectMapper mapper = new ObjectMapper();
         CertificateToken certificateToken = mapper.readValue(tokenStr, CertificateToken.class);
-        CertificateToken.ServerData serverData = certificateToken.serverData();
+        ServerData serverData = certificateToken.serverData();
         String serverDataStr = mapper.writeValueAsString(serverData);
 
         X509Certificate cert = PkiUtil.getCertificateFromString(serverData.cert());

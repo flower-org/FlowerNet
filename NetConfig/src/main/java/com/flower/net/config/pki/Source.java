@@ -28,4 +28,8 @@ public interface Source {
     @JsonProperty
     @Nullable
     String pkcs11pin();
+
+    @JsonProperty
+    @Nullable
+    String raw();
 }

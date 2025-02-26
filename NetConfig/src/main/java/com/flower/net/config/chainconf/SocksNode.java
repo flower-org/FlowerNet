@@ -8,14 +8,9 @@ import com.flower.net.config.certs.local.LocalCertificate;
 import com.flower.net.config.certs.remote.ImmutableRemoteCertificate;
 import com.flower.net.config.certs.remote.ImmutableRemoteCertificateFileConfig;
 import com.flower.net.config.certs.remote.RemoteCertificate;
-import com.flower.crypt.PkiUtil;
 import org.immutables.value.Value;
 
 import javax.annotation.Nullable;
-import javax.net.ssl.TrustManagerFactory;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.security.KeyStore;
 
 @Value.Immutable
 @JsonSerialize(as = ImmutableSocksNode.class)
@@ -86,28 +81,5 @@ public interface SocksNode {
                         ImmutableRemoteCertificateFileConfig.builder().certificateFile(certificateFilename).build()
                     ).build())
                 .build();
-    }
-
-    default TrustManagerFactory buildTrustManagerFactory() {
-        if (rootServerCertificate() != null) {
-            if (rootServerCertificate().fileConfig() != null) {
-                File certificateFile = new File(rootServerCertificate().fileConfig().certificateFile());
-                try {
-                    KeyStore keyStore = PkiUtil.loadTrustStore(certificateFile);
-                    return PkiUtil.getTrustManagerForKeyStore(keyStore);
-                } catch (FileNotFoundException e) {
-                    throw new RuntimeException("Configured certificate File not found", e);
-                }
-            } else if (rootServerCertificate().resourceConfig() != null) {
-                KeyStore keyStore = PkiUtil.loadTrustStore(rootServerCertificate().resourceConfig().certificateResourceName());
-                return PkiUtil.getTrustManagerForKeyStore(keyStore);
-            } else if (rootServerCertificate().pkcs11Config() != null) {
-                throw new UnsupportedOperationException("PKCS#11 config not supported yet");
-            } else if (rootServerCertificate().bksConfig() != null) {
-                throw new UnsupportedOperationException("BKS config not supported yet");
-            }
-        }
-
-        throw new RuntimeException("Certificate File config not found");
     }
 }

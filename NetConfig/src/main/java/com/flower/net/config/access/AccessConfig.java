@@ -19,7 +19,7 @@ public interface AccessConfig {
     Boolean directIpAccess();
 
     @JsonProperty
-    Access defaultAccess();
+    Access defaultAccessRule();
 
     @JsonProperty
     @Nullable List<Rule> accessRules();

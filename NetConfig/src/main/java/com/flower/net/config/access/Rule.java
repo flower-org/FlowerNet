@@ -20,13 +20,17 @@ public interface Rule {
     Access access();
     @JsonProperty
     @Nullable
-    String rule();
+    List<String> rules();
     @JsonProperty
     @Nullable
     List<Integer> ports();
     @JsonProperty
     @Nullable
     List<PortRange> portRanges();
+
+    @JsonProperty
+    @Nullable
+    String ruleName();
 
     @Value.Immutable
     @JsonSerialize(as = ImmutablePortRange.class)

@@ -5,8 +5,8 @@ import com.flower.net.config.access.AccessConfig;
 import java.net.InetAddress;
 
 public interface AccessManager {
-    boolean isAllowed(InetAddress address);
-    boolean isAllowed(String name);
+    Access accessCheck(InetAddress address, int port);
+    Access accessCheck(String name, int port);
 
     static AccessManager of(AccessConfig accessConfig) {
         return new ConfigAccessManager(accessConfig);
@@ -14,8 +14,8 @@ public interface AccessManager {
 
     static AccessManager allowAll() {
         return new AccessManager() {
-            @Override public boolean isAllowed(InetAddress address) { return true; }
-            @Override public boolean isAllowed(String name) { return true; }
+            @Override public Access accessCheck(InetAddress address, int port) { return Access.ALLOW; }
+            @Override public Access accessCheck(String name, int port) { return Access.ALLOW; }
         };
     }
 }

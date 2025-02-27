@@ -26,7 +26,20 @@ Address resolution:
 
 ← resolve_response | request_id | name_len | name_to_resolve | success | ip4_count | ip4[] | ip_6_count | ip6[]
 
-← resolve_response | request_id | name_len | name_to_resolve | error | error_len | error
+← resolve_response | request_id | name_len | name_to_resolve | error_code | error_len | error_text
+
+---
+
+Possible Error codes (Socks5)
+    0: SUCCESS
+    1: FAILURE
+    2: FORBIDDEN
+    3: NETWORK_UNREACHABLE
+    4: HOST_UNREACHABLE
+    5: CONNECTION_REFUSED
+    6: TTL_EXPIRED
+    7: COMMAND_UNSUPPORTED
+    8: ADDRESS_UNSUPPORTED
 
 ---
 

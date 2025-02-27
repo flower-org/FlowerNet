@@ -1,6 +1,6 @@
 package com.flower.net.socksui.forms.traffic;
 
-import com.flower.net.conntrack.whiteblacklist.FilterType;
+import com.flower.net.access.Access;
 import com.flower.net.conntrack.whiteblacklist.ImmutableAddressRecord;
 import com.flower.net.conntrack.whiteblacklist.ImmutableHostRecord;
 import com.flower.net.conntrack.whiteblacklist.ImmutablePortRecord;
@@ -43,7 +43,7 @@ public class TrafficRuleAddDialog extends VBox {
     }
 
     Boolean getIsWhitelist(TrafficRule trafficRule) {
-        return trafficRule.getFilterType() == FilterType.WHITELIST;
+        return trafficRule.getFilterType() == Access.ALLOW;
     }
     @Nullable String getHost(TrafficRule trafficRule) {
         return StringUtils.defaultIfBlank(trafficRule.getHost(), null);
@@ -126,17 +126,17 @@ public class TrafficRuleAddDialog extends VBox {
                 }
             }
 
-            FilterType filterType = null;
+            Access access = null;
             try {
                 if (filterTypeStr.equals(WHITELIST)) {
-                    filterType = FilterType.WHITELIST;
+                    access = Access.ALLOW;
                 } else if (filterTypeStr.equals(BLACKLIST)) {
-                    filterType = FilterType.BLACKLIST;
+                    access = Access.DENY;
                 }
             } catch (Exception e) {
             }
 
-            if ((filterType != FilterType.WHITELIST && filterType != FilterType.BLACKLIST)) {
+            if ((access != Access.ALLOW && access != Access.DENY)) {
                 Alert alert = new Alert(Alert.AlertType.INFORMATION,
                         "Please specify valid filter type (WHITELIST ot BLACKLIST)", ButtonType.OK);
                 alert.showAndWait();
@@ -151,7 +151,7 @@ public class TrafficRuleAddDialog extends VBox {
             } else {
                 if (!StringUtils.isBlank(host) && !StringUtils.isBlank(portStr)) {
                     trafficRule = new TrafficRule(ImmutableAddressRecord.builder()
-                            .filterType(filterType)
+                            .access(access)
                             .dstHost(host)
                             .dstPort(port)
                             .isWildcard(isWildcard)
@@ -160,7 +160,7 @@ public class TrafficRuleAddDialog extends VBox {
                     checkNotNull(stage).close();
                 } else if (!StringUtils.isBlank(host) && StringUtils.isBlank(portStr)) {
                     trafficRule = new TrafficRule(ImmutableHostRecord.builder()
-                            .filterType(filterType)
+                            .access(access)
                             .dstHost(host)
                             .isWildcard(isWildcard)
                             .creationTimestamp(System.currentTimeMillis())
@@ -168,7 +168,7 @@ public class TrafficRuleAddDialog extends VBox {
                     checkNotNull(stage).close();
                 } else if (StringUtils.isBlank(host) && !StringUtils.isBlank(portStr)) {
                     trafficRule = new TrafficRule(ImmutablePortRecord.builder()
-                            .filterType(filterType)
+                            .access(access)
                             .dstPort(port)
                             .creationTimestamp(System.currentTimeMillis())
                             .build());

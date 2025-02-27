@@ -1,6 +1,6 @@
 package com.flower.net.socksui.forms.traffic;
 
-import com.flower.net.conntrack.whiteblacklist.FilterType;
+import com.flower.net.access.Access;
 import com.flower.net.conntrack.whiteblacklist.ImmutableAddressRecord;
 import com.flower.net.conntrack.whiteblacklist.ImmutableHostRecord;
 import com.flower.net.conntrack.whiteblacklist.ImmutablePortRecord;
@@ -117,7 +117,7 @@ public abstract class RuleManager {
 
     public void clearWhitelistTmpRules() {
         if (JavaFxUtils.showYesNoDialog(clearWhitelistRulesMsg()) == JavaFxUtils.YesNo.YES) {
-            innerFilter.clearFilterType(FilterType.WHITELIST);
+            innerFilter.clearFilterType(Access.ALLOW);
             refreshAndRestoreCursor();
         }
     }
@@ -128,7 +128,7 @@ public abstract class RuleManager {
 
     public void clearBlacklistTmpRules() {
         if (JavaFxUtils.showYesNoDialog(clearBlacklistRulesMsg()) == JavaFxUtils.YesNo.YES) {
-            innerFilter.clearFilterType(FilterType.BLACKLIST);
+            innerFilter.clearFilterType(Access.DENY);
             refreshAndRestoreCursor();
         }
     }
@@ -149,10 +149,10 @@ public abstract class RuleManager {
         refreshAndRestoreCursor();
     }
 
-    FilterType flipFilterType(FilterType type) {
+    Access flipFilterType(Access type) {
         switch (type) {
-            case BLACKLIST: return FilterType.WHITELIST;
-            case WHITELIST: return FilterType.BLACKLIST;
+            case DENY: return Access.ALLOW;
+            case ALLOW: return Access.DENY;
             default: throw new IllegalArgumentException("FilterType should be either Blacklist or Whitelist");
         }
     }
@@ -161,31 +161,31 @@ public abstract class RuleManager {
         TrafficRule trafficRule = getSelectedTrafficRule();
         if (trafficRule != null) {
             if (trafficRule.addressRecord != null) {
-                FilterType newFilterType = flipFilterType(trafficRule.addressRecord.filterType());
+                Access newAccess = flipFilterType(trafficRule.addressRecord.access());
                 innerFilter.addAddressRecord(ImmutableAddressRecord.builder()
                                 .dstHost(trafficRule.addressRecord.dstHost())
                                 .dstPort(trafficRule.addressRecord.dstPort())
-                                .filterType(newFilterType)
+                                .access(newAccess)
                                 .creationTimestamp(System.currentTimeMillis())
                                 .isWildcard(trafficRule.isWildcard())
                                 .build(),
                         true);
             } else if (trafficRule.hostRecord != null) {
                 innerFilter.removeHostRecord(trafficRule.hostRecord);
-                FilterType newFilterType = flipFilterType(trafficRule.hostRecord.filterType());
+                Access newAccess = flipFilterType(trafficRule.hostRecord.access());
                 innerFilter.addHostRecord(ImmutableHostRecord.builder()
                                 .dstHost(trafficRule.hostRecord.dstHost())
-                                .filterType(newFilterType)
+                                .access(newAccess)
                                 .creationTimestamp(System.currentTimeMillis())
                                 .isWildcard(trafficRule.isWildcard())
                                 .build(),
                         true);
             } else if (trafficRule.portRecord != null) {
                 innerFilter.removePortRecord(trafficRule.portRecord);
-                FilterType newFilterType = flipFilterType(trafficRule.portRecord.filterType());
+                Access newAccess = flipFilterType(trafficRule.portRecord.access());
                 innerFilter.addPortRecord(ImmutablePortRecord.builder()
                                 .dstPort(trafficRule.portRecord.dstPort())
-                                .filterType(newFilterType)
+                                .access(newAccess)
                                 .creationTimestamp(System.currentTimeMillis())
                                 .build(),
                         true);

@@ -84,7 +84,7 @@
                                                  </TableColumn>
                                                  <TableColumn minWidth="250.0" prefWidth="250.0" text="FilterType">
                                                      <cellValueFactory>
-                                                         <PropertyValueFactory property="filterType" />
+                                                         <PropertyValueFactory property="access" />
                                                      </cellValueFactory>
                                                  </TableColumn>
                                                  <TableColumn minWidth="250.0" prefWidth="250.0" text="Date">
@@ -167,7 +167,7 @@
                                                         </TableColumn>
                                                         <TableColumn minWidth="250.0" prefWidth="250.0" text="FilterType">
                                                             <cellValueFactory>
-                                                                <PropertyValueFactory property="filterType" />
+                                                                <PropertyValueFactory property="access" />
                                                             </cellValueFactory>
                                                         </TableColumn>
                                                         <TableColumn minWidth="250.0" prefWidth="250.0" text="Date">

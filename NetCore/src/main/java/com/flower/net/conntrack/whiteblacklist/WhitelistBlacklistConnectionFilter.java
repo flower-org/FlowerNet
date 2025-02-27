@@ -1,6 +1,6 @@
 package com.flower.net.conntrack.whiteblacklist;
 
-import com.flower.net.conntrack.AddressCheck;
+import com.flower.net.access.Access;
 import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nullable;
@@ -180,35 +180,35 @@ public class WhitelistBlacklistConnectionFilter {
         wildcardHostRecords.clear();
     }
 
-    public void clearFilterType(FilterType filterType) {
+    public void clearFilterType(Access access) {
         for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> addressRecord : addressRecords.entrySet()) {
             ConcurrentHashMap<Integer, AddressRecord> portMap = addressRecord.getValue();
             for (Map.Entry<Integer, AddressRecord> portRecord : portMap.entrySet()) {
-                if (portRecord.getValue().filterType() == filterType) {
+                if (portRecord.getValue().access() == access) {
                     portMap.remove(portRecord.getKey());
                 }
             }
         }
         for (Map.Entry<String, HostRecord> hostRecord : hostRecords.entrySet()) {
-            if (hostRecord.getValue().filterType() == filterType) {
+            if (hostRecord.getValue().access() == access) {
                 hostRecords.remove(hostRecord.getKey());
             }
         }
         for (Map.Entry<Integer, PortRecord> portRecord : portRecords.entrySet()) {
-            if (portRecord.getValue().filterType() == filterType) {
+            if (portRecord.getValue().access() == access) {
                 portRecords.remove(portRecord.getKey());
             }
         }
         for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> wildcardAddressRecord : wildcardAddressRecords.entrySet()) {
             ConcurrentHashMap<Integer, AddressRecord> portMap = wildcardAddressRecord.getValue();
             for (Map.Entry<Integer, AddressRecord> portRecord : portMap.entrySet()) {
-                if (portRecord.getValue().filterType() == filterType) {
+                if (portRecord.getValue().access() == access) {
                     portMap.remove(portRecord.getKey());
                 }
             }
         }
         for (Map.Entry<String, HostRecord> wildcardHostRecord : wildcardHostRecords.entrySet()) {
-            if (wildcardHostRecord.getValue().filterType() == filterType) {
+            if (wildcardHostRecord.getValue().access() == access) {
                 wildcardHostRecords.remove(wildcardHostRecord.getKey());
             }
         }
@@ -360,18 +360,18 @@ public class WhitelistBlacklistConnectionFilter {
                 .build();
     }
 
-    @Nullable public AddressCheck getRecordRule(String dstHost, int dstPort) {
+    @Nullable public Access getRecordRule(String dstHost, int dstPort) {
         // Priority 0 - exact hostname/port match
         Map<Integer, AddressRecord> portMap = addressRecords.get(dstHost);
         if (portMap != null) {
             AddressRecord record = portMap.get(dstPort);
             if (record != null) {
-                if (record.filterType() == FilterType.WHITELIST) {
-                    return AddressCheck.CONNECTION_ALLOWED;
-                } else if (record.filterType() == FilterType.BLACKLIST) {
-                    return AddressCheck.CONNECTION_PROHIBITED;
+                if (record.access() == Access.ALLOW) {
+                    return Access.ALLOW;
+                } else if (record.access() == Access.DENY) {
+                    return Access.DENY;
                 } else {
-                    throw new IllegalArgumentException("Unknown filter type: " + record.filterType());
+                    throw new IllegalArgumentException("Unknown filter type: " + record.access());
                 }
             }
         }
@@ -379,12 +379,12 @@ public class WhitelistBlacklistConnectionFilter {
         // Priority 1 - hostname match (without port)
         HostRecord hostRecord = hostRecords.get(dstHost);
         if (hostRecord != null) {
-            if (hostRecord.filterType() == FilterType.WHITELIST) {
-                return AddressCheck.CONNECTION_ALLOWED;
-            } else if (hostRecord.filterType() == FilterType.BLACKLIST) {
-                return AddressCheck.CONNECTION_PROHIBITED;
+            if (hostRecord.access() == Access.ALLOW) {
+                return Access.ALLOW;
+            } else if (hostRecord.access() == Access.DENY) {
+                return Access.DENY;
             } else {
-                throw new IllegalArgumentException("Unknown filter type: " + hostRecord.filterType());
+                throw new IllegalArgumentException("Unknown filter type: " + hostRecord.access());
             }
         }
 
@@ -394,12 +394,12 @@ public class WhitelistBlacklistConnectionFilter {
             AddressRecord record = wildcardPortMap.get(dstPort);
 
             if (record != null) {
-                if (record.filterType() == FilterType.WHITELIST) {
-                    return AddressCheck.CONNECTION_ALLOWED;
-                } else if (record.filterType() == FilterType.BLACKLIST) {
-                    return AddressCheck.CONNECTION_PROHIBITED;
+                if (record.access() == Access.ALLOW) {
+                    return Access.ALLOW;
+                } else if (record.access() == Access.DENY) {
+                    return Access.DENY;
                 } else {
-                    throw new IllegalArgumentException("Unknown filter type: " + record.filterType());
+                    throw new IllegalArgumentException("Unknown filter type: " + record.access());
                 }
             }
         }
@@ -407,24 +407,24 @@ public class WhitelistBlacklistConnectionFilter {
         // Priority 3 - wildcard hostname match (without port)
         HostRecord wildcardHostRecord = getWildcardResource(dstHost, wildcardHostRecords);
         if (wildcardHostRecord != null) {
-            if (wildcardHostRecord.filterType() == FilterType.WHITELIST) {
-                return AddressCheck.CONNECTION_ALLOWED;
-            } else if (wildcardHostRecord.filterType() == FilterType.BLACKLIST) {
-                return AddressCheck.CONNECTION_PROHIBITED;
+            if (wildcardHostRecord.access() == Access.ALLOW) {
+                return Access.ALLOW;
+            } else if (wildcardHostRecord.access() == Access.DENY) {
+                return Access.DENY;
             } else {
-                throw new IllegalArgumentException("Unknown filter type: " + wildcardHostRecord.filterType());
+                throw new IllegalArgumentException("Unknown filter type: " + wildcardHostRecord.access());
             }
         }
 
         // Priority 4 - port match (without hostname)
         PortRecord portRecord = portRecords.get(dstPort);
         if (portRecord != null) {
-            if (portRecord.filterType() == FilterType.WHITELIST) {
-                return AddressCheck.CONNECTION_ALLOWED;
-            } else if (portRecord.filterType() == FilterType.BLACKLIST) {
-                return AddressCheck.CONNECTION_PROHIBITED;
+            if (portRecord.access() == Access.ALLOW) {
+                return Access.ALLOW;
+            } else if (portRecord.access() == Access.DENY) {
+                return Access.DENY;
             } else {
-                throw new IllegalArgumentException("Unknown filter type: " + portRecord.filterType());
+                throw new IllegalArgumentException("Unknown filter type: " + portRecord.access());
             }
         }
 

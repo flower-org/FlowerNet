@@ -3,10 +3,9 @@ package com.flower.net.socksui.forms.traffic;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
-import com.flower.net.conntrack.AddressCheck;
 import com.flower.net.conntrack.ConnectionFilter;
+import com.flower.net.access.Access;
 import com.flower.net.conntrack.whiteblacklist.AddressFilterList;
-import com.flower.net.conntrack.whiteblacklist.FilterType;
 import com.flower.net.conntrack.whiteblacklist.ImmutableAddressRecord;
 import com.flower.net.conntrack.whiteblacklist.ImmutableHostRecord;
 import com.flower.net.conntrack.whiteblacklist.ImmutablePortRecord;
@@ -265,11 +264,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     }
 
     class CheckResult {
-        final AddressCheck checkResult;
+        final Access checkResult;
         final boolean isDirectIpBlock;
         final boolean isRuleMatched;
 
-        CheckResult(AddressCheck checkResult, boolean isDirectIpBlock, boolean isRuleMatched) {
+        CheckResult(Access checkResult, boolean isDirectIpBlock, boolean isRuleMatched) {
             this.checkResult = checkResult;
             this.isDirectIpBlock = isDirectIpBlock;
             this.isRuleMatched = isRuleMatched;
@@ -278,7 +277,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
     CheckResult getCheckResult(String dstHost, int dstPort) {
         FilterListMode filterListMode = getFilterListMode();
-        AddressCheck checkResult;
+        Access checkResult;
         if (filterListMode == FilterListMode.MAIN) {
             checkResult = mainRuleManager.innerFilter.getRecordRule(dstHost, dstPort);
         } else if (filterListMode == FilterListMode.TMP) {
@@ -299,26 +298,26 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         if (trafficControlType == TrafficControlType.OFF) {
             // If filtering is off, we allow all connections
             isRuleMatched = false;
-            checkResult = AddressCheck.CONNECTION_ALLOWED;
+            checkResult = Access.ALLOW;
         } else {
             boolean isDirectIpAccessAllowed = checkNotNull(allowDirectIpAccessCheckBox).selectedProperty().get();
             if (!isDirectIpAccessAllowed && IpAddressUtil.isIPAddress(dstHost)) {
                 isDirectIpBlock = true;
                 isRuleMatched = false;
-                checkResult = AddressCheck.CONNECTION_PROHIBITED;
+                checkResult = Access.DENY;
             } else if (trafficControlType == TrafficControlType.WHITELIST) {
                 isRuleMatched = true;
                 // If matching record not found, we prohibit anything that's not whitelisted
                 if (checkResult == null) {
                     isRuleMatched = false;
-                    checkResult = AddressCheck.CONNECTION_PROHIBITED;
+                    checkResult = Access.DENY;
                 }
             } else if (trafficControlType == TrafficControlType.BLACKLIST) {
                 isRuleMatched = true;
                 // If matching records not found, we allow everything that's not blacklisted
                 if (checkResult == null) {
                     isRuleMatched = false;
-                    checkResult = AddressCheck.CONNECTION_ALLOWED;
+                    checkResult = Access.ALLOW;
                 }
             } else {
                 throw new IllegalArgumentException("Unknown traffic control type: " + trafficControlType);
@@ -329,7 +328,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     }
 
     @Override
-    public AddressCheck approveConnection(String dstHost, int dstPort, @Nullable SocketAddress from) {
+    public Access approveConnection(String dstHost, int dstPort, @Nullable SocketAddress from) {
         CheckResult check = getCheckResult(dstHost, dstPort);
 
         if (!check.isRuleMatched) {
@@ -338,7 +337,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 AddressRecord addressRecord = ImmutableAddressRecord.builder()
                         .dstHost(dstHost)
                         .dstPort(dstPort)
-                        .filterType(autoAddRulesMode == AutoAddRulesMode.AUTO_WHITELIST ? FilterType.WHITELIST : FilterType.BLACKLIST)
+                        .access(autoAddRulesMode == AutoAddRulesMode.AUTO_WHITELIST ? Access.ALLOW : Access.DENY)
                         .creationTimestamp(System.currentTimeMillis())
                         .isWildcard(false)
                         .build();
@@ -382,7 +381,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
             });
 
             totalConnections.incrementAndGet();
-            if (check.checkResult == AddressCheck.CONNECTION_ALLOWED) {
+            if (check.checkResult == Access.ALLOW) {
                 allowedConnections.incrementAndGet();
             } else {
                 prohibitedConnections.incrementAndGet();
@@ -421,7 +420,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         AddressRecord addressRecord = ImmutableAddressRecord.builder()
                 .dstHost(host)
                 .dstPort(port)
-                .filterType(FilterType.WHITELIST)
+                .access(Access.ALLOW)
                 .creationTimestamp(System.currentTimeMillis())
                 .isWildcard(false)
                 .build();
@@ -449,7 +448,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         AddressRecord addressRecord = ImmutableAddressRecord.builder()
                 .dstHost(host)
                 .dstPort(port)
-                .filterType(FilterType.BLACKLIST)
+                .access(Access.DENY)
                 .creationTimestamp(System.currentTimeMillis())
                 .isWildcard(false)
                 .build();
@@ -477,7 +476,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
         HostRecord hostRecord = ImmutableHostRecord.builder()
                 .dstHost(host)
-                .filterType(FilterType.WHITELIST)
+                .access(Access.ALLOW)
                 .creationTimestamp(System.currentTimeMillis())
                 .isWildcard(false)
                 .build();
@@ -504,7 +503,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
         HostRecord hostRecord = ImmutableHostRecord.builder()
                 .dstHost(host)
-                .filterType(FilterType.BLACKLIST)
+                .access(Access.DENY)
                 .creationTimestamp(System.currentTimeMillis())
                 .isWildcard(false)
                 .build();
@@ -532,7 +531,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
         PortRecord portRecord = ImmutablePortRecord.builder()
                 .dstPort(port)
-                .filterType(FilterType.WHITELIST)
+                .access(Access.ALLOW)
                 .creationTimestamp(System.currentTimeMillis())
                 .build();
         PortRecord existingRule = activeRuleManager.innerFilter.addPortRecord(portRecord, false);
@@ -569,7 +568,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
         PortRecord portRecord = ImmutablePortRecord.builder()
                 .dstPort(port)
-                .filterType(FilterType.BLACKLIST)
+                .access(Access.DENY)
                 .creationTimestamp(System.currentTimeMillis())
                 .build();
         PortRecord existingRule = activeRuleManager.innerFilter.addPortRecord(portRecord, false);

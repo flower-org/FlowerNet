@@ -11,12 +11,12 @@ public class ConfigAccessManager implements AccessManager {
     }
 
     @Override
-    public boolean isAllowed(InetAddress address) {
-        return false;
+    public Access accessCheck(InetAddress address, int port) {
+        return Access.ALLOW;
     }
 
     @Override
-    public boolean isAllowed(String name) {
-        return false;
+    public Access accessCheck(String name, int port) {
+        return Access.DENY;
     }
 }

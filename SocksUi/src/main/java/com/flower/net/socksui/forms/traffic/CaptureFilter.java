@@ -1,6 +1,6 @@
 package com.flower.net.socksui.forms.traffic;
 
-import com.flower.net.conntrack.AddressCheck;
+import com.flower.net.access.Access;
 
 public class CaptureFilter {
     final boolean matchedAllowed;
@@ -15,15 +15,15 @@ public class CaptureFilter {
         this.unmatchedProhibited = unmatchedProhibited;
     }
 
-    boolean matchCapturedRecord(AddressCheck checkResult, boolean isRuleMatched) {
+    boolean matchCapturedRecord(Access access, boolean isRuleMatched) {
         if (isRuleMatched) {
-            if (checkResult == AddressCheck.CONNECTION_ALLOWED) {
+            if (access == Access.ALLOW) {
                 return matchedAllowed;
             } else {
                 return matchedProhibited;
             }
         } else {
-            if (checkResult == AddressCheck.CONNECTION_ALLOWED) {
+            if (access == Access.ALLOW) {
                 return unmatchedAllowed;
             } else {
                 return unmatchedProhibited;

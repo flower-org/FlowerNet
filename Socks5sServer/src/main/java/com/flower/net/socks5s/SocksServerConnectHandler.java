@@ -15,6 +15,7 @@
  */
 package com.flower.net.socks5s;
 
+import com.flower.net.access.Access;
 import com.flower.net.access.AccessManager;
 import com.flower.net.handlers.RelayHandler;
 import com.flower.net.utils.ImmediateFuture;
@@ -112,7 +113,8 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                     .handler(new DirectClientHandler(promise));
 
             String hostname = request.dstAddr();
-            if (hostnameProhibited(hostname)) {
+            int port = request.dstPort();
+            if (hostnameProhibited(hostname, port)) {
                 LOGGER.error("DISCONNECTED {} hostname prohibited. " + hostname, getConnectionInfo(ctx));
                 ctx.channel().writeAndFlush(new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED));
                 ServerUtil.closeOnFlush(ctx.channel());
@@ -121,12 +123,12 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                     resolveFuture -> {
                         if (resolveFuture.isSuccess()) {
                             InetAddress addr = (InetAddress) resolveFuture.getNow();
-                            if (ipAddressProhibited(addr)) {
+                            if (ipAddressProhibited(addr, port)) {
                                 LOGGER.error("DISCONNECTED {} IpAddress prohibited. " + addr, getConnectionInfo(ctx));
                                 ctx.channel().writeAndFlush(new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED));
                                 ServerUtil.closeOnFlush(ctx.channel());
                             } else {
-                                b.connect(addr, request.dstPort()).addListener((ChannelFutureListener) future -> {
+                                b.connect(addr, port).addListener((ChannelFutureListener) future -> {
                                     if (future.isSuccess()) {
                                         // Connection established use handler provided results
                                     } else {
@@ -205,7 +207,8 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                     .handler(new DirectClientHandler(promise));
 
             String hostname = request.dstAddr();
-            if (hostnameProhibited(hostname)) {
+            int port = request.dstPort();
+            if (hostnameProhibited(hostname, port)) {
                 LOGGER.error("DISCONNECTED {} hostname prohibited. " + hostname, getConnectionInfo(ctx));
                 ctx.channel().writeAndFlush(
                         new DefaultSocks5CommandResponse(Socks5CommandStatus.FORBIDDEN, request.dstAddrType()));
@@ -215,13 +218,13 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                     resolveFuture -> {
                         if (resolveFuture.isSuccess()) {
                             InetAddress addr = (InetAddress) resolveFuture.getNow();
-                            if (ipAddressProhibited(addr)) {
+                            if (ipAddressProhibited(addr, port)) {
                                 LOGGER.error("DISCONNECTED {} IpAddress prohibited. " + addr, getConnectionInfo(ctx));
                                 ctx.channel().writeAndFlush(
                                         new DefaultSocks5CommandResponse(Socks5CommandStatus.FORBIDDEN, request.dstAddrType()));
                                 ServerUtil.closeOnFlush(ctx.channel());
                             } else {
-                                b.connect(addr, request.dstPort()).addListener((ChannelFutureListener) future -> {
+                                b.connect(addr, port).addListener((ChannelFutureListener) future -> {
                                     if (future.isSuccess()) {
                                         // Connection established use handler provided results
                                     } else {
@@ -286,12 +289,12 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
         }
     }
 
-    public boolean hostnameProhibited(String name) {
-        return !accessManager.isAllowed(name);
+    public boolean hostnameProhibited(String name, int port) {
+        return accessManager.accessCheck(name, port) != Access.ALLOW;
     }
 
-    public boolean ipAddressProhibited(InetAddress addr) {
-        return !accessManager.isAllowed(addr);
+    public boolean ipAddressProhibited(InetAddress addr, int port) {
+        return accessManager.accessCheck(addr, port) != Access.ALLOW;
     }
 
     @Override

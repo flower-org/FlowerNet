@@ -1,6 +1,6 @@
 package com.flower.net.socksserver;
 
-import com.flower.net.conntrack.AddressCheck;
+import com.flower.net.access.Access;
 import com.flower.net.conntrack.ConnectionFilter;
 import com.flower.net.conntrack.ConnectionInfo;
 import com.flower.net.conntrack.ConnectionId;
@@ -81,7 +81,7 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
                         ctx.channel().attr(DESTINATION_KEY).set(new Destination(socksV4CmdRequest.dstAddr(), socksV4CmdRequest.dstPort()));
                     }
 
-                    if (approveConnection(socksV4CmdRequest.dstAddr(), socksV4CmdRequest.dstPort(), ctx.channel().remoteAddress()) == AddressCheck.CONNECTION_ALLOWED) {
+                    if (approveConnection(socksV4CmdRequest.dstAddr(), socksV4CmdRequest.dstPort(), ctx.channel().remoteAddress()) == Access.ALLOW) {
                         connecting(getConnectionInfo(ctx));
 
                         ctx.pipeline().addLast(connectHandlerProvider.get());
@@ -128,7 +128,7 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
                             ctx.channel().attr(DESTINATION_KEY).set(new Destination(socks5CmdRequest.dstAddr(), socks5CmdRequest.dstPort()));
                         }
 
-                        if (approveConnection(socks5CmdRequest.dstAddr(), socks5CmdRequest.dstPort(), ctx.channel().remoteAddress()) == AddressCheck.CONNECTION_ALLOWED) {
+                        if (approveConnection(socks5CmdRequest.dstAddr(), socks5CmdRequest.dstPort(), ctx.channel().remoteAddress()) == Access.ALLOW) {
                             connecting(getConnectionInfo(ctx));
 
                             ctx.pipeline().addLast(connectHandlerProvider.get());
@@ -167,23 +167,23 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
         ServerUtil.closeOnFlush(ctx.channel());
     }
 
-    public AddressCheck approveConnection(String dstHost, int dstPort, SocketAddress from) {
+    public Access approveConnection(String dstHost, int dstPort, SocketAddress from) {
         if (!allowDirectAccessByIpAddress.get()) {
             if (IpAddressUtil.isIPAddress(dstHost)) {
                 LOGGER.error("CONNECTION_PROHIBITED: no direct IP access allowed {}:{} from {}", dstHost, dstPort, from);
-                return AddressCheck.CONNECTION_PROHIBITED;
+                return Access.DENY;
             }
         }
 
-        AddressCheck addressCheck = AddressCheck.CONNECTION_ALLOWED;
+        Access access = Access.ALLOW;
         if (connectionFilters != null) {
             for (ConnectionFilter filter : connectionFilters) {
-                if (filter.approveConnection(dstHost, dstPort, from) == AddressCheck.CONNECTION_PROHIBITED) {
-                    addressCheck = AddressCheck.CONNECTION_PROHIBITED;
+                if (filter.approveConnection(dstHost, dstPort, from) == Access.DENY) {
+                    access = Access.DENY;
                 }
             }
         }
-        return addressCheck;
+        return access;
     }
 
     @Override

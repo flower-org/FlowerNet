@@ -24,7 +24,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.flower.net.conntrack.AddressCheck.CONNECTION_PROHIBITED;
+import static com.flower.net.access.Access.DENY;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class ConnectionMonitorForm extends AnchorPane implements Refreshable, ConnectionListener {
@@ -199,7 +199,7 @@ public class ConnectionMonitorForm extends AnchorPane implements Refreshable, Co
                 Destination dest = info.connectionInfo.destination;
 
                 if (dest != null) {
-                    if (trafficControlForm.approveConnection(dest.host, dest.port, null) == CONNECTION_PROHIBITED) {
+                    if (trafficControlForm.approveConnection(dest.host, dest.port, null) == DENY) {
                         info.connectionInfo.channel.close();
                     }
                 }

@@ -1,7 +1,7 @@
 package com.flower.net.socksui.forms.traffic;
 
 import com.flower.net.conntrack.whiteblacklist.AddressFilterList;
-import com.flower.net.conntrack.whiteblacklist.FilterType;
+import com.flower.net.access.Access;
 
 import javax.annotation.Nullable;
 import java.util.Date;
@@ -34,13 +34,13 @@ public class TrafficRule {
         this.creationTimestamp = portRecord.creationTimestamp();
     }
 
-    public FilterType getFilterType() {
+    public Access getFilterType() {
         if (addressRecord != null) {
-            return addressRecord.filterType();
+            return addressRecord.access();
         } else if (hostRecord != null) {
-            return hostRecord.filterType();
+            return hostRecord.access();
         } else if (portRecord != null) {
-            return portRecord.filterType();
+            return portRecord.access();
         } else {
             throw new IllegalStateException("Either addressRecord or hostRecord or portRecord should be not null");
         }

@@ -3,6 +3,7 @@ package com.flower.net.conntrack.whiteblacklist;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.flower.net.access.Access;
 import org.immutables.value.Value;
 
 import javax.annotation.Nullable;
@@ -18,7 +19,7 @@ public interface AddressFilterList {
     @JsonDeserialize(as = ImmutableAddressRecord.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     interface AddressRecord {
-        FilterType filterType();
+        Access access();
         String dstHost();
         Integer dstPort();
         Long creationTimestamp();
@@ -28,7 +29,7 @@ public interface AddressFilterList {
             if (record1 == record2) { return true; }
             if (record1 == null || record2 == null) { return false; }
 
-            return record1.filterType().equals(record2.filterType())
+            return record1.access().equals(record2.access())
                     && record1.dstHost().equals(record2.dstHost())
                     && record1.dstPort().equals(record2.dstPort());
         }
@@ -39,7 +40,7 @@ public interface AddressFilterList {
     @JsonDeserialize(as = ImmutableHostRecord.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     interface HostRecord {
-        FilterType filterType();
+        Access access();
         String dstHost();
         Long creationTimestamp();
         Boolean isWildcard();
@@ -48,7 +49,7 @@ public interface AddressFilterList {
             if (record1 == record2) { return true; }
             if (record1 == null || record2 == null) { return false; }
 
-            return record1.filterType().equals(record2.filterType())
+            return record1.access().equals(record2.access())
                     && record1.dstHost().equals(record2.dstHost());
         }
     }
@@ -58,7 +59,7 @@ public interface AddressFilterList {
     @JsonDeserialize(as = ImmutablePortRecord.class)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     interface PortRecord {
-        FilterType filterType();
+        Access access();
         Integer dstPort();
         Long creationTimestamp();
 
@@ -66,7 +67,7 @@ public interface AddressFilterList {
             if (record1 == record2) { return true; }
             if (record1 == null || record2 == null) { return false; }
 
-            return record1.filterType().equals(record2.filterType())
+            return record1.access().equals(record2.access())
                     && record1.dstPort().equals(record2.dstPort());
         }
     }

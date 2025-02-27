@@ -15,6 +15,10 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public interface AccessConfig {
     @JsonProperty
+    @Nullable
+    Boolean directIpAccess();
+
+    @JsonProperty
     Access defaultAccess();
 
     @JsonProperty

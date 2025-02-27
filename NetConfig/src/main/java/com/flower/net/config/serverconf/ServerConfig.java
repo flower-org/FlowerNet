@@ -29,10 +29,6 @@ public interface ServerConfig {
 
     @JsonProperty
     @Nullable
-    Boolean directIpAccess();
-
-    @JsonProperty
-    @Nullable
     AccessConfig accessConfig();
 
     @JsonProperty

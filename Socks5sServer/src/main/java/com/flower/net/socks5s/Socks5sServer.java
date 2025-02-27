@@ -1,8 +1,10 @@
 package com.flower.net.socks5s;
 
 import com.flower.crypt.PkiUtil;
-import com.flower.net.access.AccessManager;
+import com.flower.net.config.access.Access;
 import com.flower.net.config.access.AccessConfig;
+import com.flower.net.config.access.AccessManager;
+import com.flower.net.config.access.ConfigAccessManager;
 import com.flower.net.config.dns.DnsServerConfig;
 import com.flower.net.config.dns.DnsType;
 import com.flower.net.config.exception.ConfigurationException;
@@ -37,7 +39,9 @@ public final class Socks5sServer {
         int port = serverConfig.port() == null ? DEFAULT_PORT : serverConfig.port();
         boolean isSocks5OverTls = serverConfig.tls() == null ? DEFAULT_IS_SOCKS5_OVER_TLS : serverConfig.tls();
         boolean allowDirectIpAccess =
-                serverConfig.directIpAccess() == null ? DEFAULT_ALLOW_DIRECT_IP_ACCESS : serverConfig.directIpAccess();
+                serverConfig.accessConfig() == null || serverConfig.accessConfig().directIpAccess() == null
+                        ? DEFAULT_ALLOW_DIRECT_IP_ACCESS
+                        : serverConfig.accessConfig().directIpAccess();
 
         AccessManager accessManager = buildAccessManager(serverConfig.accessConfig());
         DnsClient dnsClient = buildDnsClient(serverConfig.dns());
@@ -54,8 +58,15 @@ public final class Socks5sServer {
         }
     }
 
+    static AccessManager allowAll() {
+        return new AccessManager() {
+            @Override public Access accessCheck(InetAddress address, int port) { return Access.ALLOW; }
+            @Override public Access accessCheck(String name, int port) { return Access.ALLOW; }
+        };
+    }
+
     static AccessManager buildAccessManager(@Nullable AccessConfig accessConfig) {
-        return accessConfig == null ? AccessManager.allowAll() : AccessManager.of(accessConfig);
+        return accessConfig == null ? allowAll() : new ConfigAccessManager(accessConfig);
     }
 
     static DnsClient buildDnsClient(@Nullable DnsServerConfig serverNameResolution) throws SSLException, InterruptedException, FileNotFoundException {

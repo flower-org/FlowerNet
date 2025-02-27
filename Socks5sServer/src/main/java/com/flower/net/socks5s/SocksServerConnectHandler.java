@@ -16,7 +16,7 @@
 package com.flower.net.socks5s;
 
 import com.flower.net.config.access.Access;
-import com.flower.net.access.AccessManager;
+import com.flower.net.config.access.AccessManager;
 import com.flower.net.handlers.RelayHandler;
 import com.flower.net.utils.ImmediateFuture;
 import com.flower.net.utils.IpAddressUtil;

@@ -1,9 +1,6 @@
-package com.flower.net.access;
+package com.flower.net.config.access;
 
 import java.net.InetAddress;
-
-import com.flower.net.config.access.Access;
-import com.flower.net.config.access.AccessConfig;
 
 public class ConfigAccessManager implements AccessManager {
     final AccessConfig accessConfig;

@@ -16,30 +16,36 @@ import java.util.List;
 public interface Rule {
     @JsonProperty
     RuleType ruleType();
+
     @JsonProperty
     Access access();
+
+    /** Rules, format varies based on ruleType
+     * IP_ADDRESS    - ip addresses (IPv4 and IPv6)
+     *                 e.g. "192.168.1.2", "2001:4860:4860::8888"
+     * IP_RANGE      - ip address ranges (IPv4 and IPv6)
+     *                 e.g. "192.168.0.0/16", "2001:db8::/32"
+     * NAME          - names without wildcards
+     *                 e.g. "google.com", "ya.ru"
+     * NAME_WILDCARD - names with wildcards (less performant than exact NAME match)
+     *                 e.g. "*.ya.ru"
+     * PORT          - rules Must be NULL, use ports/portRanges
+     */
     @JsonProperty
     @Nullable
     List<String> rules();
+
     @JsonProperty
     @Nullable
     List<Integer> ports();
+
+    /** Dash-separated strings, e.g. "8080-8090" */
     @JsonProperty
     @Nullable
-    List<PortRange> portRanges();
+    List<String> portRanges();
 
+    /** Optional rule name */
     @JsonProperty
     @Nullable
     String ruleName();
-
-    @Value.Immutable
-    @JsonSerialize(as = ImmutablePortRange.class)
-    @JsonDeserialize(as = ImmutablePortRange.class)
-    @JsonInclude(JsonInclude.Include.NON_NULL)
-    interface PortRange {
-        @JsonProperty
-        Integer from();
-        @JsonProperty
-        Integer to();
-    }
 }

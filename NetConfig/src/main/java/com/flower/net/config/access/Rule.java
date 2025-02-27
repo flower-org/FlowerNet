@@ -27,8 +27,8 @@ public interface Rule {
      *                 e.g. "192.168.0.0/16", "2001:db8::/32"
      * NAME          - names without wildcards
      *                 e.g. "google.com", "ya.ru"
-     * NAME_WILDCARD - names with wildcards (less performant than exact NAME match)
-     *                 e.g. "*.ya.ru"
+     * NAME_WILDCARD - names with wildcards '*' and '?' (less performant than exact NAME match)
+     *                 e.g. "server-*.company.com", "node-??.datacenter.net", "host-??-*env.cloud.org", "*error*?.sys.local"
      * PORT          - rules Must be NULL, use ports/portRanges
      */
     @JsonProperty

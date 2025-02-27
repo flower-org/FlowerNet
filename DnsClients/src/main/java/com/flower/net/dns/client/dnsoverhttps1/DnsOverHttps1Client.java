@@ -69,6 +69,13 @@ public class DnsOverHttps1Client implements DnsClient {
                                long callbackExpirationTimeoutMillis, long sslHandshakeTimeoutMillis,
                                TrustManagerFactory trustManager) throws SSLException {
         this.dnsServerAddress = new InetSocketAddress(dnsServerAddress, dnsServerPort);
+
+        if (!dnsServerPathPrefix.startsWith("/")) {
+            dnsServerPathPrefix = "/" + dnsServerPathPrefix;
+        }
+        if (!dnsServerPathPrefix.endsWith("?name=")) {
+            dnsServerPathPrefix = dnsServerPathPrefix + "?name=";
+        }
         this.dnsServerPathPrefix = dnsServerPathPrefix;
         this.callbacks = new ConcurrentEvictListWithFixedTimeout<>(callbackExpirationTimeoutMillis);
 

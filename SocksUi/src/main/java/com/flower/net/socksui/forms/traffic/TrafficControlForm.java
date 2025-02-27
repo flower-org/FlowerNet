@@ -263,7 +263,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         checkNotNull(connectionMonitorForm).checkBlacklistedHosts();
     }
 
-    class CheckResult {
+    static class CheckResult {
         final Access checkResult;
         final boolean isDirectIpBlock;
         final boolean isRuleMatched;

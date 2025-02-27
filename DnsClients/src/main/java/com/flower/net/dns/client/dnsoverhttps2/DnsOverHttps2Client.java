@@ -80,6 +80,13 @@ public class DnsOverHttps2Client implements DnsClient {
                                int maxParallelConnections, int maxQueryRetryCount,
                                TrustManagerFactory trustManager) throws SSLException {
         this.dnsServerAddress = new InetSocketAddress(dnsServerAddress, dnsServerPort);
+
+        if (!dnsServerPathPrefix.startsWith("/")) {
+            dnsServerPathPrefix = "/" + dnsServerPathPrefix;
+        }
+        if (!dnsServerPathPrefix.endsWith("?name=")) {
+            dnsServerPathPrefix = dnsServerPathPrefix + "?name=";
+        }
         this.dnsServerPathPrefix = dnsServerPathPrefix;
         this.maxQueryRetryCount = maxQueryRetryCount;
         this.callbacks = new ConcurrentEvictListWithFixedTimeout<>(callbackExpirationTimeoutMillis);

@@ -17,8 +17,8 @@ import org.apache.commons.cli.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Main {
-    final static Logger LOGGER = LoggerFactory.getLogger(Main.class);
+public class Socks5sServerMain {
+    final static Logger LOGGER = LoggerFactory.getLogger(Socks5sServerMain.class);
 
     static final String CONFIG_OPTION_NAME = "config";
     static final String APP_NAME = "Sock5s server";

@@ -16,6 +16,6 @@ public class ConfigAccessManager implements AccessManager {
 
     @Override
     public Access accessCheck(String name, int port) {
-        return Access.DENY;
+        return Access.ALLOW;
     }
 }

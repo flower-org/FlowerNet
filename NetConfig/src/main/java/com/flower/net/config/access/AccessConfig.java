@@ -15,17 +15,8 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public interface AccessConfig {
     @JsonProperty
-    AccessRuleType defaultAccess();
+    Access defaultAccess();
 
     @JsonProperty
-    @Nullable List<IpRule> ipRules();
-
-    @JsonProperty
-    @Nullable List<IpRangeRule> ipRangeRules();
-
-    @JsonProperty
-    @Nullable List<NameRule> nameRules();
-
-    @JsonProperty
-    @Nullable List<NameWildcardRule> nameWildcardRules();
+    @Nullable List<Rule> accessRules();
 }

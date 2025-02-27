@@ -24,7 +24,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.flower.net.access.Access.DENY;
+import static com.flower.net.config.access.Access.DENY;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class ConnectionMonitorForm extends AnchorPane implements Refreshable, ConnectionListener {

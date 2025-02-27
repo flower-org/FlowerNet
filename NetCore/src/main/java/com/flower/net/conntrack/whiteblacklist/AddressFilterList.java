@@ -3,7 +3,7 @@ package com.flower.net.conntrack.whiteblacklist;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.flower.net.access.Access;
+import com.flower.net.config.access.Access;
 import org.immutables.value.Value;
 
 import javax.annotation.Nullable;

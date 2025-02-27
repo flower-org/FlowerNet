@@ -1,6 +1,6 @@
 package com.flower.net.conntrack.whiteblacklist;
 
-import com.flower.net.access.Access;
+import com.flower.net.config.access.Access;
 import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nullable;

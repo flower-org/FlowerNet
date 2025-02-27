@@ -1,6 +1,6 @@
 package com.flower.net.socksui.forms.traffic;
 
-import com.flower.net.access.Access;
+import com.flower.net.config.access.Access;
 
 import java.net.SocketAddress;
 import java.util.Date;

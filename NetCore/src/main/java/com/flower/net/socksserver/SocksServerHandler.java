@@ -1,6 +1,6 @@
 package com.flower.net.socksserver;
 
-import com.flower.net.access.Access;
+import com.flower.net.config.access.Access;
 import com.flower.net.conntrack.ConnectionFilter;
 import com.flower.net.conntrack.ConnectionInfo;
 import com.flower.net.conntrack.ConnectionId;

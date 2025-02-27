@@ -1,6 +1,6 @@
 package com.flower.net.socksui.forms.traffic;
 
-import com.flower.net.access.Access;
+import com.flower.net.config.access.Access;
 import com.flower.net.conntrack.whiteblacklist.ImmutableAddressRecord;
 import com.flower.net.conntrack.whiteblacklist.ImmutableHostRecord;
 import com.flower.net.conntrack.whiteblacklist.ImmutablePortRecord;
@@ -20,12 +20,13 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public abstract class RuleManager {
     final static Logger LOGGER = LoggerFactory.getLogger(RuleManager.class);
 
-    final WhitelistBlacklistConnectionFilter innerFilter;
+    final WhitelistBlacklistConnectionFilter filter;
 
-    protected RuleManager(WhitelistBlacklistConnectionFilter innerFilter) {
-        this.innerFilter = innerFilter;
+    protected RuleManager(WhitelistBlacklistConnectionFilter filter) {
+        this.filter = filter;
     }
 
+    /** Open TrafficRule dialog */
     public void newRule() {
         try {
             TrafficRuleAddDialog trafficRuleAddDialog = new TrafficRuleAddDialog();
@@ -57,6 +58,7 @@ public abstract class RuleManager {
         refreshAndRestoreCursor();
     }
 
+    /** Open TrafficRule dialog pre-filled with derived rule */
     public void deriveRule() {
         try {
             TrafficRule trafficRuleToDeriveFrom = getSelectedTrafficRule();
@@ -93,31 +95,34 @@ public abstract class RuleManager {
         refreshAndRestoreCursor();
     }
 
+    /** Add traffic rule to innerFilter */
     private void addTrafficRule(TrafficRule trafficRule) {
         if (trafficRule.addressRecord != null) {
-            innerFilter.addAddressRecord(trafficRule.addressRecord, true);
+            filter.addAddressRecord(trafficRule.addressRecord, true);
         } else if (trafficRule.hostRecord != null) {
-            innerFilter.addHostRecord(trafficRule.hostRecord, true);
+            filter.addHostRecord(trafficRule.hostRecord, true);
         } else if (trafficRule.portRecord != null) {
-            innerFilter.addPortRecord(trafficRule.portRecord, true);
+            filter.addPortRecord(trafficRule.portRecord, true);
         }
         refreshAndRestoreCursor();
     }
 
     protected String clearRulesMsg() { return "Delete all rules?"; }
 
+    /** Clear inner filter rules */
     public void clearRules() {
         if (JavaFxUtils.showYesNoDialog(clearRulesMsg()) == JavaFxUtils.YesNo.YES) {
-            innerFilter.clear();
+            filter.clear();
             refreshAndRestoreCursor();
         }
     }
 
     protected String clearWhitelistRulesMsg() { return "Delete all Whitelist rules?"; }
 
-    public void clearWhitelistTmpRules() {
+    /** Clear inner filter ALLOW rules */
+    public void clearAllowlistRules() {
         if (JavaFxUtils.showYesNoDialog(clearWhitelistRulesMsg()) == JavaFxUtils.YesNo.YES) {
-            innerFilter.clearFilterType(Access.ALLOW);
+            filter.clearFilterType(Access.ALLOW);
             refreshAndRestoreCursor();
         }
     }
@@ -126,22 +131,24 @@ public abstract class RuleManager {
         return "Delete all Blacklist rules?";
     }
 
-    public void clearBlacklistTmpRules() {
+    /** Clear inner filter DENY rules */
+    public void clearDenylistRules() {
         if (JavaFxUtils.showYesNoDialog(clearBlacklistRulesMsg()) == JavaFxUtils.YesNo.YES) {
-            innerFilter.clearFilterType(Access.DENY);
+            filter.clearFilterType(Access.DENY);
             refreshAndRestoreCursor();
         }
     }
 
+    /** Remove inner filter rule selected in UI */
     public void removeRule() {
         TrafficRule trafficRule = getSelectedTrafficRule();
         if (trafficRule != null) {
             if (trafficRule.addressRecord != null) {
-                innerFilter.removeAddressRecord(trafficRule.addressRecord);
+                filter.removeAddressRecord(trafficRule.addressRecord);
             } else if (trafficRule.hostRecord != null) {
-                innerFilter.removeHostRecord(trafficRule.hostRecord);
+                filter.removeHostRecord(trafficRule.hostRecord);
             } else if (trafficRule.portRecord != null) {
-                innerFilter.removePortRecord(trafficRule.portRecord);
+                filter.removePortRecord(trafficRule.portRecord);
             }
             checkBlacklistedHosts();
         }
@@ -157,12 +164,14 @@ public abstract class RuleManager {
         }
     }
 
+    /** Flip access type of a rule selected in UI */
     public void flipRule() {
         TrafficRule trafficRule = getSelectedTrafficRule();
         if (trafficRule != null) {
             if (trafficRule.addressRecord != null) {
+                filter.removeAddressRecord(trafficRule.addressRecord);
                 Access newAccess = flipFilterType(trafficRule.addressRecord.access());
-                innerFilter.addAddressRecord(ImmutableAddressRecord.builder()
+                filter.addAddressRecord(ImmutableAddressRecord.builder()
                                 .dstHost(trafficRule.addressRecord.dstHost())
                                 .dstPort(trafficRule.addressRecord.dstPort())
                                 .access(newAccess)
@@ -171,9 +180,9 @@ public abstract class RuleManager {
                                 .build(),
                         true);
             } else if (trafficRule.hostRecord != null) {
-                innerFilter.removeHostRecord(trafficRule.hostRecord);
+                filter.removeHostRecord(trafficRule.hostRecord);
                 Access newAccess = flipFilterType(trafficRule.hostRecord.access());
-                innerFilter.addHostRecord(ImmutableHostRecord.builder()
+                filter.addHostRecord(ImmutableHostRecord.builder()
                                 .dstHost(trafficRule.hostRecord.dstHost())
                                 .access(newAccess)
                                 .creationTimestamp(System.currentTimeMillis())
@@ -181,9 +190,9 @@ public abstract class RuleManager {
                                 .build(),
                         true);
             } else if (trafficRule.portRecord != null) {
-                innerFilter.removePortRecord(trafficRule.portRecord);
+                filter.removePortRecord(trafficRule.portRecord);
                 Access newAccess = flipFilterType(trafficRule.portRecord.access());
-                innerFilter.addPortRecord(ImmutablePortRecord.builder()
+                filter.addPortRecord(ImmutablePortRecord.builder()
                                 .dstPort(trafficRule.portRecord.dstPort())
                                 .access(newAccess)
                                 .creationTimestamp(System.currentTimeMillis())
@@ -196,6 +205,7 @@ public abstract class RuleManager {
     }
 
     abstract void refreshAndRestoreCursor();
+    /** "close on blacklist" existing connections for newly blacklisted hosts */
     abstract void checkBlacklistedHosts();
     @Nullable abstract TrafficRule getSelectedTrafficRule();
     @Nullable abstract Stage getStage();

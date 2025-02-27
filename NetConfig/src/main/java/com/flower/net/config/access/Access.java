@@ -1,4 +1,4 @@
-package com.flower.net.access;
+package com.flower.net.config.access;
 
 public enum Access {
     ALLOW,

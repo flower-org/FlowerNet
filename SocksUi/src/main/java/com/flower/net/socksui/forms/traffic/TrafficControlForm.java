@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
 import com.flower.net.conntrack.ConnectionFilter;
-import com.flower.net.access.Access;
+import com.flower.net.config.access.Access;
 import com.flower.net.conntrack.whiteblacklist.AddressFilterList;
 import com.flower.net.conntrack.whiteblacklist.ImmutableAddressRecord;
 import com.flower.net.conntrack.whiteblacklist.ImmutableHostRecord;
@@ -279,13 +279,13 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         FilterListMode filterListMode = getFilterListMode();
         Access checkResult;
         if (filterListMode == FilterListMode.MAIN) {
-            checkResult = mainRuleManager.innerFilter.getRecordRule(dstHost, dstPort);
+            checkResult = mainRuleManager.filter.getRecordRule(dstHost, dstPort);
         } else if (filterListMode == FilterListMode.TMP) {
-            checkResult = tmpRuleManager.innerFilter.getRecordRule(dstHost, dstPort);
+            checkResult = tmpRuleManager.filter.getRecordRule(dstHost, dstPort);
         } else if (filterListMode == FilterListMode.MAIN_AND_TMP) {
-            checkResult = tmpRuleManager.innerFilter.getRecordRule(dstHost, dstPort);
+            checkResult = tmpRuleManager.filter.getRecordRule(dstHost, dstPort);
             if (checkResult == null) {
-                checkResult = mainRuleManager.innerFilter.getRecordRule(dstHost, dstPort);
+                checkResult = mainRuleManager.filter.getRecordRule(dstHost, dstPort);
             }
         } else {
             throw new IllegalStateException("Unknown filter list mode");
@@ -341,7 +341,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                         .creationTimestamp(System.currentTimeMillis())
                         .isWildcard(false)
                         .build();
-                AddressRecord oldRule = tmpRuleManager.innerFilter.addAddressRecord(addressRecord, false);
+                AddressRecord oldRule = tmpRuleManager.filter.addAddressRecord(addressRecord, false);
 
                 // We need this check, because even when tmp list is inactive we still want to auto-add.
                 if (oldRule == null) {
@@ -424,11 +424,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 .creationTimestamp(System.currentTimeMillis())
                 .isWildcard(false)
                 .build();
-        AddressRecord existingRule = activeRuleManager.innerFilter.addAddressRecord(addressRecord, false);
+        AddressRecord existingRule = activeRuleManager.filter.addAddressRecord(addressRecord, false);
         if (existingRule != null && !AddressRecord.recordsEqual(existingRule, addressRecord)) {
             //Ask to reload
             if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                activeRuleManager.innerFilter.addAddressRecord(addressRecord, true);
+                activeRuleManager.filter.addAddressRecord(addressRecord, true);
             }
         }
         refreshContent();
@@ -452,11 +452,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 .creationTimestamp(System.currentTimeMillis())
                 .isWildcard(false)
                 .build();
-        AddressRecord existingRule = activeRuleManager.innerFilter.addAddressRecord(addressRecord, false);
+        AddressRecord existingRule = activeRuleManager.filter.addAddressRecord(addressRecord, false);
         if (existingRule != null && !AddressRecord.recordsEqual(existingRule, addressRecord)) {
             //Ask to reload
             if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                activeRuleManager.innerFilter.addAddressRecord(addressRecord, true);
+                activeRuleManager.filter.addAddressRecord(addressRecord, true);
             }
         }
         checkNotNull(connectionMonitorForm).checkBlacklistedHosts();
@@ -480,11 +480,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 .creationTimestamp(System.currentTimeMillis())
                 .isWildcard(false)
                 .build();
-        HostRecord existingRule = activeRuleManager.innerFilter.addHostRecord(hostRecord, false);
+        HostRecord existingRule = activeRuleManager.filter.addHostRecord(hostRecord, false);
         if (existingRule != null && !HostRecord.recordsEqual(existingRule, hostRecord)) {
             //Ask to reload
             if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                activeRuleManager.innerFilter.addHostRecord(hostRecord, true);
+                activeRuleManager.filter.addHostRecord(hostRecord, true);
             }
         }
         refreshContent();
@@ -507,11 +507,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 .creationTimestamp(System.currentTimeMillis())
                 .isWildcard(false)
                 .build();
-        HostRecord existingRule = activeRuleManager.innerFilter.addHostRecord(hostRecord, false);
+        HostRecord existingRule = activeRuleManager.filter.addHostRecord(hostRecord, false);
         if (existingRule != null && !HostRecord.recordsEqual(existingRule, hostRecord)) {
             //Ask to reload
             if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                activeRuleManager.innerFilter.addHostRecord(hostRecord, true);
+                activeRuleManager.filter.addHostRecord(hostRecord, true);
             }
         }
         checkNotNull(connectionMonitorForm).checkBlacklistedHosts();
@@ -534,11 +534,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 .access(Access.ALLOW)
                 .creationTimestamp(System.currentTimeMillis())
                 .build();
-        PortRecord existingRule = activeRuleManager.innerFilter.addPortRecord(portRecord, false);
+        PortRecord existingRule = activeRuleManager.filter.addPortRecord(portRecord, false);
         if (existingRule != null && !PortRecord.recordsEqual(existingRule, portRecord)) {
             //Ask to reload
             if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                activeRuleManager.innerFilter.addPortRecord(portRecord, true);
+                activeRuleManager.filter.addPortRecord(portRecord, true);
             }
         }
         refreshContent();
@@ -571,11 +571,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 .access(Access.DENY)
                 .creationTimestamp(System.currentTimeMillis())
                 .build();
-        PortRecord existingRule = activeRuleManager.innerFilter.addPortRecord(portRecord, false);
+        PortRecord existingRule = activeRuleManager.filter.addPortRecord(portRecord, false);
         if (existingRule != null && !PortRecord.recordsEqual(existingRule, portRecord)) {
             //Ask to reload
             if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                activeRuleManager.innerFilter.addPortRecord(portRecord, true);
+                activeRuleManager.filter.addPortRecord(portRecord, true);
             }
         }
         checkNotNull(connectionMonitorForm).checkBlacklistedHosts();
@@ -584,26 +584,26 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
     List<TrafficRule> getRulesList(RuleManager ruleManager) {
         return Streams.concat(
-                ruleManager.innerFilter.getPortRecords()
+                ruleManager.filter.getPortRecords()
                     .entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
                     .map(e -> new TrafficRule(e.getValue())),
-                ruleManager.innerFilter.getHostRecords()
+                ruleManager.filter.getHostRecords()
                     .entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
                     .map(e -> new TrafficRule(e.getValue())),
-                ruleManager.innerFilter.getAddressRecords()
+                ruleManager.filter.getAddressRecords()
                     .entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
                     .map(Map.Entry::getValue)
                     .flatMap(m -> m.entrySet().stream())
                     .sorted(Map.Entry.comparingByKey())
                     .map(e -> new TrafficRule(e.getValue())),
-                ruleManager.innerFilter.getWildcardHostRecords()
+                ruleManager.filter.getWildcardHostRecords()
                     .entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
                     .map(e -> new TrafficRule(e.getValue())),
-                ruleManager.innerFilter.getWildcardAddressRecords()
+                ruleManager.filter.getWildcardAddressRecords()
                     .entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
                     .map(Map.Entry::getValue)
@@ -626,7 +626,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         Preferences userPreferences = Preferences.userRoot();
         try {
             // Save main rules
-            AddressFilterList addressFilterList = mainRuleManager.innerFilter.getFullList();
+            AddressFilterList addressFilterList = mainRuleManager.filter.getFullList();
 
             StringWriter writer = new StringWriter();
             ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
@@ -640,7 +640,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
         try {
             // Save tmp rules
-            AddressFilterList tmpAddressFilterList = tmpRuleManager.innerFilter.getFullList();
+            AddressFilterList tmpAddressFilterList = tmpRuleManager.filter.getFullList();
 
             StringWriter writer = new StringWriter();
             ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
@@ -669,7 +669,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 if (!configFile.getName().endsWith(".rls")) {
                     configFile = new File(configFile.getPath()  + ".rls");
                 }
-                AddressFilterList addressFilterList = mainRuleManager.innerFilter.getFullList();
+                AddressFilterList addressFilterList = mainRuleManager.filter.getFullList();
 
                 ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
                         .registerModule(new GuavaModule());
@@ -700,8 +700,8 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
                 AddressFilterList addressFilterList = mapper.readValue(configFile, AddressFilterList.class);
 
-                mainRuleManager.innerFilter.clear();
-                mainRuleManager.innerFilter.addList(addressFilterList, true);
+                mainRuleManager.filter.clear();
+                mainRuleManager.filter.addList(addressFilterList, true);
             }
             refreshContent();
         } catch (Exception e) {
@@ -769,11 +769,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     }
 
     public void clearWhitelistTmpRules() {
-        tmpRuleManager.clearWhitelistTmpRules();
+        tmpRuleManager.clearAllowlistRules();
     }
 
     public void clearBlacklistTmpRules() {
-        tmpRuleManager.clearBlacklistTmpRules();
+        tmpRuleManager.clearDenylistRules();
     }
 
     public void deriveTmpRule() {
@@ -787,8 +787,8 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     public void mergeTmpRules() {
         if (JavaFxUtils.showYesNoDialog("Merge temporary filter rule list into main?") == JavaFxUtils.YesNo.YES) {
             boolean overrideExisting = false;
-            AddressFilterList tmpRuleList = tmpRuleManager.innerFilter.getFullList();
-            if (mainRuleManager.innerFilter.isListOverrideRequired(tmpRuleList)) {
+            AddressFilterList tmpRuleList = tmpRuleManager.filter.getFullList();
+            if (mainRuleManager.filter.isListOverrideRequired(tmpRuleList)) {
                 Optional<Boolean> override = shouldWeOverrideDialog("Override main?",
                         "Some rules conflict with existing rules in the main rule list. Should we override main list rules?");
                 if (override.isEmpty()) {
@@ -797,8 +797,8 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 overrideExisting = override.get();
             }
 
-            mainRuleManager.innerFilter.addList(tmpRuleList, overrideExisting);
-            tmpRuleManager.innerFilter.clear();
+            mainRuleManager.filter.addList(tmpRuleList, overrideExisting);
+            tmpRuleManager.filter.clear();
 
             checkNotNull(activateComboBox).getSelectionModel().select(0);
             checkNotNull(autoAddComboBox).getSelectionModel().select(0);

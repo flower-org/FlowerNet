@@ -1,6 +1,6 @@
 package com.flower.net.socksui.forms.traffic;
 
-import com.flower.net.access.Access;
+import com.flower.net.config.access.Access;
 
 public class CaptureFilter {
     final boolean matchedAllowed;

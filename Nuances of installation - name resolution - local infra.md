@@ -86,3 +86,31 @@ is deployed, LOCAL_NAMESERVER and LOCAL_OS, the point being that those may end u
   - However, disabling name resolution by itself won't prevent direct access to local services by IP. In order to prevent such access completely, IP range blacklists should be used. E.g., blacklisting a range will prevent both name resolution and data connections on a given range.
 
 There is a plethora of ways to determine a local nameserver address in Java, but nothing that looks like a reliable standard.
+
+More complete list of IP ranges - private, link-local, loopback, reserved, special use:
+```
+0.0.0.0/8
+10.0.0.0/8
+100.64.0.0/10
+127.0.0.0/8
+169.254.0.0/16
+172.16.0.0/12
+192.0.2.0/24
+192.168.0.0/16
+198.51.100.0/24
+203.0.113.0/24
+224.0.0.0/4
+240.0.0.0/4
+
+::/128
+::1/128
+::ffff:0:0/96
+64:ff9b::/96
+100::/64
+2001::/32
+2001:db8::/32
+2002::/16
+fc00::/7
+fe80::/10
+ff00::/8
+```

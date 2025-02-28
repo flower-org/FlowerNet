@@ -4,7 +4,7 @@ import com.flower.crypt.PkiUtil;
 import com.flower.net.config.access.Access;
 import com.flower.net.config.access.AccessConfig;
 import com.flower.net.config.access.AccessManager;
-import com.flower.net.config.access.ConfigAccessManager;
+import com.flower.net.access.ConfigAccessManager;
 import com.flower.net.config.dns.DnsServerConfig;
 import com.flower.net.config.dns.DnsType;
 import com.flower.net.config.exception.ConfigurationException;

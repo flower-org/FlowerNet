@@ -1,4 +1,4 @@
-package com.flower.net.utils;
+package com.flower.net.access;
 
 import inet.ipaddr.IPAddress;
 import inet.ipaddr.IPAddressString;
@@ -10,9 +10,10 @@ public class IpRangeChecker {
 
     public void addRange(String cidr) {
         IPAddress subnet = new IPAddressString(cidr).getAddress();
-        if (subnet != null) {
-            cidrMap.put(cidr, subnet);
+        if (subnet == null) {
+            throw new IllegalArgumentException("Invalid CIDR: " + cidr);
         }
+        cidrMap.put(cidr, subnet);
     }
 
     public void removeRange(String cidr) {

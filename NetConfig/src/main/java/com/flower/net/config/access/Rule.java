@@ -28,7 +28,7 @@ public interface Rule {
      * NAME          - names without wildcards
      *                 e.g. "google.com", "ya.ru"
      * NAME_WILDCARD - names with wildcards '*' and '?' (less performant than exact NAME match)
-     *                 e.g. "server-*.company.com", "node-??.datacenter.net", "host-??-*env.cloud.org", "*error*?.sys.local"
+     *                 e.g. "server-*.company.com", "node-??.datacenter.net", "host-??-*env.cloud.org"
      * PORT          - rules Must be NULL, use ports/portRanges
      */
     @JsonProperty

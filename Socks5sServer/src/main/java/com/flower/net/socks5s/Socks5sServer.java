@@ -28,6 +28,7 @@ import javax.net.ssl.TrustManagerFactory;
 import java.io.FileNotFoundException;
 import java.net.InetAddress;
 
+/** Launch from Socks5sServerMain.main() */
 public final class Socks5sServer {
     final static Logger LOGGER = LoggerFactory.getLogger(Socks5sServer.class);
 

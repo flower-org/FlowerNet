@@ -1,23 +1,14 @@
 package com.flower.net.access;
 
-import com.flower.net.utils.WildcardMatcher;
-
-import java.util.HashSet;
-import java.util.Set;
-
+//TODO: do we need this class?
 public class WildcardChecker {
-    private final Set<String> patterns = new HashSet<>();
+    private final WildcardTrie trie = new WildcardTrie();
 
     public void addPattern(String pattern) {
-        patterns.add(pattern);
-    }
-
-    public void removePattern(String pattern) {
-        patterns.remove(pattern);
+        trie.addPattern(pattern);
     }
 
     public boolean isMatch(String text) {
-        return patterns.stream()
-                .anyMatch(pattern -> WildcardMatcher.isMatch(text, pattern));
+        return trie.isMatch(text);
     }
 }

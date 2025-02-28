@@ -21,15 +21,6 @@ public class WildcardCheckerTest {
     }
 
     @Test
-    void testRemovePattern() {
-        checker.addPattern("test*");
-        assertTrue(checker.isMatch("test123"));
-
-        checker.removePattern("test*");
-        assertFalse(checker.isMatch("test123"));
-    }
-
-    @Test
     void testMultiplePatterns() {
         checker.addPattern("abc*");
         checker.addPattern("*xyz");

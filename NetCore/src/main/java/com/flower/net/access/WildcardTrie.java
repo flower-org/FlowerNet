@@ -36,6 +36,7 @@ public class WildcardTrie {
                 return true;
             } else {
                 if (node.children.containsKey('*')) {
+                    // traversing the possible "star tail", since star can match 0 characters
                     TrieNode starNode = checkNotNull(node.children.get('*'));
                     return isMatchRecursive(text, index, starNode);
                 } else {
@@ -46,11 +47,12 @@ public class WildcardTrie {
 
         char ch = text.charAt(index);
 
-        // Exact character match or '?'
+        // Exact character match
         if (node.children.containsKey(ch)
                 && isMatchRecursive(text, index + 1, checkNotNull(node.children.get(ch)))) {
             return true;
         }
+        // '?' - any character match
         if (node.children.containsKey('?')
                 && isMatchRecursive(text, index + 1, checkNotNull(node.children.get('?')))) {
             return true;

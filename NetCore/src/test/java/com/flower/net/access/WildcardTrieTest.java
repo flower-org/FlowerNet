@@ -65,6 +65,7 @@ class WildcardTrieTest {
         trie.addPattern("****g");
         assertTrue(trie.isMatch("anything"));
         assertTrue(trie.isMatch("gg"));
+        assertFalse(trie.isMatch(""));
     }
 
     @Test

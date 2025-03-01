@@ -5,7 +5,7 @@ import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-public class WildcardTrie {
+public class WildcardTrieChecker {
     private static class TrieNode {
         final boolean isAStar;
         Map<Character, TrieNode> children = new HashMap<>();

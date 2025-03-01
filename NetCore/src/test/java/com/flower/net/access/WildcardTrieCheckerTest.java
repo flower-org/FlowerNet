@@ -4,12 +4,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class WildcardCheckerTest {
-    private WildcardChecker checker;
+public class WildcardTrieCheckerTest {
+    private WildcardTrieChecker checker;
 
     @BeforeEach
     void setUp() {
-        checker = new WildcardChecker();
+        checker = new WildcardTrieChecker();
     }
 
     @Test

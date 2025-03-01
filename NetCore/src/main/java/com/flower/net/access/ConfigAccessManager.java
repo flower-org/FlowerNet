@@ -28,7 +28,7 @@ public class ConfigAccessManager implements AccessManager {
     protected final List<Pair<IpRangeChecker, AccessManagerRule>> ipRangeRules;
 
     protected final Multimap<String, AccessManagerRule> nameRules;
-    protected final List<Pair<WildcardChecker, AccessManagerRule>> nameWildcardRules;
+    protected final List<Pair<WildcardTrieChecker, AccessManagerRule>> nameWildcardRules;
 
     protected final Multimap<Integer, AccessManagerRule> portRules;
     protected final List<AccessManagerRule> portRangeRules;
@@ -82,11 +82,11 @@ public class ConfigAccessManager implements AccessManager {
                         if (rule.rules() == null || rule.rules().isEmpty()) {
                             throw new RuntimeException(rule.ruleType() + " rule must contain IpRange-es");
                         }
-                        WildcardChecker wildcardChecker = new WildcardChecker();
+                        WildcardTrieChecker wildcardTrieChecker = new WildcardTrieChecker();
                         for (String pattern : rule.rules()) {
-                            wildcardChecker.addPattern(pattern);
+                            wildcardTrieChecker.addPattern(pattern);
                         }
-                        nameWildcardRules.add(Pair.of(wildcardChecker, new AccessManagerRule(rule)));
+                        nameWildcardRules.add(Pair.of(wildcardTrieChecker, new AccessManagerRule(rule)));
                         break;
                     case PORT:
                         if (rule.rules() != null && !rule.rules().isEmpty()) {

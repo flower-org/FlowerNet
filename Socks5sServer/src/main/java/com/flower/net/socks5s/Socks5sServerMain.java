@@ -20,7 +20,10 @@ import org.slf4j.LoggerFactory;
 public class Socks5sServerMain {
     final static Logger LOGGER = LoggerFactory.getLogger(Socks5sServerMain.class);
 
+    static final String CONFIG_OPTION_SHORT = "c";
     static final String CONFIG_OPTION_NAME = "config";
+    static final String HELP_OPTION_SHORT = "h";
+    static final String HELP_OPTION_NAME = "help";
     static final String APP_NAME = "Sock5s server";
 
     public static void main(String[] args) {
@@ -29,33 +32,36 @@ public class Socks5sServerMain {
 
         // create the Options
         Options options = new Options();
-        options.addOption("c", CONFIG_OPTION_NAME, true, "Config file name");
+        options.addOption(CONFIG_OPTION_SHORT, CONFIG_OPTION_NAME, true, "Config file name");
+        options.addOption(HELP_OPTION_SHORT, HELP_OPTION_NAME, false, "Show help");
 
         try {
             // Parse the command line arguments
             CommandLine line = parser.parse(options, args);
 
-            if (line.hasOption(CONFIG_OPTION_NAME)) {
-                String configName = line.getOptionValue(CONFIG_OPTION_NAME);
-                ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
-                        .registerModule(new GuavaModule());
-
-                ServerConfig serverConfig;
-                File configFile = new File(configName);
-                if (configFile.exists()) {
-                    serverConfig = mapper.readValue(configFile, ServerConfig.class);
-                } else {
-                    String resourceStr = Resources.toString(Resources.getResource(configName), Charsets.UTF_8);
-                    serverConfig = mapper.readValue(resourceStr, ServerConfig.class);
-                }
-
-                Socks5sServer.run(serverConfig);
-            } else {
-                System.out.println("Please specify config name");
-
+            if (line.hasOption(HELP_OPTION_NAME)) {
                 HelpFormatter formatter = new HelpFormatter();
                 formatter.printHelp(APP_NAME, options);
+                return;
             }
+
+            String configName = "socks5s.yaml";
+            if (line.hasOption(CONFIG_OPTION_NAME)) {
+                configName = line.getOptionValue(CONFIG_OPTION_NAME);
+            }
+            ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
+                    .registerModule(new GuavaModule());
+
+            ServerConfig serverConfig;
+            File configFile = new File(configName);
+            if (configFile.exists()) {
+                serverConfig = mapper.readValue(configFile, ServerConfig.class);
+            } else {
+                String resourceStr = Resources.toString(Resources.getResource(configName), Charsets.UTF_8);
+                serverConfig = mapper.readValue(resourceStr, ServerConfig.class);
+            }
+
+            Socks5sServer.run(serverConfig);
         } catch (ParseException pe) {
             System.out.println("Argument parsing error: " + pe.getMessage());
 

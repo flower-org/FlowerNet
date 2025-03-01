@@ -128,7 +128,7 @@ public class ConfigAccessManager implements AccessManager {
         }
 
         List<AccessManagerRule> matchRules = ipRangeRules
-                .stream().filter(r -> r.getLeft().isIpInRange(address.getHostAddress()))
+                .stream().filter(r -> r.getLeft().isIpInRange(address))
                 .map(Pair::getRight)
                 .toList();
 

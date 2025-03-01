@@ -35,6 +35,12 @@ accessConfig:
         - "fc00::/7"
         - "fe80::/10"
         - "ff00::/8"
+    - ruleName: "GKE inner ranges"
+      ruleType: IP_RANGE
+      access: DENY
+      rules:
+        - "10.115.128.0/17"
+        - "34.118.224.0/20"
 dns:
   dnsType: DNS_HTTPS_2
   host: "1.1.1.1"

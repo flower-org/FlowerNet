@@ -32,6 +32,7 @@ public final class SocksChainServer {
     public static void main(String[] args) throws Exception {
         boolean isSocks5OverTls = TLS;
         int port = PORT;
+        String bindToIp = null;
         if (args.length > 0) {
             isSocks5OverTls = Boolean.parseBoolean(args[0]);
         }
@@ -44,12 +45,13 @@ public final class SocksChainServer {
                 () -> new SocksChainServerConnectHandler(HARDCODED_CHAIN_PROVIDER));
         try {
             LOGGER.info("Starting on port {} TLS: {}", port, isSocks5OverTls);
-            server.startServer(port, sslCtx)
+            server.startServer(port, bindToIp, sslCtx)
                     .sync().channel().closeFuture().sync();
         } finally {
             server.shutdownServer();
         }
     }
+
     public static SslContext buildSslContext() throws SSLException {
         return FlowerSslContextBuilder.buildSslContext(
                 checkNotNull(PkiUtil.getKeyManagerFromResources("socks5s_server.crt",

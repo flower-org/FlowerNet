@@ -37,6 +37,7 @@ public final class Socks5sServer {
     static final boolean DEFAULT_ALLOW_DIRECT_IP_ACCESS = true;
 
     public static void run(ServerConfig serverConfig) throws Exception {
+        String bindToIp = serverConfig.bindToIp();
         int port = serverConfig.port() == null ? DEFAULT_PORT : serverConfig.port();
         boolean isSocks5OverTls = serverConfig.tls() == null ? DEFAULT_IS_SOCKS5_OVER_TLS : serverConfig.tls();
         boolean allowDirectIpAccess =
@@ -51,8 +52,8 @@ public final class Socks5sServer {
         SocksServer server = new SocksServer(() -> allowDirectIpAccess,
                 () -> new SocksServerConnectHandler(accessManager, dnsClient));
         try {
-            LOGGER.info("Starting on port {} TLS: {}", port, isSocks5OverTls);
-            server.startServer(port, sslCtx)
+            LOGGER.info("Starting on port {} bindToIp {} TLS: {}", port, bindToIp, isSocks5OverTls);
+            server.startServer(port, bindToIp, sslCtx)
                     .sync().channel().closeFuture().sync();
         } finally {
             server.shutdownServer();

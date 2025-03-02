@@ -131,6 +131,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
             if (!isStarted) {
                 String portStr = checkNotNull(portTextField).textProperty().get();
                 int port;
+                String bindToIp = null;
                 try {
                     port = Integer.parseInt(portStr);
                 } catch (Exception e) {
@@ -143,7 +144,8 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
                     return;
                 }
 
-                checkNotNull(server).startServer(port, null).sync();
+                // TODO: bind to IP setting ?
+                checkNotNull(server).startServer(port, bindToIp, null).sync();
                 mainApp.setStatusText("Server started on port " + port);
                 isStarted = true;
             }

@@ -60,7 +60,7 @@ public final class SocksServer {
         connectionListeners.remove(listener);
     }
 
-    public ChannelFuture startServer(int port, @Nullable SslContext sslCtx) {
+    public ChannelFuture startServer(int port, @Nullable String boundIpAddr, @Nullable SslContext sslCtx) {
         bossGroup = new NioEventLoopGroup(1);
         workerGroup = new NioEventLoopGroup();
 
@@ -70,6 +70,10 @@ public final class SocksServer {
             //.handler(new LoggingHandler(LogLevel.INFO))
             .childHandler(new SocksServerInitializer(connectHandlerProvider, allowDirectAccessByIpAddress, sslCtx,
                     connectionFilters, connectionListeners));
-        return b.bind(port);
+        if (boundIpAddr == null) {
+            return b.bind(port);
+        } else {
+            return b.bind(boundIpAddr, port);
+        }
     }
 }

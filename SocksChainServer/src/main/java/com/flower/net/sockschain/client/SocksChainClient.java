@@ -188,8 +188,10 @@ public class SocksChainClient {
             //We have next proxy node in the chain to connect to.
             SocksNode nextNode = socksProxyChain.get(nodeIndex.get() + 1);
             if (currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5 || currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5s) {
+                boolean isTls = currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5s;
+                SslContext sslContext = isTls ? sslCtx(currentNode) : null;
                 SocksChainClientPipelineManager.initSocks5Pipeline(outgoingChannel(), nextNode.serverAddress(),
-                        nextNode.serverPort(), this, sslCtx(currentNode), future -> {
+                        nextNode.serverPort(), this, sslContext, future -> {
                     //System.out.println("HANDSHAKE DONE! PROXY");
                     outgoingChannel().writeAndFlush(new DefaultSocks5InitialRequest(Socks5AuthMethod.NO_AUTH));
                 });
@@ -202,9 +204,11 @@ public class SocksChainClient {
             //Chain's completed, connect to the endpoint.
             if (currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5 || currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5s) {
                 if (inboundMessage instanceof Socks5CommandRequest) {
+                    boolean isTls = currentNode.socksProtocolVersion() == SocksProtocolVersion.SOCKS5s;
+                    SslContext sslContext = isTls ? sslCtx(currentNode) : null;
                     Socks5CommandRequest socks5Request = (Socks5CommandRequest) inboundMessage;
                     SocksChainClientPipelineManager.initSocks5Pipeline(outgoingChannel(), socks5Request.dstAddr(),
-                            socks5Request.dstPort(), this, sslCtx(currentNode), future -> {
+                            socks5Request.dstPort(), this, sslContext, future -> {
                         //System.out.println("HANDSHAKE DONE! ENDPOINT");
                         outgoingChannel().writeAndFlush(new DefaultSocks5InitialRequest(Socks5AuthMethod.NO_AUTH));
                     });

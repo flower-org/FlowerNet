@@ -30,9 +30,9 @@
                   <Button mnemonicParsing="false" onAction="#notImplemented" text="Generate iptables" />
                   <Separator orientation="VERTICAL" prefHeight="200.0" />
                   <Label text="IP:" />
-                  <TextField fx:id="bindServerToIpTextField" prefWidth="120.0" promptText="Server IP" />
+                  <TextField fx:id="bindServerToIpTextField" onKeyTyped="#ipBindingsUpdated" prefWidth="120.0" promptText="Server IP" />
                   <Label text="Client IP:" />
-                  <TextField fx:id="bindClientToIpTextField" prefWidth="120.0" promptText="Client IP" />
+                  <TextField fx:id="bindClientToIpTextField" onKeyTyped="#ipBindingsUpdated" prefWidth="120.0" promptText="Client IP" />
                </items>
             </ToolBar>
          </children>

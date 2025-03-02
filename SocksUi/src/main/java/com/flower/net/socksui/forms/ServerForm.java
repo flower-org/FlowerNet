@@ -49,6 +49,8 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
     final static Logger LOGGER = LoggerFactory.getLogger(ServerForm.class);
 
     final static String PROXY_CHAIN_AND_SERVERS_PREF = "proxyChainAndServersPref";
+    final static String BIND_SERVER_TO_IP = "bindServerToIp";
+    final static String BIND_CLIENT_TO_IP = "bindClientToIp";
 
     final ReentrantLock startLock;
     final MainApp mainApp;
@@ -113,6 +115,12 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
             socksChain.clear();
             socksChain.addAll(chainConfiguration.proxyChain().stream().map(FXSocksNode::new).toList());
             checkNotNull(socksChainTable).itemsProperty().set(socksChain);
+
+            String bindToIp = userPreferences.get(BIND_SERVER_TO_IP, "");
+            String bindClientToIp = userPreferences.get(BIND_CLIENT_TO_IP, "");
+
+            checkNotNull(bindServerToIpTextField).textProperty().set(bindToIp);
+            checkNotNull(bindClientToIpTextField).textProperty().set(bindClientToIp);
         } catch (Exception e) {
             LOGGER.error("Error loading ProxyChains and Servers from UserPreferences", e);
         }
@@ -381,6 +389,12 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
         } catch (Exception e) {
             LOGGER.error("Error saving ProxyChains and Servers to UserPreferences", e);
         }
+    }
+
+    public void ipBindingsUpdated() {
+        Preferences userPreferences = Preferences.userRoot();
+        userPreferences.put(BIND_SERVER_TO_IP, getBindToIp());
+        userPreferences.put(BIND_CLIENT_TO_IP, getBindClientToIp());
     }
 
     public void notImplemented() {

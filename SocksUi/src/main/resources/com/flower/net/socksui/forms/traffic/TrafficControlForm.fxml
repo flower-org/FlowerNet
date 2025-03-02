@@ -27,12 +27,11 @@
             <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                <items>
                   <Label text="Filtering mode:" />
-                   <ComboBox fx:id="filteringModeComboBox" value="Allow" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="24.0" AnchorPane.rightAnchor="24.0" AnchorPane.topAnchor="10.0">
+                   <ComboBox fx:id="filteringModeComboBox" value="Deny" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="24.0" AnchorPane.rightAnchor="24.0" AnchorPane.topAnchor="10.0">
                        <items>
                            <FXCollections fx:factory="observableArrayList">
                                <String fx:value="Allow" />
                                <String fx:value="Deny" />
-                               <String fx:value="Off" />
                            </FXCollections>
                        </items>
                    </ComboBox>

@@ -51,7 +51,6 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     final static String TMP_TRAFFIC_RULES_PREF = "tmpTrafficRulesPref";
     final static String CAPTURE_FLAG_PREF = "captureFlagPref";
 
-    final static String OFF = "Off";
     final static String ALLOW = "Allow";
     final static String DENY = "Deny";
 
@@ -229,19 +228,12 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         }
     }
 
-    public enum TrafficControlType {
-        ALLOW,
-        DENY,
-        OFF
-    }
-
-    public TrafficControlType getTrafficControlType() {
+    public Access getDefaultAccessType() {
         String modeStr = checkNotNull(filteringModeComboBox).getSelectionModel().getSelectedItem();
         switch (modeStr) {
-            case OFF: return TrafficControlType.OFF;
-            case DENY: return TrafficControlType.DENY;
+            case DENY: return Access.DENY;
             case ALLOW:
-            default: return TrafficControlType.ALLOW;
+            default: return Access.ALLOW;
         }
     }
 
@@ -294,33 +286,18 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         boolean isDirectIpBlock = false;
         boolean isRuleMatched;
 
-        TrafficControlType trafficControlType = getTrafficControlType();
-        if (trafficControlType == TrafficControlType.OFF) {
-            // If filtering is off, we allow all connections
+        Access defaultAccessType = getDefaultAccessType();
+        boolean isDirectIpAccessAllowed = checkNotNull(allowDirectIpAccessCheckBox).selectedProperty().get();
+        if (!isDirectIpAccessAllowed && IpAddressUtil.isIPAddress(dstHost)) {
+            isDirectIpBlock = true;
             isRuleMatched = false;
-            checkResult = Access.ALLOW;
+            checkResult = Access.DENY;
         } else {
-            boolean isDirectIpAccessAllowed = checkNotNull(allowDirectIpAccessCheckBox).selectedProperty().get();
-            if (!isDirectIpAccessAllowed && IpAddressUtil.isIPAddress(dstHost)) {
-                isDirectIpBlock = true;
+            isRuleMatched = true;
+            // If matching record not found, we fall back to defaultAccessType
+            if (checkResult == null) {
                 isRuleMatched = false;
-                checkResult = Access.DENY;
-            } else if (trafficControlType == TrafficControlType.ALLOW) {
-                isRuleMatched = true;
-                // If matching record not found, we prohibit anything that's not allowed
-                if (checkResult == null) {
-                    isRuleMatched = false;
-                    checkResult = Access.DENY;
-                }
-            } else if (trafficControlType == TrafficControlType.DENY) {
-                isRuleMatched = true;
-                // If matching records not found, we allow everything that's not denied
-                if (checkResult == null) {
-                    isRuleMatched = false;
-                    checkResult = Access.ALLOW;
-                }
-            } else {
-                throw new IllegalArgumentException("Unknown traffic control type: " + trafficControlType);
+                checkResult = defaultAccessType;
             }
         }
 

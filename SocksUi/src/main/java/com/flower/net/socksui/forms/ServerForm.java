@@ -405,7 +405,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
         return socksChain.stream().map(fx -> (SocksNode)fx).toList();
     }
 
-    public void saveConfigToFile() throws IOException {
+    public void saveConfigToFile() {
         try {
             FileChooser fileChooser = new FileChooser();
             fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Proxy chain config file (*.chn)", "*.chn"));
@@ -436,7 +436,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
         }
     }
 
-    public void loadConfigFromFile() throws IOException {
+    public void loadConfigFromFile() {
         try {
             FileChooser fileChooser = new FileChooser();
             fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Proxy chain config file (*.chn)", "*.chn"));

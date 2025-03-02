@@ -13,6 +13,7 @@ import com.flower.net.socksui.MainApp;
 import com.flower.net.socksui.ModalWindow;
 import com.flower.net.config.chainconf.ChainConfiguration;
 import com.flower.net.config.chainconf.ImmutableChainConfiguration;
+import com.flower.net.utils.IpAddressUtil;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -58,6 +59,8 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
     @Nullable @FXML TextField portTextField;
     @Nullable @FXML TextField serverNumberTextField;
     @Nullable @FXML CheckBox uniqueServersCheckBox;
+    @Nullable @FXML TextField bindServerToIpTextField;
+    @Nullable @FXML TextField bindClientToIpTextField;
 
     @Nullable Stage stage;
     SocksServer server;
@@ -126,13 +129,21 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
     }
 
     @Nullable String getBindToIp() {
-        // TODO: bindToIp
-        return null;
+        String ip = checkNotNull(bindServerToIpTextField).textProperty().get();
+        if (IpAddressUtil.isIPAddress(ip)) {
+            return ip;
+        } else {
+            return null;
+        }
     }
 
     @Nullable String getBindClientToIp() {
-        // TODO: bindClientToIp
-        return null;
+        String ip = checkNotNull(bindClientToIpTextField).textProperty().get();
+        if (IpAddressUtil.isIPAddress(ip)) {
+            return ip;
+        } else {
+            return null;
+        }
     }
 
     public void startServer() throws InterruptedException {

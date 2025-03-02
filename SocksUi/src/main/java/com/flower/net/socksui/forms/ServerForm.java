@@ -87,8 +87,8 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
         }
 
         // We allow direct IPs on server side since we control that in TrafficControlForm, which implements filter
-        server = new SocksServer(() -> true,
-                () -> new SocksChainServerConnectHandler(this));
+        server = new SocksServer(() -> true, () -> new SocksChainServerConnectHandler(
+                this, this::getBindClientToIp));
 
         knownServers = FXCollections.observableArrayList();
         checkNotNull(knownServersTable).itemsProperty().set(knownServers);
@@ -125,13 +125,23 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
         server.addConnectionListener(connectionListener);
     }
 
+    @Nullable String getBindToIp() {
+        // TODO: bindToIp
+        return null;
+    }
+
+    @Nullable String getBindClientToIp() {
+        // TODO: bindClientToIp
+        return null;
+    }
+
     public void startServer() throws InterruptedException {
         try {
             startLock.lock();
             if (!isStarted) {
                 String portStr = checkNotNull(portTextField).textProperty().get();
                 int port;
-                String bindToIp = null;
+                String bindToIp = getBindToIp();
                 try {
                     port = Integer.parseInt(portStr);
                 } catch (Exception e) {

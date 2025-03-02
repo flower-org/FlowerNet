@@ -8,11 +8,14 @@ import com.flower.net.utils.evictlist.MutableEvictLinkedNode;
 import com.flower.net.utils.evictlist.MutableEvictNode;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.util.concurrent.DefaultPromise;
 import io.netty.util.concurrent.Promise;
 
+import javax.annotation.Nullable;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -28,12 +31,14 @@ public class AggressiveChannelPool implements ChannelPool {
     protected final Bootstrap bootstrap;
     protected final InetAddress connectAddress;
     protected final int connectPort;
+    @Nullable protected final String bindClientToIp;
 
-    public AggressiveChannelPool(Bootstrap bootstrap, InetAddress connectAddress, int connectPort, int maxChannels) {
+    public AggressiveChannelPool(Bootstrap bootstrap, InetAddress connectAddress, int connectPort, int maxChannels, @Nullable String bindClientToIp) {
         this.maxChannels = maxChannels;
         this.bootstrap = bootstrap;
         this.connectAddress = connectAddress;
         this.connectPort = connectPort;
+        this.bindClientToIp = bindClientToIp;
 
         // Custom eviction list for channels
         this.channels = new ConcurrentEvictList<>() {
@@ -59,7 +64,14 @@ public class AggressiveChannelPool implements ChannelPool {
             if (giveChannelPromise()) {
                 // 1. Aggressive approach - if we can create more channels, create more
                 Promise<EvictLinkedNode<Channel>> channelPromise = new DefaultPromise<>(bootstrap.config().group().next());
-                bootstrap.connect(connectAddress, connectPort).addListener(
+                ChannelFuture connectFuture;
+                if (bindClientToIp == null) {
+                    connectFuture = bootstrap.connect(connectAddress, connectPort);
+                } else {
+                    connectFuture = bootstrap.connect(new InetSocketAddress(connectAddress, connectPort),
+                            new InetSocketAddress(bindClientToIp, 0));
+                }
+                connectFuture.addListener(
                     (ChannelFutureListener) channelFuture -> {
                         if (channelFuture.isSuccess()) {
                             channelPromise.setSuccess(addChannel(channelFuture.channel()));

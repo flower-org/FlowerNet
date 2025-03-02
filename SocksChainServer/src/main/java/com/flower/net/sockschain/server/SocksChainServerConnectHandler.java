@@ -23,21 +23,26 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.socksx.SocksMessage;
 
+import javax.annotation.Nullable;
 import javax.net.ssl.SSLException;
+import java.util.function.Supplier;
 
 @ChannelHandler.Sharable
 public final class SocksChainServerConnectHandler extends SimpleChannelInboundHandler<SocksMessage> {
     final ProxyChainProvider proxyChainProvider;
+    @Nullable private final Supplier<String> bindClientToIp;
 
-    public SocksChainServerConnectHandler(ProxyChainProvider proxyChainProvider) {
+    public SocksChainServerConnectHandler(ProxyChainProvider proxyChainProvider, @Nullable Supplier<String> bindClientToIp) {
         this.proxyChainProvider = proxyChainProvider;
+        this.bindClientToIp = bindClientToIp;
     }
 
     @Override
     public void channelRead0(final ChannelHandlerContext ctx, final SocksMessage message) throws SSLException {
         ctx.pipeline().remove(SocksChainServerConnectHandler.this);
         // TODO: is it excessive to create a new client every time?
-        new SocksChainClient(ctx, message, proxyChainProvider.getProxyChain()).connectChain();
+        new SocksChainClient(ctx, message, proxyChainProvider.getProxyChain(),
+                bindClientToIp == null ? null : bindClientToIp.get()).connectChain();
     }
 
     @Override

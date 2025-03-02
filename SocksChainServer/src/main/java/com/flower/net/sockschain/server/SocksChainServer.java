@@ -33,6 +33,7 @@ public final class SocksChainServer {
         boolean isSocks5OverTls = TLS;
         int port = PORT;
         String bindToIp = null;
+        String bindClientToIp = null;
         if (args.length > 0) {
             isSocks5OverTls = Boolean.parseBoolean(args[0]);
         }
@@ -42,7 +43,7 @@ public final class SocksChainServer {
         SslContext sslCtx = isSocks5OverTls ? buildSslContext() : null;
 
         SocksServer server = new SocksServer(() -> ALLOW_DIRECT_IP_ACCESS,
-                () -> new SocksChainServerConnectHandler(HARDCODED_CHAIN_PROVIDER));
+                () -> new SocksChainServerConnectHandler(HARDCODED_CHAIN_PROVIDER, () -> bindClientToIp));
         try {
             LOGGER.info("Starting on port {} TLS: {}", port, isSocks5OverTls);
             server.startServer(port, bindToIp, sslCtx)

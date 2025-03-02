@@ -64,16 +64,17 @@ public class DnsOverTlsClient implements DnsClient {
     private final EventLoopGroup group;
     private final SslContext sslCtx;
     private final Bootstrap bootstrap;
+    @Nullable protected final String bindClientToIp;
 
-    public DnsOverTlsClient(InetAddress dnsServerAddress, int dnsServerPort, TrustManagerFactory trustManager) throws SSLException {
+    public DnsOverTlsClient(InetAddress dnsServerAddress, int dnsServerPort, TrustManagerFactory trustManager, @Nullable String bindClientToIp) throws SSLException {
         this(dnsServerAddress, dnsServerPort, trustManager, DEFAULT_SSL_HANDSHAKE_TIMEOUT_MILLIS,
                 DEFAULT_CALLBACK_EXPIRATION_TIMEOUT_MILLIS, DEFAULT_MAX_PARALLEL_CONNECTIONS,
-                DEFAULT_MAX_QUERY_RETRY_COUNT);
+                DEFAULT_MAX_QUERY_RETRY_COUNT, bindClientToIp);
     }
 
     public DnsOverTlsClient(InetAddress dnsServerAddress, int dnsServerPort, TrustManagerFactory trustManager,
                             long sslHandshakeTimeoutMillis, long callbackExpirationTimeoutMillis,
-                            int maxParallelConnections, int maxQueryRetryCount) throws SSLException {
+                            int maxParallelConnections, int maxQueryRetryCount, @Nullable String bindClientToIp) throws SSLException {
         this.maxQueryRetryCount = maxQueryRetryCount;
         this.callbacks = new ConcurrentEvictListWithFixedTimeout<>(callbackExpirationTimeoutMillis);
 
@@ -84,6 +85,7 @@ public class DnsOverTlsClient implements DnsClient {
                 .ciphers(TLS_CIPHERS)
                 .trustManager(trustManager)
                 .build();
+        this.bindClientToIp = bindClientToIp;
 
         group = new NioEventLoopGroup();
         bootstrap = new Bootstrap();
@@ -127,7 +129,7 @@ public class DnsOverTlsClient implements DnsClient {
                     });
                 }
             });
-        this.channelPool = new AggressiveChannelPool(bootstrap, dnsServerAddress, dnsServerPort, maxParallelConnections);
+        this.channelPool = new AggressiveChannelPool(bootstrap, dnsServerAddress, dnsServerPort, maxParallelConnections, bindClientToIp);
     }
 
     @Override

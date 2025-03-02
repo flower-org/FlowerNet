@@ -36,6 +36,7 @@ import javax.net.ssl.TrustManagerFactory;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.security.KeyStore;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -51,7 +52,8 @@ public class SocksChainClient {
     private final static Cache<SocksNode, TrustManagerFactory> TRUST_MANAGER_CACHE = Caffeine.newBuilder()
                 .maximumSize(TRUST_MANAGER_CACHE_CAPACITY)
                 .build();
-    
+
+    @Nullable private final String bindClientToIp;
     private final ChannelHandlerContext inboundCtx;
     private final Channel inboundChannel;
     private final SocksMessage inboundMessage;
@@ -116,7 +118,8 @@ public class SocksChainClient {
         throw new RuntimeException("Certificate File config not found");
     }
 
-    public SocksChainClient(final ChannelHandlerContext inboundCtx, final SocksMessage inboundMessage, List<SocksNode> socksProxyChain) {
+    public SocksChainClient(final ChannelHandlerContext inboundCtx, final SocksMessage inboundMessage, List<SocksNode> socksProxyChain, @Nullable String bindClientToIp) {
+        this.bindClientToIp = bindClientToIp;
         this.inboundCtx = inboundCtx;
         this.inboundChannel = inboundCtx.channel();
         this.inboundMessage = inboundMessage;
@@ -163,7 +166,15 @@ public class SocksChainClient {
         // Chicken and egg problem of sorts. We can manually resolve IPs in UI via one of Socks+ servers or via specified DNS.
         // But it has to be manual, no automatic resolution.
         InetAddress address = IpAddressUtil.fromString(entryNode.serverAddress());
-        b.connect(address, entryNode.serverPort()).addListener((ChannelFutureListener) future -> {
+
+        ChannelFuture connectFuture;
+        if (bindClientToIp == null) {
+            connectFuture = b.connect(address, entryNode.serverPort());
+        } else {
+            connectFuture = b.connect(new InetSocketAddress(address, entryNode.serverPort()),
+                    new InetSocketAddress(bindClientToIp, 0));
+        }
+        connectFuture.addListener((ChannelFutureListener) future -> {
             if (future.isSuccess()) {
                 // Connection established, send initial request
                 outgoingChannel.set(future.channel());

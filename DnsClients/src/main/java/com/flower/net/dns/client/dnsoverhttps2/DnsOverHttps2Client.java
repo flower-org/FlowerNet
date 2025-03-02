@@ -67,18 +67,20 @@ public class DnsOverHttps2Client implements DnsClient {
     private final String dnsServerPathPrefix;
     private final ChannelPool channelPool;
     private final int maxQueryRetryCount;
+    @Nullable protected final String bindClientToIp;
 
     public DnsOverHttps2Client(InetAddress dnsServerAddress, int dnsServerPort, String dnsServerPathPrefix,
-                               TrustManagerFactory trustManager) throws SSLException {
+                               TrustManagerFactory trustManager, @Nullable String bindClientToIp) throws SSLException {
         this(dnsServerAddress, dnsServerPort, dnsServerPathPrefix, DEFAULT_CALLBACK_EXPIRATION_TIMEOUT_MILLIS,
                 DEFAULT_SSL_HANDSHAKE_TIMEOUT_MILLIS, DEFAULT_MAX_PARALLEL_CONNECTIONS, DEFAULT_MAX_QUERY_RETRY_COUNT,
-                trustManager);
+                trustManager, bindClientToIp);
     }
 
     public DnsOverHttps2Client(InetAddress dnsServerAddress, int dnsServerPort, String dnsServerPathPrefix,
                                long callbackExpirationTimeoutMillis, long sslHandshakeTimeoutMillis,
                                int maxParallelConnections, int maxQueryRetryCount,
-                               TrustManagerFactory trustManager) throws SSLException {
+                               TrustManagerFactory trustManager, @Nullable String bindClientToIp) throws SSLException {
+        this.bindClientToIp = bindClientToIp;
         this.dnsServerAddress = new InetSocketAddress(dnsServerAddress, dnsServerPort);
 
         if (!dnsServerPathPrefix.startsWith("/")) {
@@ -129,7 +131,7 @@ public class DnsOverHttps2Client implements DnsClient {
                             //LOGGER.info("Resolved by chn {} - {}", ctx.channel(), resp);
                         }
                     }));
-        this.channelPool = new AggressiveChannelPool(bootstrap, dnsServerAddress, dnsServerPort, maxParallelConnections);
+        this.channelPool = new AggressiveChannelPool(bootstrap, dnsServerAddress, dnsServerPort, maxParallelConnections, bindClientToIp);
     }
 
     @Override

@@ -30,7 +30,7 @@ public final class DnsOverTlsViaSocksClientTest {
 
     public static void main(String[] args) throws Exception {
         DnsOverTlsClient client = new DnsOverTlsClient(SOCKS_SERVER_ADDRESS, SOCKS_SERVER_PORT,
-                DNS_SERVER_ADDRESS, DNS_SERVER_PORT, TRUST_MANAGER, false);
+                DNS_SERVER_ADDRESS, DNS_SERVER_PORT, TRUST_MANAGER, false, null);
 
         int randomID = new Random().nextInt(60000 - 1000) + 1000;
         DnsQuery query = new DefaultDnsQuery(randomID, DnsOpCode.QUERY)

@@ -5,12 +5,15 @@ import com.flower.net.dns.dotclient.DnsOverTlsClient;
 import com.flower.net.utils.evictlist.EvictLinkedNode;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.socksx.v5.*;
 import io.netty.util.concurrent.*;
 
+import javax.annotation.Nullable;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 
 /**
  * Aggressively creates as many channels as it can until reaches `maxChannels`.
@@ -25,8 +28,9 @@ public class AggressiveViaSocksChannelPool extends AggressiveChannelPool {
                                          InetAddress connectAddress, int connectPort,
                                          String dotServerHost, int dotServerPort,
                                          DnsOverTlsClient dnsClient,
-                                         int maxChannels) {
-        super(bootstrap, connectAddress, connectPort, maxChannels);
+                                         int maxChannels,
+                                         @Nullable String bindClientToIp) {
+        super(bootstrap, connectAddress, connectPort, maxChannels,bindClientToIp);
         this.dotServerHost = dotServerHost;
         this.dotServerPort = dotServerPort;
         this.dnsClient = dnsClient;
@@ -38,7 +42,14 @@ public class AggressiveViaSocksChannelPool extends AggressiveChannelPool {
             if (giveChannelPromise()) {
                 // 1. Aggressive approach - if we can create more channels, create more
                 Promise<EvictLinkedNode<Channel>> outgoingChannelPromise = new DefaultPromise<>(bootstrap.config().group().next());
-                bootstrap.connect(connectAddress, connectPort).addListener((ChannelFutureListener) connectFuture -> {
+                ChannelFuture connectFuture0;
+                if (bindClientToIp == null) {
+                    connectFuture0 = bootstrap.connect(connectAddress, connectPort);
+                } else {
+                    connectFuture0 = bootstrap.connect(new InetSocketAddress(connectAddress, connectPort),
+                            new InetSocketAddress(bindClientToIp, 0));
+                }
+                connectFuture0.addListener((ChannelFutureListener) connectFuture -> {
                     if (connectFuture.isSuccess()) {
                         // Connection established, send initial request
                         tunnelConnection(connectFuture.channel(), dotServerHost, dotServerPort, dnsClient,

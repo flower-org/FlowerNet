@@ -58,6 +58,7 @@ public class DnsOverTlsClient {
     @Nullable private final Integer socksServerPort;
     private final InetAddress dnsServerAddress;
     private final int dnsServerPort;
+    @Nullable protected final String bindClientToIp;
 
     private final EventLoopGroup group;
     private final Bootstrap bootstrap;
@@ -71,13 +72,14 @@ public class DnsOverTlsClient {
     private final SslContext sslCtx;
 
     public DnsOverTlsClient(String socksServerHost, int socksServerPort,
-                                    String dnsServerHost, int dnsServerPort,
-                                    TrustManagerFactory trustManager, boolean useCache) throws SSLException {
+                            String dnsServerHost, int dnsServerPort,
+                            TrustManagerFactory trustManager, boolean useCache, @Nullable String bindClientToIp) throws SSLException {
         this.socksServerAddress = ServerUtil.getByName(socksServerHost);
         this.socksServerPort = socksServerPort;
 
         this.dnsServerAddress = ServerUtil.getByName(dnsServerHost);
         this.dnsServerPort = dnsServerPort;
+        this.bindClientToIp = bindClientToIp;
 
         this.callbacks = new ConcurrentEvictListWithFixedTimeout<>(CALLBACK_EXPIRATION_TIMEOUT);
 
@@ -101,14 +103,17 @@ public class DnsOverTlsClient {
         this.channelPool = new AggressiveViaSocksChannelPool(bootstrap, socksServerAddress, socksServerPort,
                 dnsServerHost, dnsServerPort,
                 this,
-                MAX_PARALLEL_CHANNELS);
+                MAX_PARALLEL_CHANNELS,
+                bindClientToIp);
 
         this.useCache = useCache;
         if (useCache) { cache = new AnswerCache(); }
                 else  { cache = null; }
     }
 
-    public DnsOverTlsClient(String dnsServerHost, int dnsServerPort, TrustManagerFactory trustManager, boolean useCache) throws SSLException {
+    public DnsOverTlsClient(String dnsServerHost, int dnsServerPort, TrustManagerFactory trustManager, boolean useCache,
+                            @Nullable String bindClientToIp) throws SSLException {
+        this.bindClientToIp = bindClientToIp;
         this.socksServerAddress = null;
         this.socksServerPort = null;
         this.dnsServerAddress = ServerUtil.getByName(dnsServerHost);
@@ -167,7 +172,7 @@ public class DnsOverTlsClient {
                     });
                 }
             });
-        this.channelPool = new AggressiveChannelPool(bootstrap, dnsServerAddress, dnsServerPort, MAX_PARALLEL_CHANNELS);
+        this.channelPool = new AggressiveChannelPool(bootstrap, dnsServerAddress, dnsServerPort, MAX_PARALLEL_CHANNELS, bindClientToIp);
 
         this.useCache = useCache;
         if (useCache) { cache = new AnswerCache(); }

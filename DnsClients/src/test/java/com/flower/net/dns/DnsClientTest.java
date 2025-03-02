@@ -39,16 +39,16 @@ public final class DnsClientTest {
         DnsClient client;
         int i = 9;
         switch (i) {
-            case 1: client = new DnsOverTlsClient(DNS_SERVER_ADDRESS, DNS_OVER_TLS_SERVER_PORT, TRUST_MANAGER); break;
-            case 2: client = new DnsCache(new DnsOverTlsClient(DNS_SERVER_ADDRESS, DNS_OVER_TLS_SERVER_PORT, TRUST_MANAGER)); break;
+            case 1: client = new DnsOverTlsClient(DNS_SERVER_ADDRESS, DNS_OVER_TLS_SERVER_PORT, TRUST_MANAGER, null); break;
+            case 2: client = new DnsCache(new DnsOverTlsClient(DNS_SERVER_ADDRESS, DNS_OVER_TLS_SERVER_PORT, TRUST_MANAGER, null)); break;
             case 3: client = new DnsOverUdpClient(DNS_SERVER_ADDRESS, DNS_OVER_UDP_SERVER_PORT); break;
             case 4: client = new DnsCache(new DnsOverUdpClient(DNS_SERVER_ADDRESS, DNS_OVER_UDP_SERVER_PORT)); break;
             case 5: client = new RawOsResolver(); break;
             case 6: client = new DnsCache(new RawOsResolver()); break;
-            case 7: client = new DnsOverHttps1Client(DNS_SERVER_ADDRESS, DNS_OVER_HTTPS_SERVER_PORT, DNS_SERVER_PATH_PREFIX, TRUST_MANAGER); break;
-            case 8: client = new DnsCache(new DnsOverHttps1Client(DNS_SERVER_ADDRESS, DNS_OVER_HTTPS_SERVER_PORT, DNS_SERVER_PATH_PREFIX, TRUST_MANAGER)); break;
-            case 9: client = new DnsOverHttps2Client(DNS_SERVER_ADDRESS, DNS_OVER_HTTPS_SERVER_PORT, DNS_SERVER_PATH_PREFIX, TRUST_MANAGER); break;
-            case 10: client = new DnsCache(new DnsOverHttps2Client(DNS_SERVER_ADDRESS, DNS_OVER_HTTPS_SERVER_PORT, DNS_SERVER_PATH_PREFIX, TRUST_MANAGER)); break;
+            case 7: client = new DnsOverHttps1Client(DNS_SERVER_ADDRESS, DNS_OVER_HTTPS_SERVER_PORT, DNS_SERVER_PATH_PREFIX, TRUST_MANAGER, null); break;
+            case 8: client = new DnsCache(new DnsOverHttps1Client(DNS_SERVER_ADDRESS, DNS_OVER_HTTPS_SERVER_PORT, DNS_SERVER_PATH_PREFIX, TRUST_MANAGER, null)); break;
+            case 9: client = new DnsOverHttps2Client(DNS_SERVER_ADDRESS, DNS_OVER_HTTPS_SERVER_PORT, DNS_SERVER_PATH_PREFIX, TRUST_MANAGER, null); break;
+            case 10: client = new DnsCache(new DnsOverHttps2Client(DNS_SERVER_ADDRESS, DNS_OVER_HTTPS_SERVER_PORT, DNS_SERVER_PATH_PREFIX, TRUST_MANAGER, null)); break;
             default: throw new RuntimeException("Client type unknown: " + i);
         }
 

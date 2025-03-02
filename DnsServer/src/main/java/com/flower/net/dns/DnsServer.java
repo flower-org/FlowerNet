@@ -49,12 +49,14 @@ public class DnsServer {
                                           OTHER_DNS_TLS_SERVER_ADDRESS,
                                           OTHER_DNS_TLS_SERVER_PORT,
                                           TRUST_MANAGER,
-                                          useCache);
+                                          useCache,
+                                          null);
         } else {
             client = new DnsOverTlsClient(OTHER_DNS_TLS_SERVER_ADDRESS,
                                           OTHER_DNS_TLS_SERVER_PORT,
                                           TRUST_MANAGER,
-                                          useCache);
+                                          useCache,
+                                          null);
         }
 
         final NioEventLoopGroup group = new NioEventLoopGroup();

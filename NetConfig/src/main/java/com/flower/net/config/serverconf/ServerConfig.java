@@ -29,6 +29,10 @@ public interface ServerConfig {
 
     @JsonProperty
     @Nullable
+    String bindClientToIp();
+
+    @JsonProperty
+    @Nullable
     Boolean tls();
 
     @JsonProperty

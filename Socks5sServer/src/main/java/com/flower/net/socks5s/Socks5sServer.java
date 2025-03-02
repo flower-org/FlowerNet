@@ -46,11 +46,11 @@ public final class Socks5sServer {
                         : serverConfig.accessConfig().directIpAccess();
 
         AccessManager accessManager = buildAccessManager(serverConfig.accessConfig());
-        DnsClient dnsClient = buildDnsClient(serverConfig.dns());
+        DnsClient dnsClient = buildDnsClient(serverConfig.dns(), serverConfig.bindClientToIp());
         SslContext sslCtx = ConfigSslContextBuilder.buildSslContext(serverConfig);
 
         SocksServer server = new SocksServer(() -> allowDirectIpAccess,
-                () -> new SocksServerConnectHandler(accessManager, dnsClient));
+                () -> new SocksServerConnectHandler(accessManager, dnsClient, serverConfig.bindClientToIp()));
         try {
             LOGGER.info("Starting on port {} bindToIp {} TLS: {}", port, bindToIp, isSocks5OverTls);
             server.startServer(port, bindToIp, sslCtx)
@@ -71,7 +71,7 @@ public final class Socks5sServer {
         return accessConfig == null ? allowAll() : new ConfigAccessManager(accessConfig);
     }
 
-    static DnsClient buildDnsClient(@Nullable DnsServerConfig serverNameResolution) throws SSLException, InterruptedException, FileNotFoundException {
+    static DnsClient buildDnsClient(@Nullable DnsServerConfig serverNameResolution, @Nullable String bindClientToIp) throws SSLException, InterruptedException, FileNotFoundException {
         if (serverNameResolution == null) {
             throw new ConfigurationException("DnsServer not configured (serverNameResolution)");
         }
@@ -99,14 +99,14 @@ public final class Socks5sServer {
                 TrustManagerFactory trustManager = ConfigSslContextBuilder.createTrustManagerFactory(serverNameResolution.certificate());
                 if (trustManager == null) { trustManager = PkiUtil.getSystemTrustManager(); }
                 if (dnsType == DnsType.DNS_TLS) {
-                    rawClient = new DnsOverTlsClient(dnsServerAddress, port, trustManager);
+                    rawClient = new DnsOverTlsClient(dnsServerAddress, port, trustManager, bindClientToIp);
                 } else {
                     if (serverNameResolution.httpPath() == null) { throw new ConfigurationException("HttpPath not specified for DnsType " + dnsType); }
                     String httpPath = serverNameResolution.httpPath();
                     if (dnsType == DnsType.DNS_HTTPS_1) {
-                        rawClient = new DnsOverHttps1Client(dnsServerAddress, port, httpPath, trustManager);
+                        rawClient = new DnsOverHttps1Client(dnsServerAddress, port, httpPath, trustManager, bindClientToIp);
                     } else if (dnsType == DnsType.DNS_HTTPS_2) {
-                        rawClient = new DnsOverHttps2Client(dnsServerAddress, port, httpPath, trustManager);
+                        rawClient = new DnsOverHttps2Client(dnsServerAddress, port, httpPath, trustManager, bindClientToIp);
                     } else {
                         throw new ConfigurationException("Unknown DNS type: " + serverNameResolution.dnsType());
                     }

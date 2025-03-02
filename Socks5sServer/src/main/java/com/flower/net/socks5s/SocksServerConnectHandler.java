@@ -56,6 +56,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -65,6 +66,8 @@ import static com.flower.net.conntrack.ConnectionAttributes.getConnectionInfo;
 import static com.flower.net.utils.ServerUtil.showPipeline;
 import com.flower.net.dns.DnsClient;
 
+import javax.annotation.Nullable;
+
 @ChannelHandler.Sharable
 public final class SocksServerConnectHandler extends SimpleChannelInboundHandler<SocksMessage> {
     final static Logger LOGGER = LoggerFactory.getLogger(SocksServerConnectHandler.class);
@@ -72,10 +75,12 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
     private final Bootstrap b = new Bootstrap();
     private final AccessManager accessManager;
     private final DnsClient dnsClient;
+    @Nullable private final String bindClientToIp;
 
-    public SocksServerConnectHandler(AccessManager accessManager, DnsClient dnsClient) {
+    public SocksServerConnectHandler(AccessManager accessManager, DnsClient dnsClient, @Nullable String bindClientToIp) {
         this.accessManager = accessManager;
         this.dnsClient = dnsClient;
+        this.bindClientToIp = bindClientToIp;
     }
 
     @Override
@@ -128,7 +133,14 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                                 ctx.channel().writeAndFlush(new DefaultSocks4CommandResponse(Socks4CommandStatus.REJECTED_OR_FAILED));
                                 ServerUtil.closeOnFlush(ctx.channel());
                             } else {
-                                b.connect(addr, port).addListener((ChannelFutureListener) future -> {
+                                ChannelFuture connectFuture;
+                                if (bindClientToIp == null) {
+                                    connectFuture = b.connect(addr, port);
+                                } else {
+                                    connectFuture = b.connect(new InetSocketAddress(addr, port),
+                                            new InetSocketAddress(bindClientToIp, 0));
+                                }
+                                connectFuture.addListener((ChannelFutureListener) future -> {
                                     if (future.isSuccess()) {
                                         // Connection established use handler provided results
                                     } else {
@@ -224,7 +236,14 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                                         new DefaultSocks5CommandResponse(Socks5CommandStatus.FORBIDDEN, request.dstAddrType()));
                                 ServerUtil.closeOnFlush(ctx.channel());
                             } else {
-                                b.connect(addr, port).addListener((ChannelFutureListener) future -> {
+                                ChannelFuture connectFuture;
+                                if (bindClientToIp == null) {
+                                    connectFuture = b.connect(addr, port);
+                                } else {
+                                    connectFuture = b.connect(new InetSocketAddress(addr, port),
+                                            new InetSocketAddress(bindClientToIp, 0));
+                                }
+                                connectFuture.addListener((ChannelFutureListener) future -> {
                                     if (future.isSuccess()) {
                                         // Connection established use handler provided results
                                     } else {

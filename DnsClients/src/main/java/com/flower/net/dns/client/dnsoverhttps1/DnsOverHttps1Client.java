@@ -59,15 +59,17 @@ public class DnsOverHttps1Client implements DnsClient {
     private final Bootstrap bootstrap;
     private final InetSocketAddress dnsServerAddress;
     private final String dnsServerPathPrefix;
+    @Nullable protected final String bindClientToIp;
 
-    public DnsOverHttps1Client(InetAddress dnsServerAddress, int dnsServerPort, String dnsServerPathPrefix, TrustManagerFactory trustManager) throws SSLException {
+    public DnsOverHttps1Client(InetAddress dnsServerAddress, int dnsServerPort, String dnsServerPathPrefix, TrustManagerFactory trustManager, @Nullable String bindClientToIp) throws SSLException {
         this(dnsServerAddress, dnsServerPort, dnsServerPathPrefix, DEFAULT_CALLBACK_EXPIRATION_TIMEOUT_MILLIS,
-                DEFAULT_SSL_HANDSHAKE_TIMEOUT_MILLIS, trustManager);
+                DEFAULT_SSL_HANDSHAKE_TIMEOUT_MILLIS, trustManager, bindClientToIp);
     }
 
     public DnsOverHttps1Client(InetAddress dnsServerAddress, int dnsServerPort, String dnsServerPathPrefix,
                                long callbackExpirationTimeoutMillis, long sslHandshakeTimeoutMillis,
-                               TrustManagerFactory trustManager) throws SSLException {
+                               TrustManagerFactory trustManager, @Nullable String bindClientToIp) throws SSLException {
+        this.bindClientToIp = bindClientToIp;
         this.dnsServerAddress = new InetSocketAddress(dnsServerAddress, dnsServerPort);
 
         if (!dnsServerPathPrefix.startsWith("/")) {
@@ -143,7 +145,13 @@ public class DnsOverHttps1Client implements DnsClient {
     public Promise<DnsResponse> query(String hostname) {
         String dnsServerIpAddressStr = dnsServerAddress.getAddress().getHostAddress();
 
-        ChannelFuture cf = bootstrap.connect(dnsServerAddress.getAddress(), dnsServerAddress.getPort());
+        ChannelFuture cf;
+        if (bindClientToIp == null) {
+            cf = bootstrap.connect(dnsServerAddress.getAddress(), dnsServerAddress.getPort());
+        } else {
+            cf = bootstrap.connect(new InetSocketAddress(dnsServerAddress.getAddress(), dnsServerAddress.getPort()),
+                    new InetSocketAddress(bindClientToIp, 0));
+        }
         cf.addListener(future -> {
             Channel channel = cf.channel();
             FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST,

@@ -16,11 +16,11 @@
 <fx:root type="VBox" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1">
     <AnchorPane VBox.vgrow="NEVER">
       <children>
-          <ComboBox fx:id="filterTypeComboBox" value="Whitelist" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="24.0" AnchorPane.rightAnchor="24.0" AnchorPane.topAnchor="10.0">
+          <ComboBox fx:id="filterTypeComboBox" value="Allow" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="24.0" AnchorPane.rightAnchor="24.0" AnchorPane.topAnchor="10.0">
               <items>
                   <FXCollections fx:factory="observableArrayList">
-                      <String fx:value="Whitelist" />
-                      <String fx:value="Blacklist" />
+                      <String fx:value="Allow" />
+                      <String fx:value="Deny" />
                   </FXCollections>
               </items>
           </ComboBox>

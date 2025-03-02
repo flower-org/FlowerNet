@@ -9,7 +9,7 @@ public class CapturedRequest {
     private final String host;
     private final Integer port;
     private final Access access;
-    /** Ture if not based on any rules, but based on general policy Whitelist/Blacklist */
+    /** Ture if not based on any rules, but based on general policy Allow/Deny */
     private final boolean isRuleMatched;
     private final boolean isDirectIpBlock;
     final long creationTimestamp;

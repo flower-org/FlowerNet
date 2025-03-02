@@ -1,4 +1,4 @@
-package com.flower.net.conntrack.whiteblacklist;
+package com.flower.net.conntrack.allowdenylist;
 
 import com.flower.net.config.access.Access;
 import com.flower.net.utils.WildcardMatcher;
@@ -10,12 +10,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.flower.net.conntrack.whiteblacklist.AddressFilterList.AddressRecord;
-import static com.flower.net.conntrack.whiteblacklist.AddressFilterList.HostRecord;
-import static com.flower.net.conntrack.whiteblacklist.AddressFilterList.PortRecord;
+import static com.flower.net.conntrack.allowdenylist.AddressFilterList.AddressRecord;
+import static com.flower.net.conntrack.allowdenylist.AddressFilterList.HostRecord;
+import static com.flower.net.conntrack.allowdenylist.AddressFilterList.PortRecord;
 
 // TODO: extensive test coverage
-public class WhitelistBlacklistConnectionFilter {
+public class AllowDenyConnectionFilter {
     final List<Pair<AddressFilterList, Boolean>> addressLists;
 
     //Priority 0
@@ -29,7 +29,7 @@ public class WhitelistBlacklistConnectionFilter {
     //Priority 4
     final ConcurrentHashMap<Integer, PortRecord> portRecords;
 
-    public WhitelistBlacklistConnectionFilter(List<Pair<AddressFilterList, Boolean>> addressLists) {
+    public AllowDenyConnectionFilter(List<Pair<AddressFilterList, Boolean>> addressLists) {
         this();
         for (Pair<AddressFilterList, Boolean> listPair : addressLists) {
             addList(listPair.getKey(), listPair.getValue());
@@ -55,7 +55,7 @@ public class WhitelistBlacklistConnectionFilter {
     public ConcurrentHashMap<Integer, PortRecord> getPortRecords() { return portRecords; }
 
 
-    public WhitelistBlacklistConnectionFilter() {
+    public AllowDenyConnectionFilter() {
         addressLists = new ArrayList<>();
         addressRecords = new ConcurrentHashMap<>();
         hostRecords = new ConcurrentHashMap<>();
@@ -255,7 +255,7 @@ public class WhitelistBlacklistConnectionFilter {
     }
 
     public AddressFilterList getLocalUpdatesDiff() {
-        WhitelistBlacklistConnectionFilter otherFilter = new WhitelistBlacklistConnectionFilter();
+        AllowDenyConnectionFilter otherFilter = new AllowDenyConnectionFilter();
         for (Pair<AddressFilterList, Boolean> filterListEntry : addressLists) {
             otherFilter.addList(filterListEntry.getKey(), filterListEntry.getValue());
         }
@@ -264,7 +264,7 @@ public class WhitelistBlacklistConnectionFilter {
     }
 
 /*    public AddressFilterList getUpdatesDiff(List<AddressFilterList> baseLists) {
-        WhitelistBlacklistConnectionFilter otherFilter = new WhitelistBlacklistConnectionFilter();
+        AllowDenyConnectionFilter otherFilter = new AllowDenyConnectionFilter();
         for (AddressFilterList filterList : baseLists) {
             otherFilter.addList(filterList, false);
         }
@@ -272,8 +272,8 @@ public class WhitelistBlacklistConnectionFilter {
         return getNewOrUpdatedRecords(this, otherFilter, true);
     }*/
 
-    public static AddressFilterList getNewOrUpdatedRecords(WhitelistBlacklistConnectionFilter fromThisFilter,
-                                                    WhitelistBlacklistConnectionFilter diffFromThatFilter,
+    public static AddressFilterList getNewOrUpdatedRecords(AllowDenyConnectionFilter fromThisFilter,
+                                                    AllowDenyConnectionFilter diffFromThatFilter,
                                                     boolean includeUpdated) {
         List<AddressRecord> addressRecords = new ArrayList<>();
         List<HostRecord> hostRecords = new ArrayList<>();

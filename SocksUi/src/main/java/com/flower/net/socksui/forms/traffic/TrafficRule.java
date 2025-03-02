@@ -1,6 +1,6 @@
 package com.flower.net.socksui.forms.traffic;
 
-import com.flower.net.conntrack.whiteblacklist.AddressFilterList;
+import com.flower.net.conntrack.allowdenylist.AddressFilterList;
 import com.flower.net.config.access.Access;
 
 import javax.annotation.Nullable;

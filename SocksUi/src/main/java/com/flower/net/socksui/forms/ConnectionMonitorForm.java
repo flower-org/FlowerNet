@@ -64,7 +64,7 @@ public class ConnectionMonitorForm extends AnchorPane implements Refreshable, Co
 
     @Nullable Stage stage;
     @Nullable @FXML TableView<ConnectionInfoWrapper> connectionTable;
-    @Nullable @FXML CheckBox closeOnBlacklistCheckBox;
+    @Nullable @FXML CheckBox closeOnDenyCheckBox;
     final ObservableList<ConnectionInfoWrapper> connections;
     final ConcurrentHashMap<ConnectionId, ConnectionInfoWrapper> connectionMap;
     TrafficControlForm trafficControlForm;
@@ -121,51 +121,51 @@ public class ConnectionMonitorForm extends AnchorPane implements Refreshable, Co
         }
     }
 
-    public void whitelistConnection() {
+    public void allowConnection() {
         ConnectionInfoWrapper connection = checkNotNull(connectionTable).getSelectionModel().getSelectedItem();
         Destination destination = connection.connectionInfo.destination;
         if (destination != null) {
-            trafficControlForm.whitelist(destination.host, destination.port);
+            trafficControlForm.allow(destination.host, destination.port);
         }
     }
 
-    public void blacklistConnection() {
+    public void denyConnection() {
         ConnectionInfoWrapper connection = checkNotNull(connectionTable).getSelectionModel().getSelectedItem();
         Destination destination = connection.connectionInfo.destination;
         if (destination != null) {
-            trafficControlForm.blacklist(destination.host, destination.port);
+            trafficControlForm.deny(destination.host, destination.port);
         }
     }
 
-    public void whitelistConnectionHost() {
+    public void allowConnectionHost() {
         ConnectionInfoWrapper connection = checkNotNull(connectionTable).getSelectionModel().getSelectedItem();
         Destination destination = connection.connectionInfo.destination;
         if (destination != null) {
-            trafficControlForm.whitelistHost(destination.host);
+            trafficControlForm.allowHost(destination.host);
         }
     }
 
-    public void blacklistConnectionHost() {
+    public void denyConnectionHost() {
         ConnectionInfoWrapper connection = checkNotNull(connectionTable).getSelectionModel().getSelectedItem();
         Destination destination = connection.connectionInfo.destination;
         if (destination != null) {
-            trafficControlForm.blacklistHost(destination.host);
+            trafficControlForm.denyHost(destination.host);
         }
     }
 
-    public void whitelistConnectionPort() {
+    public void allowConnectionPort() {
         ConnectionInfoWrapper connection = checkNotNull(connectionTable).getSelectionModel().getSelectedItem();
         Destination destination = connection.connectionInfo.destination;
         if (destination != null) {
-            trafficControlForm.whitelistPort(destination.port);
+            trafficControlForm.allowPort(destination.port);
         }
     }
 
-    public void blacklistConnectionPort() {
+    public void denyConnectionPort() {
         ConnectionInfoWrapper connection = checkNotNull(connectionTable).getSelectionModel().getSelectedItem();
         Destination destination = connection.connectionInfo.destination;
         if (destination != null) {
-            trafficControlForm.blacklistPort(destination.port);
+            trafficControlForm.denyPort(destination.port);
         }
     }
 
@@ -193,8 +193,8 @@ public class ConnectionMonitorForm extends AnchorPane implements Refreshable, Co
         });
     }
 
-    public void checkBlacklistedHosts() {
-        if (checkNotNull(closeOnBlacklistCheckBox).selectedProperty().get()) {
+    public void checkDeniedHosts() {
+        if (checkNotNull(closeOnDenyCheckBox).selectedProperty().get()) {
             for (ConnectionInfoWrapper info : connections) {
                 Destination dest = info.connectionInfo.destination;
 

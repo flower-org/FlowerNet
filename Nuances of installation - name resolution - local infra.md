@@ -26,7 +26,7 @@ We always resolve first, and we use our preferred configured way of resolution, 
 In this way we can always control an intermediate step of IP address validation. We allow connections via both IP and name, and this 
 approach allows us to filter both types of requests by the final IP.
 
-Thus, if we know the IP ranges on which our local services reside, we can blacklist those ranges to prevent 
+Thus, if we know the IP ranges on which our local services reside, we can deny those ranges to prevent 
 local service interactions.
 The standard ranges are:
  - 10.0.0.0/8
@@ -41,7 +41,7 @@ gcloud container clusters describe <CLUSTER-NAME> --region <REGION> | grep Cidr
 For additional security we can also employ a policy with which we prohibit direct access by IP, but that's really niche.
 
 If we, on the other hand, want to run our proxy as a gateway to our infrastructure, we may either ignore those ranges, allowing 
-connections to be made to any address, or actively whitelist those ranges, prohibiting our clients to connect to anything but the local 
+connections to be made to any address, or actively allow those ranges, prohibiting our clients to connect to anything but the local 
 services.
 For gateway use case it's also important to be able to resolve local names properly, more on that in `Chapter 2`.
 
@@ -83,7 +83,7 @@ is deployed, LOCAL_NAMESERVER and LOCAL_OS, the point being that those may end u
   - We disable it by default in order to avoid any direct user interaction with components of local cluster.
   - With that said, using LOCAL_NAMESERVER implicit discovery by default is sensible, to achieve 
     the best latency, and it's "safe" at least in GKE, where it doesn't allow local service discovery.
-  - However, disabling name resolution by itself won't prevent direct access to local services by IP. In order to prevent such access completely, IP range blacklists should be used. E.g., blacklisting a range will prevent both name resolution and data connections on a given range.
+  - However, disabling name resolution by itself won't prevent direct access to local services by IP. In order to prevent such access completely, IP range denylists should be used. E.g., denying a range will prevent both name resolution and data connections on a given range.
 
 There is a plethora of ways to determine a local nameserver address in Java, but nothing that looks like a reliable standard.
 

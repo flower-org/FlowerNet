@@ -27,11 +27,11 @@
             <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                <items>
                   <Label text="Filtering mode:" />
-                   <ComboBox fx:id="filteringModeComboBox" value="Whitelist" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="24.0" AnchorPane.rightAnchor="24.0" AnchorPane.topAnchor="10.0">
+                   <ComboBox fx:id="filteringModeComboBox" value="Allow" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="24.0" AnchorPane.rightAnchor="24.0" AnchorPane.topAnchor="10.0">
                        <items>
                            <FXCollections fx:factory="observableArrayList">
-                               <String fx:value="Whitelist" />
-                               <String fx:value="Blacklist" />
+                               <String fx:value="Allow" />
+                               <String fx:value="Deny" />
                                <String fx:value="Off" />
                            </FXCollections>
                        </items>
@@ -135,8 +135,8 @@
                                                     <items>
                                                         <FXCollections fx:factory="observableArrayList">
                                                             <String fx:value="No auto-add" />
-                                                            <String fx:value="Auto-Whitelist" />
-                                                            <String fx:value="Auto-Blacklist" />
+                                                            <String fx:value="Auto-Allow" />
+                                                            <String fx:value="Auto-Deny" />
                                                         </FXCollections>
                                                     </items>
                                                 </ComboBox>
@@ -145,8 +145,8 @@
                                                 <Separator orientation="VERTICAL" prefHeight="200.0" />
                                                         <Button mnemonicParsing="false" onAction="#newTmpRule" text="New tmp rule" />
                                                         <Button mnemonicParsing="false" onAction="#clearTmpRules" text="Clear tmp rules" />
-                                                        <Button mnemonicParsing="false" onAction="#clearWhitelistTmpRules" text="Clear Whitelist" />
-                                                        <Button mnemonicParsing="false" onAction="#clearBlacklistTmpRules" text="Clear Blacklist" />
+                                                        <Button mnemonicParsing="false" onAction="#clearAllowTmpRules" text="Clear AllowList" />
+                                                        <Button mnemonicParsing="false" onAction="#clearDenyTmpRules" text="Clear DenyList" />
                                                     </items>
                                                 </ToolBar>
                                             </children>
@@ -208,14 +208,14 @@
                                         <TextField fx:id="maxRequests" prefHeight="26.0" prefWidth="60.0" text="50" />
                                         <Button mnemonicParsing="false" onAction="#clearCapturedData" text="Clear" />
                                         <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                        <Button mnemonicParsing="false" onAction="#whitelistCapture" text="Whitelist" />
-                                        <Button mnemonicParsing="false" onAction="#blacklistCapture" text="Blacklist" />
+                                        <Button mnemonicParsing="false" onAction="#allowCapture" text="Allow" />
+                                        <Button mnemonicParsing="false" onAction="#denyCapture" text="Deny" />
                                         <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                        <Button mnemonicParsing="false" onAction="#whitelistCaptureHost" text="Whitelist host" />
-                                        <Button mnemonicParsing="false" onAction="#blacklistCaptureHost" text="Blacklist host" />
+                                        <Button mnemonicParsing="false" onAction="#allowCaptureHost" text="Allow host" />
+                                        <Button mnemonicParsing="false" onAction="#denyCaptureHost" text="Deny host" />
                                         <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                        <Button mnemonicParsing="false" onAction="#whitelistCapturePort" text="Whitelist port" />
-                                        <Button mnemonicParsing="false" onAction="#blacklistCapturePort" text="Blacklist port" />
+                                        <Button mnemonicParsing="false" onAction="#allowCapturePort" text="Allow port" />
+                                        <Button mnemonicParsing="false" onAction="#denyCapturePort" text="Deny port" />
                                     <Separator orientation="VERTICAL" prefHeight="200.0" />
                                     <MenuButton fx:id="captureFilterMenuButton" mnemonicParsing="false" text="Filter">
                                       <items>

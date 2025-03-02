@@ -1,9 +1,9 @@
 package com.flower.net.socksui.forms.traffic;
 
 import com.flower.net.config.access.Access;
-import com.flower.net.conntrack.whiteblacklist.ImmutableAddressRecord;
-import com.flower.net.conntrack.whiteblacklist.ImmutableHostRecord;
-import com.flower.net.conntrack.whiteblacklist.ImmutablePortRecord;
+import com.flower.net.conntrack.allowdenylist.ImmutableAddressRecord;
+import com.flower.net.conntrack.allowdenylist.ImmutableHostRecord;
+import com.flower.net.conntrack.allowdenylist.ImmutablePortRecord;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.Alert;
@@ -27,8 +27,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class TrafficRuleAddDialog extends VBox {
     final static Logger LOGGER = LoggerFactory.getLogger(TrafficRuleAddDialog.class);
 
-    public final static String WHITELIST = "Whitelist";
-    public final static String BLACKLIST = "Blacklist";
+    public final static String ALLOW = "Allow";
+    public final static String DENY = "Deny";
 
     @FXML @Nullable ComboBox<String> filterTypeComboBox;
     @FXML @Nullable TextField hostTextField;
@@ -42,7 +42,7 @@ public class TrafficRuleAddDialog extends VBox {
         this(null);
     }
 
-    Boolean getIsWhitelist(TrafficRule trafficRule) {
+    Boolean getIsAllow(TrafficRule trafficRule) {
         return trafficRule.getFilterType() == Access.ALLOW;
     }
     @Nullable String getHost(TrafficRule trafficRule) {
@@ -67,12 +67,12 @@ public class TrafficRuleAddDialog extends VBox {
         }
 
         if (trafficRule != null) {
-            Boolean isWhitelist = getIsWhitelist(trafficRule);
+            Boolean isAllow = getIsAllow(trafficRule);
             String host = getHost(trafficRule);
             Integer port = getPort(trafficRule);
             Boolean isWildcard = getIsWildcard(trafficRule);
 
-            checkNotNull(filterTypeComboBox).getSelectionModel().select(isWhitelist ? WHITELIST : BLACKLIST);
+            checkNotNull(filterTypeComboBox).getSelectionModel().select(isAllow ? ALLOW : DENY);
             if (host != null) { checkNotNull(hostTextField).textProperty().set(host); }
             if (port != null) { checkNotNull(portTextField).textProperty().set(port.toString()); }
             checkNotNull(isWildcardRuleCheckBox).setSelected(isWildcard);
@@ -128,9 +128,9 @@ public class TrafficRuleAddDialog extends VBox {
 
             Access access = null;
             try {
-                if (filterTypeStr.equals(WHITELIST)) {
+                if (filterTypeStr.equals(ALLOW)) {
                     access = Access.ALLOW;
-                } else if (filterTypeStr.equals(BLACKLIST)) {
+                } else if (filterTypeStr.equals(DENY)) {
                     access = Access.DENY;
                 }
             } catch (Exception e) {
@@ -138,7 +138,7 @@ public class TrafficRuleAddDialog extends VBox {
 
             if ((access != Access.ALLOW && access != Access.DENY)) {
                 Alert alert = new Alert(Alert.AlertType.INFORMATION,
-                        "Please specify valid filter type (WHITELIST ot BLACKLIST)", ButtonType.OK);
+                        "Please specify valid filter type (ALLOW ot DENY)", ButtonType.OK);
                 alert.showAndWait();
             } else if (StringUtils.isBlank(host) && StringUtils.isBlank(portStr)) {
                 Alert alert = new Alert(Alert.AlertType.INFORMATION,

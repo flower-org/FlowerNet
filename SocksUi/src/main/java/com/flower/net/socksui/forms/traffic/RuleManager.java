@@ -1,10 +1,10 @@
 package com.flower.net.socksui.forms.traffic;
 
 import com.flower.net.config.access.Access;
-import com.flower.net.conntrack.whiteblacklist.ImmutableAddressRecord;
-import com.flower.net.conntrack.whiteblacklist.ImmutableHostRecord;
-import com.flower.net.conntrack.whiteblacklist.ImmutablePortRecord;
-import com.flower.net.conntrack.whiteblacklist.WhitelistBlacklistConnectionFilter;
+import com.flower.net.conntrack.allowdenylist.ImmutableAddressRecord;
+import com.flower.net.conntrack.allowdenylist.ImmutableHostRecord;
+import com.flower.net.conntrack.allowdenylist.ImmutablePortRecord;
+import com.flower.net.conntrack.allowdenylist.AllowDenyConnectionFilter;
 import com.flower.net.socksui.JavaFxUtils;
 import com.flower.net.socksui.ModalWindow;
 import javafx.scene.control.Alert;
@@ -20,9 +20,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public abstract class RuleManager {
     final static Logger LOGGER = LoggerFactory.getLogger(RuleManager.class);
 
-    final WhitelistBlacklistConnectionFilter filter;
+    final AllowDenyConnectionFilter filter;
 
-    protected RuleManager(WhitelistBlacklistConnectionFilter filter) {
+    protected RuleManager(AllowDenyConnectionFilter filter) {
         this.filter = filter;
     }
 
@@ -117,23 +117,23 @@ public abstract class RuleManager {
         }
     }
 
-    protected String clearWhitelistRulesMsg() { return "Delete all Whitelist rules?"; }
+    protected String clearAllowRulesMsg() { return "Delete all Alow rules?"; }
 
     /** Clear inner filter ALLOW rules */
-    public void clearAllowlistRules() {
-        if (JavaFxUtils.showYesNoDialog(clearWhitelistRulesMsg()) == JavaFxUtils.YesNo.YES) {
+    public void clearAllowRules() {
+        if (JavaFxUtils.showYesNoDialog(clearAllowRulesMsg()) == JavaFxUtils.YesNo.YES) {
             filter.clearFilterType(Access.ALLOW);
             refreshAndRestoreCursor();
         }
     }
 
-    protected String clearBlacklistRulesMsg() {
-        return "Delete all Blacklist rules?";
+    protected String clearDenyRulesMsg() {
+        return "Delete all Deny rules?";
     }
 
     /** Clear inner filter DENY rules */
-    public void clearDenylistRules() {
-        if (JavaFxUtils.showYesNoDialog(clearBlacklistRulesMsg()) == JavaFxUtils.YesNo.YES) {
+    public void clearDenyRules() {
+        if (JavaFxUtils.showYesNoDialog(clearDenyRulesMsg()) == JavaFxUtils.YesNo.YES) {
             filter.clearFilterType(Access.DENY);
             refreshAndRestoreCursor();
         }
@@ -150,7 +150,7 @@ public abstract class RuleManager {
             } else if (trafficRule.portRecord != null) {
                 filter.removePortRecord(trafficRule.portRecord);
             }
-            checkBlacklistedHosts();
+            checkDeniedHosts();
         }
 
         refreshAndRestoreCursor();
@@ -160,7 +160,7 @@ public abstract class RuleManager {
         switch (type) {
             case DENY: return Access.ALLOW;
             case ALLOW: return Access.DENY;
-            default: throw new IllegalArgumentException("FilterType should be either Blacklist or Whitelist");
+            default: throw new IllegalArgumentException("FilterType should be either Deny or Allow");
         }
     }
 
@@ -199,14 +199,14 @@ public abstract class RuleManager {
                                 .build(),
                         true);
             }
-            checkBlacklistedHosts();
+            checkDeniedHosts();
         }
         refreshAndRestoreCursor();
     }
 
     abstract void refreshAndRestoreCursor();
-    /** "close on blacklist" existing connections for newly blacklisted hosts */
-    abstract void checkBlacklistedHosts();
+    /** "close on deny" existing connections for newly denied hosts */
+    abstract void checkDeniedHosts();
     @Nullable abstract TrafficRule getSelectedTrafficRule();
     @Nullable abstract Stage getStage();
 }

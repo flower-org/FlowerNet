@@ -1,4 +1,4 @@
-package com.flower.net.conntrack.whiteblacklist;
+package com.flower.net.conntrack.allowdenylist;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;

@@ -1,4 +1,4 @@
-package com.flower.net.conntrack.whiteblacklist;
+package com.flower.net.conntrack.allowdenylist;
 
 import java.util.List;
 

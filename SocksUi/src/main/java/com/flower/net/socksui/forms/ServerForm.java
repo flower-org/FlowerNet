@@ -110,7 +110,9 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
             socksChain.clear();
             socksChain.addAll(chainConfiguration.proxyChain().stream().map(FXSocksNode::new).toList());
             checkNotNull(socksChainTable).itemsProperty().set(socksChain);
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            LOGGER.error("Error loading ProxyChains and Servers from UserPreferences", e);
+        }
 
         refreshContent();
     }
@@ -353,7 +355,9 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
 
             Preferences userPreferences = Preferences.userRoot();
             userPreferences.put(PROXY_CHAIN_AND_SERVERS_PREF, trafficRules);
-        } catch (Exception e) {}
+        } catch (Exception e) {
+            LOGGER.error("Error saving ProxyChains and Servers to UserPreferences", e);
+        }
     }
 
     public void notImplemented() {

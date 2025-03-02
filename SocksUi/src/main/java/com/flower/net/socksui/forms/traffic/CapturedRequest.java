@@ -29,8 +29,8 @@ public class CapturedRequest {
 
     public int getPort() { return port; }
 
-    public String getAccess() {
-        return (access == Access.ALLOW ? "Allowed" : "Prohibited")
+    public String getFilterResult() {
+        return (access == Access.ALLOW ? "Allowed" : "Denied")
                 + (isDirectIpBlock ? " (direct IP block)" : (isRuleMatched ? " (rule match)" : " (default)"));
     }
 

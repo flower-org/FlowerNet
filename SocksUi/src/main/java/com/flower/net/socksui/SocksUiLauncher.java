@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * RUN THIS, THIS IS THE CORRECT ONE
+ * CORRECT, RUN THIS, THIS IS THE CORRECT ONE
  */
 public class SocksUiLauncher {
     final static Logger LOGGER = LoggerFactory.getLogger(SocksUiLauncher.class);

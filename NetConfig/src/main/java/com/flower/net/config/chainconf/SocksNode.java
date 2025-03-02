@@ -1,5 +1,6 @@
 package com.flower.net.config.chainconf;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -33,6 +34,7 @@ public interface SocksNode {
     @JsonProperty
     @Nullable RemoteCertificate rootServerCertificate();
 
+    @JsonIgnore
     default String getClientCertificateStr() {
         if (clientCertificate() != null) {
             if (clientCertificate().fileConfig() != null) {
@@ -48,6 +50,7 @@ public interface SocksNode {
         return "N/A";
     }
 
+    @JsonIgnore
     default String getRootServerCertificateStr() {
         if (rootServerCertificate() != null) {
             if (rootServerCertificate().fileConfig() != null) {

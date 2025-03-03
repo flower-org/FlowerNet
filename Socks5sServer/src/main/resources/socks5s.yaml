@@ -1,5 +1,7 @@
 port: 8443
 tls: true
+#bindToIp: "IP"
+#bindClientToIp: "IP"
 certificate:
   generated: true
 clientCertificate:

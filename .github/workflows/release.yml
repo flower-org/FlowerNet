@@ -46,7 +46,7 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload Linux artifact
+      - name: Upload x64 artifact
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ github.token }}

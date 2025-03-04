@@ -1,14 +1,10 @@
 name: Release Socks UI
 
-# This triggers the workflow manually from GitHub UI
+# This triggers workflow on tag push
 on:
-  workflow_dispatch:
-
-# This triggers workflow on push
-#on:
-#  push:
-#    branches:
-#      - main  # or specify your branch
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   release:

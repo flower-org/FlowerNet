@@ -32,6 +32,17 @@ jobs:
       - name: LS
         run: ls -al SocksUi/build/libs
 
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
       - name: upload linux artifact
         uses: actions/upload-release-asset@v1
         env:
@@ -40,4 +51,4 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: SocksUi/build/libs/SocksUi-0.0.8-SNAPSHOT-Intel-all.jar
           asset_name: SocksUi-0.0.8-SNAPSHOT-Intel-all.jar
-          asset_content_type: application/gzip
+          asset_content_type: application/jar

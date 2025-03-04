@@ -8,7 +8,7 @@ plugins {
 }
 
 group 'com.flower.socksui'
-version '0.0.8-SNAPSHOT-Intel'
+version '0.1.0-SNAPSHOT-Intel'
 
 repositories {
     mavenCentral()

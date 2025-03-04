@@ -35,4 +35,4 @@ jobs:
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
         with:
-          files: SocksUi/build/libs/SocksUi-*-SNAPSHOT-Intel-all.jar
+          files: SocksUi/build/libs/SocksUi-0.0.8-SNAPSHOT-Intel-all.jar

@@ -32,7 +32,12 @@ jobs:
       - name: LS
         run: ls -al SocksUi/build/libs
 
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v2
+      - name: upload linux artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
-          files: SocksUi/build/libs/SocksUi-0.0.8-SNAPSHOT-Intel-all.jar
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: SocksUi/build/libs/SocksUi-0.0.8-SNAPSHOT-Intel-all.jar
+          asset_name: SocksUi-0.0.8-SNAPSHOT-Intel-all.jar
+          asset_content_type: application/gzip

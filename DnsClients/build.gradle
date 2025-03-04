@@ -43,7 +43,7 @@ dependencies {
     implementation("com.github.ben-manes.caffeine:caffeine:3.2.0")
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-guava:2.13.4'
 
-    implementation 'io.netty:netty-all:4.1.79.Final' // Use the latest version
+    implementation 'io.netty:netty-all:4.1.94.final' // Use the latest version
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.1'
     testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.9.1'

@@ -1,0 +1,39 @@
+name: Release Socks UI
+
+# This triggers the workflow manually from GitHub UI
+on:
+  workflow_dispatch:
+
+# This triggers workflow on push
+#on:
+#  push:
+#    branches:
+#      - main  # or specify your branch
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up JDK 17 with Temurin
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Do wrapper
+        run: gradle wrapper
+
+      - name: Build JAR file with Gradle
+        run: ./gradlew shadowJar
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: SocksUi/build/libs/SocksUi-0.0.7-SNAPSHOT-Intel-all.jar

@@ -28,6 +28,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,7 +139,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
 
     @Nullable String getBindToIp() {
         String ip = checkNotNull(bindServerToIpTextField).textProperty().get();
-        if (IpAddressUtil.isIPAddress(ip)) {
+        if (!StringUtils.isBlank(ip) && IpAddressUtil.isIPAddress(ip)) {
             return ip;
         } else {
             return null;
@@ -147,7 +148,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
 
     @Nullable String getBindClientToIp() {
         String ip = checkNotNull(bindClientToIpTextField).textProperty().get();
-        if (IpAddressUtil.isIPAddress(ip)) {
+        if (!StringUtils.isBlank(ip) && IpAddressUtil.isIPAddress(ip)) {
             return ip;
         } else {
             return null;
@@ -393,8 +394,8 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
 
     public void ipBindingsUpdated() {
         Preferences userPreferences = Preferences.userRoot();
-        userPreferences.put(BIND_SERVER_TO_IP, getBindToIp());
-        userPreferences.put(BIND_CLIENT_TO_IP, getBindClientToIp());
+        userPreferences.put(BIND_SERVER_TO_IP, StringUtils.defaultIfBlank(getBindToIp(), ""));
+        userPreferences.put(BIND_CLIENT_TO_IP, StringUtils.defaultIfBlank(getBindClientToIp(), ""));
     }
 
     public void notImplemented() {

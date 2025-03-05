@@ -463,4 +463,21 @@ public class PkiUtil {
         signature.update(data);
         return signature.verify(sign);
     }
+
+    public static boolean testKeyPairMatchBySigning(PublicKey publicKey, PrivateKey privateKey) throws NoSuchAlgorithmException, SignatureException, InvalidKeyException {
+        byte[] data = "Test data".getBytes();
+        byte[] signature = signData(data, privateKey);
+        return verifySignature(data, signature, publicKey);
+    }
+
+    public static boolean testKeyPairMatchByEncrypting(PublicKey publicKey, PrivateKey privateKey) throws
+            NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException,
+            IllegalBlockSizeException, BadPaddingException {
+        byte[] data = "Test data".getBytes();
+
+        byte[] encryptedData = encrypt(data, publicKey);
+        byte[] decryptedData = decrypt(encryptedData, privateKey);
+
+        return new String(decryptedData).equals(new String(data));
+    }
 }

@@ -389,51 +389,78 @@ public class PkiUtil {
     }
 
     public static String signData(String dataString, PrivateKey privateKey) throws NoSuchAlgorithmException, SignatureException, InvalidKeyException {
-        Signature signature = Signature.getInstance("SHA256WithRSA");
-        signature.initSign(privateKey);
-        signature.update(dataString.getBytes());
-        byte[] signedData = signature.sign();
+        byte[] signedData = signData(dataString.getBytes(), privateKey);
         return Base64.getEncoder().encodeToString(signedData);
     }
 
-
     public static boolean verifySignature(String dataString, String sign, PublicKey publicKey) throws NoSuchAlgorithmException, SignatureException, InvalidKeyException {
-        Signature signature = Signature.getInstance("SHA256WithRSA");
-        signature.initVerify(publicKey);
-        signature.update(dataString.getBytes());
         byte[] decodedSignature = Base64.getDecoder().decode(sign);
-        return signature.verify(decodedSignature);
+        return verifySignature(dataString.getBytes(), decodedSignature, publicKey);
     }
 
     public static String encrypt(String plaintext, PublicKey publicKey)
             throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
-        Cipher cipher = Cipher.getInstance("RSA");
-        cipher.init(Cipher.ENCRYPT_MODE, publicKey);
-        byte[] encryptedBytes = cipher.doFinal(plaintext.getBytes());
+        byte[] encryptedBytes = encrypt(plaintext.getBytes(), publicKey);
         return Base64.getEncoder().encodeToString(encryptedBytes);
     }
 
     public static String decrypt(String encryptedText, PrivateKey privateKey)
             throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
-        Cipher cipher = Cipher.getInstance("RSA");
-        cipher.init(Cipher.DECRYPT_MODE, privateKey);
-        byte[] decryptedBytes = cipher.doFinal(Base64.getDecoder().decode(encryptedText));
+        byte[] decryptedBytes = decrypt(Base64.getDecoder().decode(encryptedText), privateKey);
         return new String(decryptedBytes);
     }
 
     public static String encrypt(String plaintext, PrivateKey privateKey)
             throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
-        Cipher cipher = Cipher.getInstance("RSA");
-        cipher.init(Cipher.ENCRYPT_MODE, privateKey);
-        byte[] encryptedBytes = cipher.doFinal(plaintext.getBytes());
+        byte[] encryptedBytes = encrypt(plaintext.getBytes(), privateKey);
         return Base64.getEncoder().encodeToString(encryptedBytes);
     }
 
     public static String decrypt(String encryptedText, PublicKey publicKey)
             throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
+        byte[] decryptedBytes = decrypt(Base64.getDecoder().decode(encryptedText), publicKey);
+        return new String(decryptedBytes);
+    }
+
+    public static byte[] encrypt(byte[] data, PublicKey publicKey)
+            throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.ENCRYPT_MODE, publicKey);
+        return cipher.doFinal(data);
+    }
+
+    public static byte[] decrypt(byte[] encryptedData, PrivateKey privateKey)
+            throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.DECRYPT_MODE, privateKey);
+        return cipher.doFinal(encryptedData);
+    }
+
+    public static byte[] encrypt(byte[] data, PrivateKey privateKey)
+            throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.ENCRYPT_MODE, privateKey);
+        return cipher.doFinal(data);
+    }
+
+    public static byte[] decrypt(byte[] encryptedData, PublicKey publicKey)
+            throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
         Cipher cipher = Cipher.getInstance("RSA");
         cipher.init(Cipher.DECRYPT_MODE, publicKey);
-        byte[] decryptedBytes = cipher.doFinal(Base64.getDecoder().decode(encryptedText));
-        return new String(decryptedBytes);
+        return cipher.doFinal(encryptedData);
+    }
+
+    public static byte[] signData(byte[] data, PrivateKey privateKey) throws NoSuchAlgorithmException, SignatureException, InvalidKeyException {
+        Signature signature = Signature.getInstance("SHA256WithRSA");
+        signature.initSign(privateKey);
+        signature.update(data);
+        return signature.sign();
+    }
+
+    public static boolean verifySignature(byte[] data, byte[] sign, PublicKey publicKey) throws NoSuchAlgorithmException, SignatureException, InvalidKeyException {
+        Signature signature = Signature.getInstance("SHA256WithRSA");
+        signature.initVerify(publicKey);
+        signature.update(data);
+        return signature.verify(sign);
     }
 }

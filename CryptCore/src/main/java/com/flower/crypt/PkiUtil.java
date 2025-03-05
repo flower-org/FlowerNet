@@ -57,9 +57,11 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Date;
 import java.util.Enumeration;
+import java.util.List;
 
 public class PkiUtil {
     public static TrustManagerFactory getSystemTrustManager() {
@@ -108,12 +110,20 @@ public class PkiUtil {
     }
 
     public static X509Certificate getCertificateFromString(String certStr) {
-        try {
-            CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            return (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(certStr.getBytes()));
-        } catch (CertificateException e) {
-            throw new RuntimeException(e);
-        }
+        return getCertificateFromStream(new ByteArrayInputStream(certStr.getBytes()));
+    }
+
+    public static PrivateKey getPrivateKeyFromStream(InputStream keyStream) throws NoSuchAlgorithmException, IOException, InvalidKeySpecException {
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        PemReader pemReader = new PemReader(new InputStreamReader(keyStream));
+        PemObject pemObject = pemReader.readPemObject();
+        byte[] content = pemObject.getContent();
+        PKCS8EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(content);
+        return keyFactory.generatePrivate(privateKeySpec);
+    }
+
+    public static PrivateKey getPrivateKeyFromString(String keyStr) throws NoSuchAlgorithmException, IOException, InvalidKeySpecException {
+        return getPrivateKeyFromStream(new ByteArrayInputStream(keyStr.getBytes()));
     }
 
     public static KeyStore loadTrustStore(X509Certificate cert) {
@@ -181,15 +191,8 @@ public class PkiUtil {
 
     public static KeyManagerFactory getKeyManagerFromPem(InputStream certificateStream, InputStream keyStream, String keyPassword) {
         try {
-            CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            X509Certificate cert = (X509Certificate) cf.generateCertificate(certificateStream);
-
-            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-            PemReader pemReader = new PemReader(new InputStreamReader(keyStream));
-            PemObject pemObject = pemReader.readPemObject();
-            byte[] content = pemObject.getContent();
-            PKCS8EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(content);
-            PrivateKey privateKey = keyFactory.generatePrivate(privateKeySpec);
+            X509Certificate cert = getCertificateFromStream(certificateStream);
+            PrivateKey privateKey = getPrivateKeyFromStream(keyStream);
 
             KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
             keyStore.load(null, null);
@@ -271,6 +274,38 @@ public class PkiUtil {
     public static Certificate getCertificateFromKeyStore(KeyStore keyStore, String alias) {
         try {
             return keyStore.getCertificate(alias);
+        } catch (KeyStoreException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static List<String> getKeyAliasesFromKeyStore(KeyStore keyStore) {
+        List<String> keyAliases = new ArrayList<>();
+        try {
+            Enumeration<String> aliases = keyStore.aliases();
+            while (aliases.hasMoreElements()) {
+                String alias = aliases.nextElement();
+                if (keyStore.isKeyEntry(alias)) {
+                    keyAliases.add(alias);
+                }
+            }
+            return keyAliases;
+        } catch (KeyStoreException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static List<String> getCertificateAliasesFromKeyStore(KeyStore keyStore) {
+        List<String> certificateAliases = new ArrayList<>();
+        try {
+            Enumeration<String> aliases = keyStore.aliases();
+            while (aliases.hasMoreElements()) {
+                String alias = aliases.nextElement();
+                if (keyStore.isKeyEntry(alias) || keyStore.isCertificateEntry(alias)) {
+                    certificateAliases.add(alias);
+                }
+            }
+            return certificateAliases;
         } catch (KeyStoreException e) {
             throw new RuntimeException(e);
         }

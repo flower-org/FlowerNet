@@ -241,7 +241,12 @@ public class PkiUtil {
 
     public static KeyStore loadPKCS11KeyStore(Provider pkcs11Provider, String pin) {
         try {
-            KeyStore pkcs11Store = KeyStore.getInstance("PKCS11", pkcs11Provider);
+            //Pretty notable is the fact is that if we use `getInstance(String type, String provider)`
+            // removing and reinserting USB token is not recoverable without program restart.
+            // Also, you can't re-attach USB token after first load, if it fails due to no token attached.
+            // On the other hand, calling `getInstance(String type)` again reloads correctly.
+            KeyStore pkcs11Store = KeyStore.getInstance("PKCS11");
+            //KeyStore pkcs11Store = KeyStore.getInstance("PKCS11", pkcs11Provider);
             pkcs11Store.load(null, pin.toCharArray());
 
             return pkcs11Store;

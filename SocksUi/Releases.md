@@ -1,4 +1,12 @@
 ```
+Mar 7, 2025
+0.1.5
+SocksUi-0.1.5-amd64-all.jar
+36441209
+SHA2-256= 11b843875771d3d0a7fc7f5136013bb40e57766bdee69b6cb6fcc47bd77842c8
+```
+
+```
 Mar 3, 2025
 0.1.4
 SocksUi-0.1.4-SNAPSHOT-Intel-all.jar

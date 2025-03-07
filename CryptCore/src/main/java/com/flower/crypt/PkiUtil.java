@@ -1,13 +1,17 @@
 package com.flower.crypt;
 
 import com.google.common.io.Resources;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
+import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
 
@@ -15,6 +19,8 @@ import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLPeerUnverifiedException;
@@ -27,12 +33,19 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.StringReader;
 import java.math.BigInteger;
 import java.net.URL;
+import java.nio.file.Files;
+import java.security.DigestInputStream;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyFactory;
@@ -41,6 +54,7 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.Provider;
@@ -57,13 +71,19 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Date;
 import java.util.Enumeration;
+import java.util.HexFormat;
 import java.util.List;
 
 public class PkiUtil {
+    private static final int FILE_ENCRYPT_CHUNK_SIZE = 4096;
+    private static final int FILE_SIGNATURE_CHUNK_SIZE = 4096;
+    private static final String AES_TRANSFORMATION = "AES/CBC/PKCS5Padding";
+
     public static TrustManagerFactory getSystemTrustManager() {
         try {
             TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
@@ -497,11 +517,48 @@ public class PkiUtil {
         return signature.sign();
     }
 
+    public static byte[] signData(File file, PrivateKey privateKey) throws NoSuchAlgorithmException, SignatureException, InvalidKeyException, IOException {
+        Signature signature = Signature.getInstance("SHA256withRSA");
+        signature.initSign(privateKey);
+
+        // Read the file in chunks
+        try (FileInputStream fis = new FileInputStream(file)) {
+            byte[] buffer = new byte[FILE_SIGNATURE_CHUNK_SIZE]; // 4KB buffer
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                signature.update(buffer, 0, bytesRead);
+            }
+        }
+
+        return signature.sign();
+    }
+
     public static boolean verifySignature(byte[] data, byte[] sign, PublicKey publicKey) throws NoSuchAlgorithmException, SignatureException, InvalidKeyException {
         Signature signature = Signature.getInstance("SHA256WithRSA");
         signature.initVerify(publicKey);
         signature.update(data);
         return signature.verify(sign);
+    }
+
+    public static boolean verifySignature(File file, byte[] signatureBytes, PublicKey publicKey) throws InvalidKeyException, IOException, SignatureException, NoSuchAlgorithmException {
+        Signature signature = Signature.getInstance("SHA256withRSA");
+        signature.initVerify(publicKey);
+
+        // Read the file in chunks
+        try (FileInputStream fis = new FileInputStream(file)) {
+            byte[] buffer = new byte[4096]; // 4KB buffer
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                signature.update(buffer, 0, bytesRead);
+            }
+        }
+
+        return signature.verify(signatureBytes);
+    }
+
+    public static boolean verifySignature(File file, File signatureFile, PublicKey publicKey) throws IOException, SignatureException, NoSuchAlgorithmException, InvalidKeyException {
+        byte[] sign = Files.readAllBytes(signatureFile.toPath());
+        return verifySignature(file, sign, publicKey);
     }
 
     public static boolean testKeyPairMatchBySigning(PublicKey publicKey, PrivateKey privateKey) throws NoSuchAlgorithmException, SignatureException, InvalidKeyException {
@@ -519,5 +576,138 @@ public class PkiUtil {
         byte[] decryptedData = decrypt(encryptedData, privateKey);
 
         return new String(decryptedData).equals(new String(data));
+    }
+
+    public static byte[] getSha256(byte[] bytes) throws NoSuchAlgorithmException {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        return digest.digest(bytes);
+
+    }
+
+    public static String getSha256Hex(byte[] bytes) throws NoSuchAlgorithmException {
+        return HexFormat.of().formatHex(getSha256(bytes));
+    }
+
+    public static byte[] getSha256(File file) throws NoSuchAlgorithmException, IOException {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        try (InputStream fis = new FileInputStream(file)) {
+            DigestInputStream dis = new DigestInputStream(fis, digest);
+            while (dis.read() != -1) {
+                // Here we're reading file stream to update hash
+            }
+        }
+        return digest.digest();
+    }
+
+    public static String getSha256Hex(File file) throws NoSuchAlgorithmException, IOException {
+        return HexFormat.of().formatHex(getSha256(file));
+    }
+
+    public static String toHex(byte[] bytes) throws NoSuchAlgorithmException, IOException {
+        return HexFormat.of().formatHex(bytes);
+    }
+
+    public static X509Certificate signCsr(PKCS10CertificationRequest csr,
+                                          PrivateKey caPrivateKey,
+                                          X509Certificate caCert) {
+        try {
+            Date notBefore = new Date();
+            Date notAfter = new Date(System.currentTimeMillis() + (365L * 24 * 60 * 60 * 1000 * 10)); //10 years
+
+            BigInteger serialNumber = new BigInteger(64, new SecureRandom());
+
+            PublicKey subjectPublicKey = KeyFactory.getInstance("RSA")
+                    .generatePublic(new X509EncodedKeySpec(csr.getSubjectPublicKeyInfo().getEncoded()));
+
+            X509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(
+                    new X500Name(caCert.getSubjectX500Principal().getName()),
+                    serialNumber,
+                    notBefore,
+                    notAfter,
+                    csr.getSubject(),
+                    subjectPublicKey
+            );
+
+            ContentSigner signer = new JcaContentSignerBuilder("SHA256withRSA").build(caPrivateKey);
+            X509CertificateHolder certHolder = certBuilder.build(signer);
+
+            return new JcaX509CertificateConverter().getCertificate(certHolder);
+        } catch (CertificateException | OperatorCreationException | NoSuchAlgorithmException | IOException | InvalidKeySpecException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static PKCS10CertificationRequest loadCsr(File f) throws IOException {
+        return loadCsr(new FileReader(f));
+    }
+
+    public static PKCS10CertificationRequest loadCsr(String csr) throws IOException {
+        return loadCsr(new StringReader(csr));
+    }
+
+    public static PKCS10CertificationRequest loadCsr(Reader reader) throws IOException {
+        PEMParser pemParser = new PEMParser(reader);
+        return (PKCS10CertificationRequest)pemParser.readObject();
+    }
+
+    public static void encryptFile(SecretKeySpec secretKey, IvParameterSpec iv, FileInputStream fis,
+                                   FileOutputStream fos, int length) throws NoSuchPaddingException, NoSuchAlgorithmException,
+            InvalidAlgorithmParameterException, InvalidKeyException, IOException, IllegalBlockSizeException, BadPaddingException {
+        Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, iv);
+
+        byte[] inputBytes = new byte[FILE_ENCRYPT_CHUNK_SIZE];
+        int bytesRead;
+        int totalBytesRead = 0;
+
+        // Read and encrypt in chunks until the specified length is reached
+        while (totalBytesRead < length && (bytesRead = fis.read(inputBytes)) != -1) {
+            // Only process the bytes up to the specified length
+            int bytesToProcess = Math.min(bytesRead, length - totalBytesRead);
+            byte[] outputBytes = cipher.update(inputBytes, 0, bytesToProcess);
+            if (outputBytes != null) {
+                fos.write(outputBytes);
+            }
+            totalBytesRead += bytesToProcess;
+        }
+
+        // Finalize encryption if we have processed any bytes
+        if (totalBytesRead > 0) {
+            byte[] outputBytes = cipher.doFinal();
+            if (outputBytes != null) {
+                fos.write(outputBytes);
+            }
+        }
+    }
+
+    public static void decryptFile(SecretKeySpec secretKey, IvParameterSpec iv, FileInputStream fis,
+                                   FileOutputStream fos, int length) throws NoSuchPaddingException, NoSuchAlgorithmException,
+            InvalidAlgorithmParameterException, InvalidKeyException, IOException, IllegalBlockSizeException, BadPaddingException {
+        Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, iv);
+
+        byte[] inputBytes = new byte[FILE_ENCRYPT_CHUNK_SIZE]; // Buffer size of 4KB
+        int bytesRead;
+        int totalBytesRead = 0;
+
+        // Read and decrypt in chunks until the specified length is reached
+        while (totalBytesRead < length && (bytesRead = fis.read(inputBytes)) != -1) {
+            // Only process the bytes up to the specified length
+            int bytesToProcess = Math.min(bytesRead, length - totalBytesRead);
+            byte[] outputBytes = cipher.update(inputBytes, 0, bytesToProcess);
+            if (outputBytes != null) {
+                fos.write(outputBytes);
+            }
+            totalBytesRead += bytesToProcess;
+        }
+
+        // Finalize decryption
+        if (totalBytesRead > 0) {
+            // If we have processed any bytes, finalize the decryption
+            byte[] outputBytes = cipher.doFinal(); // This handles padding
+            if (outputBytes != null) {
+                fos.write(outputBytes);
+            }
+        }
     }
 }

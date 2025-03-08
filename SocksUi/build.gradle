@@ -49,6 +49,7 @@ sourceSets {
 
 dependencies {
     implementation project(':CryptCore')
+    implementation project(':JavaFxUtils')
     implementation project(':NetConfig')
     implementation project(':NetCore')
     implementation project(':SocksChainServer')

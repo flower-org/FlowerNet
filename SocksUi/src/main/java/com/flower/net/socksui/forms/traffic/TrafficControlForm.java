@@ -10,7 +10,7 @@ import com.flower.net.conntrack.allowdenylist.ImmutableAddressRecord;
 import com.flower.net.conntrack.allowdenylist.ImmutableHostRecord;
 import com.flower.net.conntrack.allowdenylist.ImmutablePortRecord;
 import com.flower.net.conntrack.allowdenylist.AllowDenyConnectionFilter;
-import com.flower.net.socksui.JavaFxUtils;
+import com.flower.fxutils.JavaFxUtils;
 import com.flower.net.socksui.MainApp;
 import com.flower.net.socksui.forms.ConnectionMonitorForm;
 import com.flower.net.socksui.forms.Refreshable;

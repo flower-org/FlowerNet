@@ -10,7 +10,7 @@ import com.flower.net.config.chainconf.SocksNode;
 import com.flower.net.sockschain.server.SocksChainServerConnectHandler;
 import com.flower.net.socksserver.SocksServer;
 import com.flower.net.socksui.MainApp;
-import com.flower.net.socksui.ModalWindow;
+import com.flower.fxutils.ModalWindow;
 import com.flower.net.config.chainconf.ChainConfiguration;
 import com.flower.net.config.chainconf.ImmutableChainConfiguration;
 import com.flower.crypt.keys.KeyProvider;

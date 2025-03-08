@@ -1,0 +1,6 @@
+[submodule "CryptCore"]
+	path = CryptCore
+	url = https://github.com/flower-org/CryptCore.git
+[submodule "JavaFxUtils"]
+	path = JavaFxUtils
+	url = https://github.com/flower-org/JavaFxUtils.git

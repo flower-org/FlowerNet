@@ -13,6 +13,8 @@ import com.flower.net.socksui.MainApp;
 import com.flower.net.socksui.ModalWindow;
 import com.flower.net.config.chainconf.ChainConfiguration;
 import com.flower.net.config.chainconf.ImmutableChainConfiguration;
+import com.flower.crypt.keys.KeyProvider;
+import com.flower.crypt.keys.RsaKeyProvider;
 import com.flower.net.utils.IpAddressUtil;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -33,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import javax.net.ssl.KeyManagerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
@@ -41,6 +44,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 import java.util.prefs.Preferences;
 import java.util.stream.Collectors;
 
@@ -55,6 +59,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
 
     final ReentrantLock startLock;
     final MainApp mainApp;
+    final KeyProvider keyProvider;
     boolean isStarted;
 
     @Nullable @FXML Button startButton;
@@ -77,8 +82,9 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
         this.stage = stage;
     }
 
-    public ServerForm(MainApp mainApp) {
+    public ServerForm(MainApp mainApp, KeyProvider keyProvider) {
         this.mainApp = mainApp;
+        this.keyProvider = keyProvider;
         startLock = new ReentrantLock();
         isStarted = false;
 
@@ -94,7 +100,7 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
 
         // We allow direct IPs on server side since we control that in TrafficControlForm, which implements filter
         server = new SocksServer(() -> true, () -> new SocksChainServerConnectHandler(
-                this, this::getBindClientToIp));
+                this, this::getBindClientToIp, getKeyManagerSupplier()));
 
         knownServers = FXCollections.observableArrayList();
         checkNotNull(knownServersTable).itemsProperty().set(knownServers);
@@ -127,6 +133,10 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
         }
 
         refreshContent();
+    }
+
+    protected Supplier<KeyManagerFactory> getKeyManagerSupplier() {
+        return () -> ((RsaKeyProvider)keyProvider).getKeyManagerFactory();
     }
 
     public void addConnectionFilter(ConnectionFilter connectionFilter) {

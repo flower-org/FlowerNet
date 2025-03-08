@@ -24,6 +24,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.socksx.SocksMessage;
 
 import javax.annotation.Nullable;
+import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import java.util.function.Supplier;
 
@@ -31,10 +32,13 @@ import java.util.function.Supplier;
 public final class SocksChainServerConnectHandler extends SimpleChannelInboundHandler<SocksMessage> {
     final ProxyChainProvider proxyChainProvider;
     @Nullable private final Supplier<String> bindClientToIp;
+    private final Supplier<KeyManagerFactory> clientKeyManagerSupplier;
 
-    public SocksChainServerConnectHandler(ProxyChainProvider proxyChainProvider, @Nullable Supplier<String> bindClientToIp) {
+    public SocksChainServerConnectHandler(ProxyChainProvider proxyChainProvider, @Nullable Supplier<String> bindClientToIp,
+                                          Supplier<KeyManagerFactory> clientKeyManagerSupplier) {
         this.proxyChainProvider = proxyChainProvider;
         this.bindClientToIp = bindClientToIp;
+        this.clientKeyManagerSupplier = clientKeyManagerSupplier;
     }
 
     @Override
@@ -42,7 +46,7 @@ public final class SocksChainServerConnectHandler extends SimpleChannelInboundHa
         ctx.pipeline().remove(SocksChainServerConnectHandler.this);
         // TODO: is it excessive to create a new client every time?
         new SocksChainClient(ctx, message, proxyChainProvider.getProxyChain(),
-                bindClientToIp == null ? null : bindClientToIp.get()).connectChain();
+                bindClientToIp == null ? null : bindClientToIp.get(), clientKeyManagerSupplier).connectChain();
     }
 
     @Override

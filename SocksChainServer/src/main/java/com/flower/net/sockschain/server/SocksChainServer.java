@@ -43,7 +43,9 @@ public final class SocksChainServer {
         SslContext sslCtx = isSocks5OverTls ? buildSslContext() : null;
 
         SocksServer server = new SocksServer(() -> ALLOW_DIRECT_IP_ACCESS,
-                () -> new SocksChainServerConnectHandler(HARDCODED_CHAIN_PROVIDER, () -> bindClientToIp));
+                () -> new SocksChainServerConnectHandler(HARDCODED_CHAIN_PROVIDER, () -> bindClientToIp,
+                        ETokenKeyManagerProvider::getManagerOld));
+
         try {
             LOGGER.info("Starting on port {} TLS: {}", port, isSocks5OverTls);
             server.startServer(port, bindToIp, sslCtx)

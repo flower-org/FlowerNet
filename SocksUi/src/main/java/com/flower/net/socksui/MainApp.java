@@ -3,6 +3,11 @@ package com.flower.net.socksui;
 import com.flower.net.socksui.forms.ConnectionMonitorForm;
 import com.flower.net.socksui.forms.ServerForm;
 import com.flower.net.socksui.forms.traffic.TrafficControlForm;
+import com.flower.crypt.keys.forms.MultiKeyProvider;
+import com.flower.crypt.keys.forms.RsaFileKeyProvider;
+import com.flower.crypt.keys.forms.RsaPkcs11KeyProvider;
+import com.flower.crypt.keys.forms.RsaRawKeyProvider;
+import com.flower.crypt.keys.forms.TabKeyProvider;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
@@ -13,6 +18,8 @@ import javafx.stage.Stage;
 
 import javax.annotation.Nullable;
 
+import java.util.List;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class MainApp {
@@ -22,6 +29,7 @@ public class MainApp {
     @FXML @Nullable Label serverInfoLabel;
     @FXML @Nullable TabPane tabs;
 
+    @Nullable TabKeyProvider keyProvider;
     @Nullable ServerForm serverForm;
     @Nullable TrafficControlForm trafficControlForm;
     @Nullable ConnectionMonitorForm connectionMonitorForm;
@@ -63,6 +71,7 @@ public class MainApp {
     }
 
     public void showTabs() {
+        openClientCertificateTab();
         openServerTab();
         openTrafficControlTab();
         openConnectionsTab();
@@ -73,8 +82,26 @@ public class MainApp {
         checkNotNull(tabs).getSelectionModel().select(0);
     }
 
+    private static TabKeyProvider buildMainKeyProvider(Stage mainStage) {
+        RsaPkcs11KeyProvider rsaPkcs11KeyProvider = new RsaPkcs11KeyProvider(mainStage);
+        RsaFileKeyProvider rsaFileKeyProvider = new RsaFileKeyProvider(mainStage);
+        RsaRawKeyProvider rsaRawKeyProvider = new RsaRawKeyProvider();
+        return new MultiKeyProvider(mainStage, "RSA-2048",
+                List.of(rsaPkcs11KeyProvider, rsaFileKeyProvider, rsaRawKeyProvider));
+    }
+
+    public void openClientCertificateTab() {
+        keyProvider = buildMainKeyProvider(mainStage);
+        keyProvider.initPreferences();
+
+        final Tab tab = new Tab("Client cert", keyProvider.tabContent());
+        tab.setClosable(false);
+
+        addTab(tab);
+    }
+
     public void openServerTab() {
-        serverForm = new ServerForm(this);
+        serverForm = new ServerForm(this, keyProvider);
         serverForm.setStage(checkNotNull(mainStage));
         final Tab tab = new Tab("Server", serverForm);
         tab.setClosable(false);

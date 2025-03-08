@@ -1,6 +1,5 @@
 package com.flower.net.sockschain.client;
 
-import com.flower.crypt.ETokenKeyManagerProvider;
 import com.flower.crypt.PkiUtil;
 import com.flower.net.handlers.RelayHandler;
 import com.flower.net.utils.EmptyPipelineChannelInitializer;
@@ -31,6 +30,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 
 import javax.annotation.Nullable;
+import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.File;
@@ -41,6 +41,7 @@ import java.security.KeyStore;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import com.flower.net.utils.ServerUtil;
 
@@ -61,6 +62,7 @@ public class SocksChainClient {
 
     private final SocksMessage downstreamResponseSuccess;
     private final SocksMessage downstreamResponseFailure;
+    private final Supplier<KeyManagerFactory> clientKeyManagerSupplier;
 
     private final Bootstrap b = new Bootstrap();
     private final AtomicInteger nodeIndex = new AtomicInteger(-1);
@@ -86,7 +88,7 @@ public class SocksChainClient {
             return SslContextBuilder.forClient()
                     .protocols(TLS_PROTOCOLS)
                     .ciphers(TLS_CIPHERS)
-                    .keyManager(ETokenKeyManagerProvider.getManager())
+                    .keyManager(clientKeyManagerSupplier.get())
                     .clientAuth(ClientAuth.REQUIRE)
                     .trustManager(trustManagerFactory)
                     .build();
@@ -118,12 +120,15 @@ public class SocksChainClient {
         throw new RuntimeException("Certificate File config not found");
     }
 
-    public SocksChainClient(final ChannelHandlerContext inboundCtx, final SocksMessage inboundMessage, List<SocksNode> socksProxyChain, @Nullable String bindClientToIp) {
+    public SocksChainClient(final ChannelHandlerContext inboundCtx, final SocksMessage inboundMessage,
+                            List<SocksNode> socksProxyChain, @Nullable String bindClientToIp,
+                            Supplier<KeyManagerFactory> clientKeyManagerSupplier) {
         this.bindClientToIp = bindClientToIp;
         this.inboundCtx = inboundCtx;
         this.inboundChannel = inboundCtx.channel();
         this.inboundMessage = inboundMessage;
         this.socksProxyChain = socksProxyChain;
+        this.clientKeyManagerSupplier = clientKeyManagerSupplier;
 
         if (socksProxyChain.isEmpty()) {
             throw new IllegalStateException("Proxy chain can't be empty.");

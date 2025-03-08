@@ -10,9 +10,11 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -38,6 +40,9 @@ public class SocksNodeAddDialog extends VBox {
     @FXML @Nullable TextField certTextField;
     @FXML @Nullable Button addButton;
 
+    @FXML @Nullable Label certLabel;
+    @FXML @Nullable GridPane certChoiceGridPane;
+
     @Nullable Stage stage;
     @Nullable volatile SocksNode returnSocksNode = null;
 
@@ -57,6 +62,22 @@ public class SocksNodeAddDialog extends VBox {
             selectServerType(nodeToEdit.socksProtocolVersion());
             checkNotNull(hostTextField).textProperty().set(nodeToEdit.serverAddress());
             checkNotNull(portTextField).textProperty().set(Integer.toString(nodeToEdit.serverPort()));
+        }
+
+        checkNotNull(socksTypeComboBox).setOnAction(event -> {
+            updateCertFields();
+        });
+        updateCertFields();
+    }
+
+    protected void updateCertFields() {
+        String selectedItem = checkNotNull(socksTypeComboBox).getSelectionModel().getSelectedItem();
+        if (SOCKS_5S.equals(selectedItem) || SOCKS_PLUS.equals(selectedItem)) {
+            checkNotNull(certLabel).visibleProperty().set(true);
+            checkNotNull(certChoiceGridPane).visibleProperty().set(true);
+        } else {
+            checkNotNull(certLabel).visibleProperty().set(false);
+            checkNotNull(certChoiceGridPane).visibleProperty().set(false);
         }
     }
 

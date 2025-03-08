@@ -44,8 +44,8 @@
             <Label text="Port:" GridPane.rowIndex="1" />
             <TextField fx:id="hostTextField" GridPane.columnIndex="1" />
             <TextField fx:id="portTextField" GridPane.columnIndex="1" GridPane.rowIndex="1" />
-            <Label text="Cert:" GridPane.rowIndex="2" />
-            <GridPane GridPane.columnIndex="1" GridPane.rowIndex="2">
+            <Label fx:id="certLabel" text="Cert:" GridPane.rowIndex="2" />
+            <GridPane fx:id="certChoiceGridPane" GridPane.columnIndex="1" GridPane.rowIndex="2">
               <columnConstraints>
                 <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
                 <ColumnConstraints hgrow="SOMETIMES" maxWidth="20.0" minWidth="20.0" prefWidth="20.0" />

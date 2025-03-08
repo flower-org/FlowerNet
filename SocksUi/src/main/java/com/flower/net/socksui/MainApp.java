@@ -47,7 +47,7 @@ public class MainApp {
     }
 
     public void showAboutDialog() {
-        Alert alert = new Alert(Alert.AlertType.NONE, "Socks UI v 0.1.4", ButtonType.OK);
+        Alert alert = new Alert(Alert.AlertType.NONE, "Socks UI v 0.1.5", ButtonType.OK);
         alert.showAndWait();
     }
 

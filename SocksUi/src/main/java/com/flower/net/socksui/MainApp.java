@@ -1,5 +1,6 @@
 package com.flower.net.socksui;
 
+import com.flower.fxutils.JavaFxUtils;
 import com.flower.net.socksui.forms.ConnectionMonitorForm;
 import com.flower.net.socksui.forms.ServerForm;
 import com.flower.net.socksui.forms.traffic.TrafficControlForm;
@@ -8,10 +9,13 @@ import com.flower.crypt.keys.forms.RsaFileKeyProvider;
 import com.flower.crypt.keys.forms.RsaPkcs11KeyProvider;
 import com.flower.crypt.keys.forms.RsaRawKeyProvider;
 import com.flower.crypt.keys.forms.TabKeyProvider;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
+import javafx.scene.control.SingleSelectionModel;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.stage.Stage;
@@ -19,7 +23,9 @@ import javafx.stage.Stage;
 import javax.annotation.Nullable;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import static com.flower.fxutils.JavaFxUtils.YesNo.NO;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class MainApp {
@@ -86,8 +92,36 @@ public class MainApp {
         RsaPkcs11KeyProvider rsaPkcs11KeyProvider = new RsaPkcs11KeyProvider(mainStage);
         RsaFileKeyProvider rsaFileKeyProvider = new RsaFileKeyProvider(mainStage);
         RsaRawKeyProvider rsaRawKeyProvider = new RsaRawKeyProvider();
-        return new MultiKeyProvider(mainStage, "RSA-2048",
+        MultiKeyProvider multiKeyProvider = new MultiKeyProvider(mainStage, "RSA-2048",
                 List.of(rsaPkcs11KeyProvider, rsaFileKeyProvider, rsaRawKeyProvider));
+        SingleSelectionModel<Tab> tabPaneSelectionModel = multiKeyProvider.getChildProvidersTabPane().getSelectionModel();
+        tabPaneSelectionModel.selectedItemProperty().addListener(new ChangeListener<Tab>() {
+            final AtomicBoolean reverseInProgress = new AtomicBoolean(false);
+            @Override
+            public void changed(ObservableValue<? extends Tab> observableValue, Tab oldTab, Tab newTab) {
+                if (oldTab != newTab) {
+                    //If reverse is not in progress
+                    if (!reverseInProgress.get()) {
+                        if (NO == JavaFxUtils.showYesNoDialog(
+                                "Confirm certificate change",
+                                "Confirm certificate change",
+                                "Tab switch will change the client TLS certificate used " +
+                                "for encrypted channels. Proceed?")) {
+                            try {
+                                //Set reverse in progress
+                                while (!reverseInProgress.compareAndSet(false, true));
+                                //Reverse tab
+                                tabPaneSelectionModel.select(oldTab);
+                            } finally {
+                                //Unset reverse in progress
+                                reverseInProgress.compareAndSet(true, false);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        return multiKeyProvider;
     }
 
     public void openClientCertificateTab() {

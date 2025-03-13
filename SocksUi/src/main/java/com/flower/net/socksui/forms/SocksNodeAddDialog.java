@@ -62,6 +62,7 @@ public class SocksNodeAddDialog extends VBox {
             selectServerType(nodeToEdit.socksProtocolVersion());
             checkNotNull(hostTextField).textProperty().set(nodeToEdit.serverAddress());
             checkNotNull(portTextField).textProperty().set(Integer.toString(nodeToEdit.serverPort()));
+            checkNotNull(certTextField).textProperty().set(nodeToEdit.getRootServerCertificateStr());
         }
 
         checkNotNull(socksTypeComboBox).setOnAction(event -> {
@@ -125,10 +126,10 @@ public class SocksNodeAddDialog extends VBox {
                 Alert alert = new Alert(Alert.AlertType.INFORMATION, "Please specify SOCKS type", ButtonType.OK);
                 alert.showAndWait();
             } else if (StringUtils.isBlank(host)) {
-                Alert alert = new Alert(Alert.AlertType.INFORMATION, "Please specify host " + host, ButtonType.OK);
+                Alert alert = new Alert(Alert.AlertType.INFORMATION, "Please specify host", ButtonType.OK);
                 alert.showAndWait();
-            } else if (StringUtils.isBlank(filename)) {
-                Alert alert = new Alert(Alert.AlertType.INFORMATION, "Please specify certificate " + host, ButtonType.OK);
+            } else if ((SOCKS_5S.equals(socksType) || SOCKS_PLUS.equals(socksType)) && StringUtils.isBlank(filename)) {
+                Alert alert = new Alert(Alert.AlertType.INFORMATION, "Please specify certificate", ButtonType.OK);
                 alert.showAndWait();
             } else if (port <= 0) {
                 Alert alert = new Alert(Alert.AlertType.INFORMATION, "Please specify integer port > 0 (specified:" + portStr + ")", ButtonType.OK);

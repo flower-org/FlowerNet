@@ -1,0 +1,53 @@
+package com.flower.net.visitor;
+
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+
+import java.io.IOException;
+
+/**
+ * INCORRECT, DON'T RUN THIS
+*/
+public class VisiTorApplication extends Application {
+    /**
+     * Don't use this method directly, use VisiTorLauncher.
+     * For whatever reason, running this directly will fail with an error.
+     */
+    public static void main(String[] args) {
+        launch();
+    }
+
+    @Override
+    public void start(Stage mainStage) throws IOException {
+        try {
+            FXMLLoader fxmlLoader = new FXMLLoader(VisiTorApplication.class.getResource("VisiTorMainApp.fxml"));
+            Parent rootNode = fxmlLoader.load();
+
+            VisiTorMainApp mainApp = fxmlLoader.getController();
+            mainApp.setMainStage(mainStage);
+
+            Scene mainScene = new Scene(rootNode, 1024, 768);
+
+            //Close all threads when we close JavaFX windows.
+            mainStage.setOnHidden(event -> {
+                // TODO: close all tabs / clients
+                // Shutdown Netty
+                Platform.exit();
+                mainApp.shutdownServer();
+            });
+
+            mainStage.setTitle("VisiTOR");
+            mainStage.setScene(mainScene);
+            mainStage.setResizable(true);
+            mainApp.showTabs();
+            mainStage.show();
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
+    }
+}

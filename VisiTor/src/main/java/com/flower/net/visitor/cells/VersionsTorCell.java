@@ -5,39 +5,39 @@ import io.netty.buffer.ByteBuf;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.flower.net.visitor.cells.CellCode.VERSIONS;
+import static com.flower.net.visitor.cells.CellCommand.VERSIONS;
 
 public class VersionsTorCell extends AbstractTorCell {
-    protected final List<Integer> versionList = new ArrayList<>();
+    protected final List<Integer> versions = new ArrayList<>();
 
-    public VersionsTorCell(int circuitId, int... versions) {
+    public VersionsTorCell(int circuitId, int... versionArr) {
         super(circuitId, VERSIONS);
-        for(int v : versions) {
-            versionList.add(v);
+        for(int v : versionArr) {
+            versions.add(v);
         }
     }
 
-    public VersionsTorCell(int circuitId, List<Integer> versions) {
+    public VersionsTorCell(int circuitId, List<Integer> versionLst) {
         super(circuitId, VERSIONS);
-        for(int v : versions) {
-            versionList.add(v);
+        for(int v : versionLst) {
+            versions.add(v);
         }
     }
 
     @Override
     public void writeToBuffer(ByteBuf outBuffer) {
-        int payloadLength = versionList.size() * 2;
+        int payloadLength = versions.size() * 2;
 
         outBuffer.writeShort((short)circuitId);
         outBuffer.writeByte((byte)command.code);
         outBuffer.writeShort((short)payloadLength);
-        for(int v : versionList) {
+        for(int v : versions) {
             outBuffer.writeShort((short)v);
         }
     }
 
     /** Called from TorCell.readFromBuffer(buffer); */
-    static VersionsTorCell readFromBuffer(int circuitId, CellCode code, int payloadLength, ByteBuf buffer) {
+    static VersionsTorCell readFromBuffer(int circuitId, CellCommand code, int payloadLength, ByteBuf buffer) {
         assert(code == VERSIONS);
 
         List<Integer> versionList = new ArrayList<>();
@@ -46,5 +46,14 @@ public class VersionsTorCell extends AbstractTorCell {
         }
 
         return new VersionsTorCell(circuitId, versionList);
+    }
+
+    @Override
+    public String toString() {
+        return "VersionsTorCell{" +
+                "circuitId=" + circuitId +
+                ", command=" + command + "/" + command.code +
+                ", versions=" + versions +
+                '}';
     }
 }

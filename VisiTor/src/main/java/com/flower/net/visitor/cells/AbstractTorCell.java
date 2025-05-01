@@ -6,9 +6,9 @@ import javax.annotation.Nullable;
 
 public abstract class AbstractTorCell implements TorCell {
     protected final int circuitId;
-    protected final CellCode command;
+    protected final CellCommand command;
 
-    public AbstractTorCell(int circuitId, CellCode command) {
+    public AbstractTorCell(int circuitId, CellCommand command) {
         this.circuitId = circuitId;
         this.command = command;
     }
@@ -19,7 +19,7 @@ public abstract class AbstractTorCell implements TorCell {
     }
 
     @Override
-    public CellCode command() {
+    public CellCommand command() {
         return command;
     }
 
@@ -53,7 +53,7 @@ public abstract class AbstractTorCell implements TorCell {
             return null;
         }
 
-        CellCode command = CellCode.fromCode(code);
+        CellCommand command = CellCommand.fromCode(code);
 
         switch (command) {
             case VERSIONS:

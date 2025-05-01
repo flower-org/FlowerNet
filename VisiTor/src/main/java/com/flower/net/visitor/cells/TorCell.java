@@ -6,7 +6,7 @@ import javax.annotation.Nullable;
 
 public interface TorCell {
     int circuitId();
-    CellCode command();
+    CellCommand command();
 
     void writeToBuffer(ByteBuf outBuffer);
 

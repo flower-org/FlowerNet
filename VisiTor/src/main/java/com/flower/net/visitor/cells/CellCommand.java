@@ -1,6 +1,6 @@
 package com.flower.net.visitor.cells;
 
-public enum CellCode {
+public enum CellCommand {
     /** Command constant for a PADDING type cell. */
     PADDING(0),
 
@@ -38,11 +38,11 @@ public enum CellCode {
     AUTHORIZE(132);
 
     public final int code;
-    CellCode(int code) {
+    CellCommand(int code) {
         this.code = code;
     }
 
-    public static CellCode fromCode(int code) {
+    public static CellCommand fromCode(int code) {
         switch(code) {
             case 0: return PADDING;
             case 1: return CREATE;
@@ -61,7 +61,7 @@ public enum CellCode {
             case 131: return AUTHENTICATE;
             case 132: return AUTHORIZE;
 
-            default: throw new UnsupportedOperationException("CellCode " + code + " not supported");
+            default: throw new UnsupportedOperationException("CellCommand code:" + code + " not supported");
         }
     }
 }

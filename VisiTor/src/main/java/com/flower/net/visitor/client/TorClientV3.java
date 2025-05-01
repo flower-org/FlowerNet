@@ -108,6 +108,7 @@ public class TorClientV3 implements TorClient {
 
     protected void handleQueryResp(TorCell msg) {
         //TODO: implement
+        System.out.println("Received TorCell " + msg);
     }
 
     public Promise<Channel> establishConnection(InetAddress connectAddress, int connectPort) {

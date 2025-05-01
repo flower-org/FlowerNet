@@ -24,7 +24,7 @@ public abstract class AbstractTorCell implements TorCell {
     }
 
     @Override
-    public abstract void writeMessageToBuffer(ByteBuf outBuffer);
+    public abstract void writeToBuffer(ByteBuf outBuffer);
 
     @Nullable static TorCell readFromBuffer(ByteBuf buffer) {
         // Make sure that we have enough bytes to read header

@@ -8,6 +8,6 @@ import io.netty.handler.codec.MessageToByteEncoder;
 public class TorEncoder extends MessageToByteEncoder<TorCell> {
     @Override
     protected void encode(ChannelHandlerContext ctx, TorCell msg, ByteBuf out) throws Exception {
-        msg.writeMessageToBuffer(out);
+        msg.writeToBuffer(out);
     }
 }

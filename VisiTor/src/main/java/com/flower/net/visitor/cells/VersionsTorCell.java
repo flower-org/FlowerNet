@@ -25,7 +25,7 @@ public class VersionsTorCell extends AbstractTorCell {
     }
 
     @Override
-    public void writeMessageToBuffer(ByteBuf outBuffer) {
+    public void writeToBuffer(ByteBuf outBuffer) {
         int payloadLength = versionList.size() * 2;
 
         outBuffer.writeShort((short)circuitId);

@@ -8,7 +8,7 @@ public interface TorCell {
     int circuitId();
     CellCode command();
 
-    void writeMessageToBuffer(ByteBuf outBuffer);
+    void writeToBuffer(ByteBuf outBuffer);
 
     @Nullable
     static TorCell readFromBuffer(ByteBuf buffer) {

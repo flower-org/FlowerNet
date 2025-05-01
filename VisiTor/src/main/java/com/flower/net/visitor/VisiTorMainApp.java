@@ -1,6 +1,6 @@
 package com.flower.net.visitor;
 
-import com.flower.net.visitor.form.DirectoryInfoForm;
+import com.flower.net.visitor.forms.DirectoryInfoForm;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;

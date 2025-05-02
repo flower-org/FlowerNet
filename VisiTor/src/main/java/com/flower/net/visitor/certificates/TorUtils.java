@@ -1,0 +1,37 @@
+package com.flower.net.visitor.certificates;
+
+public class TorUtils {
+    public static final int FIXED_CELL_LEN = 512;
+    public static final int FIXED_CELL_BODY_LEN = 509;
+
+    public static long toUInt32BigEndian(byte[] byteArrayOf4) {
+        return toUInt32BigEndian(byteArrayOf4, 0);
+    }
+
+    public static long toUInt32BigEndian(byte[] byteArray, int offset) {
+        // Convert byte array to unsigned int
+        return ((byteArray[offset] & 0xFF) << 24) |
+                ((byteArray[offset + 1] & 0xFF) << 16) |
+                ((byteArray[offset + 2] & 0xFF) << 8) |
+                (byteArray[offset + 3] & 0xFF);
+    }
+
+    public static int toUInt16BigEndian(byte[] byteArrayOf2) {
+        return toUInt16BigEndian(byteArrayOf2, 0);
+    }
+
+    public static int toUInt16BigEndian(byte[] byteArray, int offset) {
+        // Convert byte array to unsigned int
+        return ((byteArray[offset] & 0xFF) << 8) |
+                (byteArray[offset + 1] & 0xFF);
+    }
+
+    public static String bytesToHex(byte[] bytes) {
+        StringBuilder hexString = new StringBuilder();
+        for (byte b : bytes) {
+            String hex = String.format("%02X", b);
+            hexString.append(hex);
+        }
+        return hexString.toString();
+    }
+}

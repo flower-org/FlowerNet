@@ -11,8 +11,9 @@ public class TorDecoder extends ByteToMessageDecoder {
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
         TorCell cell = TorCell.readFromBuffer(in);
-        if (cell != null) {
+        while (cell != null) {
             out.add(cell);
+            cell = TorCell.readFromBuffer(in);
         }
     }
 }

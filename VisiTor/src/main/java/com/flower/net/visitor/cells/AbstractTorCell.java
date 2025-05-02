@@ -35,8 +35,13 @@ public abstract class AbstractTorCell implements TorCell {
 
         int circuitId = buffer.readShort() & 0xFFFF;
         int code = buffer.readByte() & 0xFF;
+        CellCommand command = CellCommand.fromCode(code);
 
-        // TODO: process cells without payload here, I'm not sure if such cells exist though
+        // Process cells without payload length field here
+        switch (command) {
+            case NETINFO:
+                return NetInfoTorCell.readFromBuffer(circuitId, command, buffer);
+        }
 
         // Make sure that we have enough bytes to read payloadLength
         if (buffer.readableBytes() < 2) {
@@ -53,11 +58,13 @@ public abstract class AbstractTorCell implements TorCell {
             return null;
         }
 
-        CellCommand command = CellCommand.fromCode(code);
-
         switch (command) {
             case VERSIONS:
                 return VersionsTorCell.readFromBuffer(circuitId, command, payloadLength, buffer);
+            case CERTS:
+                return CertificatesTorCell.readFromBuffer(circuitId, command, payloadLength, buffer);
+            case AUTH_CHALLENGE:
+                return AuthChallengeTorCell.readFromBuffer(circuitId, command, payloadLength, buffer);
             case PADDING:
             case CREATE:
             case CREATED:
@@ -65,15 +72,13 @@ public abstract class AbstractTorCell implements TorCell {
             case DESTROY:
             case CREATE_FAST:
             case CREATED_FAST:
-            case NETINFO:
             case RELAY_EARLY:
             case VPADDING:
-            case CERTS:
-            case AUTH_CHALLENGE:
             case AUTHENTICATE:
             case AUTHORIZE:
             default:
-                throw new UnsupportedOperationException("CellCommand Code " + code + " not supported");
+                throw new UnsupportedOperationException("CellCommand Code " + command + "(" + code +
+                        ") deserialization not supported");
         }
     }
 }

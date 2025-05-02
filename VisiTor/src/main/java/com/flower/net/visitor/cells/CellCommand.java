@@ -61,7 +61,7 @@ public enum CellCommand {
             case 131: return AUTHENTICATE;
             case 132: return AUTHORIZE;
 
-            default: throw new UnsupportedOperationException("CellCommand code:" + code + " not supported");
+            default: throw new UnsupportedOperationException("CellCommand code:" + code + " unknown");
         }
     }
 }

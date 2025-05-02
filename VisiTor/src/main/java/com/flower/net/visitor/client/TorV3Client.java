@@ -1,6 +1,7 @@
 package com.flower.net.visitor.client;
 
 import com.flower.crypt.PkiUtil;
+import com.flower.net.visitor.cells.NetInfoTorCell;
 import com.flower.net.visitor.cells.TorCell;
 import com.flower.net.visitor.cells.VersionsTorCell;
 import io.netty.bootstrap.Bootstrap;
@@ -23,18 +24,22 @@ import javax.net.ssl.TrustManagerFactory;
 
 import java.net.InetAddress;
 import java.security.cert.X509Certificate;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import static com.flower.net.socksserver.FlowerSslContextBuilder.TLS_CIPHERS;
 import static com.flower.net.socksserver.FlowerSslContextBuilder.TLS_PROTOCOLS;
 
-public class TorClientV3 implements TorClient {
-    static final Logger LOGGER = LoggerFactory.getLogger(TorClientV3.class);
+public class TorV3Client implements TorClient {
+    static final Logger LOGGER = LoggerFactory.getLogger(TorV3Client.class);
 
     private final EventLoopGroup group;
     private final SslContext sslCtx;
     private final Bootstrap bootstrap;
+    private final AtomicReference<Consumer<TorCell>> cellListener;
 
-    public TorClientV3(TrustManagerFactory trustManager, long sslHandshakeTimeoutMillis) throws SSLException {
+    public TorV3Client(TrustManagerFactory trustManager, long sslHandshakeTimeoutMillis) throws SSLException {
+        cellListener = new AtomicReference<>();
         // Configure SSL.
         this.sslCtx = SslContextBuilder
                 .forClient()
@@ -58,7 +63,7 @@ public class TorClientV3 implements TorClient {
                     sslHandler.handshakeFuture().addListener(
                         future -> {
                             if (!future.isSuccess()) {
-                                LOGGER.error("DnsOverTlsClient - TLS Handshake Failed", future.cause());
+                                LOGGER.error("TorV3Client - TLS Handshake Failed", future.cause());
                             } else {
                                 // TODO: TLS handshake listener - validate certificate!
                                 LOGGER.info("TLS Handshake succeeded");
@@ -71,7 +76,7 @@ public class TorClientV3 implements TorClient {
 
                                     // Validate the certificate (you can implement your own validation logic here)
                                     for (X509Certificate cert : peerCertificates) {
-                                        LOGGER.info("Received certificate: " + cert.getSubjectDN());
+                                        //LOGGER.info("Received certificate: " + cert.getSubjectDN());
                                         // You can add your validation logic here
                                         LOGGER.info(PkiUtil.getCertificateAsPem(cert));
                                     }
@@ -94,21 +99,21 @@ public class TorClientV3 implements TorClient {
                         .addLast(new SimpleChannelInboundHandler<TorCell>() {
                             @Override
                             public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-                                LOGGER.error("TorClientV3.exceptionCaught", cause);
+                                LOGGER.error("TorV3Client.exceptionCaught", cause);
                             }
 
                             @Override
                             protected void channelRead0(ChannelHandlerContext ctx, TorCell msg) {
-                                handleQueryResp(msg);
+                                Consumer<TorCell> listener = cellListener.get();
+                                listener.accept(msg);
                             }
                         });
                 }
             });
     }
 
-    protected void handleQueryResp(TorCell msg) {
-        //TODO: implement
-        System.out.println("Received TorCell " + msg);
+    public Consumer<TorCell> setCellListener(Consumer<TorCell> listener) {
+        return cellListener.getAndSet(listener);
     }
 
     public Promise<Channel> establishConnection(InetAddress connectAddress, int connectPort) {
@@ -129,9 +134,13 @@ public class TorClientV3 implements TorClient {
         return channelPromise;
     }
 
-    public ChannelFuture handshake(Channel channel) {
+    public ChannelFuture initTorHandshake(Channel channel) {
         VersionsTorCell versionsCell = new VersionsTorCell(0, 3);
         return channel.write(versionsCell);
+    }
+
+    public ChannelFuture sendNetInfo(Channel channel, NetInfoTorCell netInfoCell) {
+        return channel.write(netInfoCell);
     }
 
     @Override

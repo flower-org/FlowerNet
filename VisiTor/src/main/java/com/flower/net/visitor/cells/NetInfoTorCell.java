@@ -108,7 +108,9 @@ public class NetInfoTorCell extends AbstractTorCell {
 
     /** Called from TorCell.readFromBuffer(buffer); */
     static NetInfoTorCell readFromBuffer(int circuitId, CellCommand code, ByteBuf buffer) {
-        assert(code == NETINFO);
+        if (code != NETINFO) {
+            throw new RuntimeException("Expected CellCommand NETINFO, got " + code);
+        }
 
         int readerIndexBefore = buffer.readerIndex();
 

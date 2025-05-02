@@ -48,7 +48,9 @@ public class AuthChallengeTorCell extends AbstractTorCell {
 
     /** Called from TorCell.readFromBuffer(buffer); */
     static AuthChallengeTorCell readFromBuffer(int circuitId, CellCommand code, int payloadLength, ByteBuf buffer) {
-        assert(code == AUTH_CHALLENGE);
+        if (code != AUTH_CHALLENGE) {
+            throw new RuntimeException("Expected CellCommand AUTH_CHALLENGE, got " + code);
+        }
 
         byte[] challenge = new byte[32];
         buffer.readBytes(challenge);

@@ -54,7 +54,9 @@ public class CertificatesTorCell extends AbstractTorCell {
 
     /** Called from TorCell.readFromBuffer(buffer); */
     static CertificatesTorCell readFromBuffer(int circuitId, CellCommand code, int payloadLength, ByteBuf buffer) {
-        assert(code == CERTS);
+        if (code != CERTS) {
+            throw new RuntimeException("Expected CellCommand CERTS, got " + code);
+        }
 
         payloadLength = checkPayloadLength(payloadLength, 1);
         int certCount = buffer.readByte() & 0xFF;

@@ -63,7 +63,9 @@ public class TorCertificate {
     }
 
     TorCertificate(TorCertificateType certificateType, X509Certificate certificate) throws CertificateEncodingException {
-        assert(TorCertificateType.isX509Certificate(certificateType));
+        if (!TorCertificateType.isX509Certificate(certificateType)) {
+            throw new RuntimeException("Expected X509Certificate, got " + certificateType);
+        }
         this.certificateType = certificateType;
         this.certificate = certificate;
         this.certificateBuffer = certificate.getEncoded();;
@@ -73,7 +75,9 @@ public class TorCertificate {
     }
 
     TorCertificate(TorCertificateType certificateType, TorEdCertificate edCertificate) {
-        assert(TorCertificateType.isEdCertificate(certificateType));
+        if (!TorCertificateType.isEdCertificate(certificateType)) {
+            throw new RuntimeException("Expected Ed Certificate, got " + certificateType);
+        }
         this.certificateType = certificateType;
         this.edCertificate = edCertificate;
         this.certificateBuffer = edCertificate.getBuffer();;
@@ -83,7 +87,9 @@ public class TorCertificate {
     }
 
     TorCertificate(TorCertificateType certificateType, TorRsaEdCrossCertificate rsaEdCertificate) {
-        assert(TorCertificateType.isRsaEdCrossCertificate(certificateType));
+        if (!TorCertificateType.isRsaEdCrossCertificate(certificateType)) {
+            throw new RuntimeException("Expected Rsa-Ed Cross Certificate, got " + certificateType);
+        }
         this.certificateType = certificateType;
         this.rsaEdCertificate = rsaEdCertificate;
         this.certificateBuffer = rsaEdCertificate.getBuffer();

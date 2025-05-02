@@ -38,7 +38,9 @@ public class VersionsTorCell extends AbstractTorCell {
 
     /** Called from TorCell.readFromBuffer(buffer); */
     static VersionsTorCell readFromBuffer(int circuitId, CellCommand code, int payloadLength, ByteBuf buffer) {
-        assert(code == VERSIONS);
+        if (code != VERSIONS) {
+            throw new RuntimeException("Expected CellCommand VERSIONS, got " + code);
+        }
 
         List<Integer> versionList = new ArrayList<>();
         for (int i = 0; i < payloadLength/2; i++) {

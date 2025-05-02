@@ -24,8 +24,8 @@ import java.util.List;
  * <p>
  * https://spec.torproject.org/cert-spec.html#ed-certs
  * - The ExtFlags field holds flags. Only one flag is currently defined:
- * 1: AFFECTS_VALIDATION. If this flag is present, then the extension affects whether the certificate is valid;
- * implementations MUST NOT accept the certificate as valid unless they recognize the ExtType and accept the extension as valid.
+ * 1: AFFECTS_VALIDATION. If this flag is present, then the extension affects whether the certificate is valid; ??? WAT
+ * implementations MUST NOT accept the certificate as valid unless they recognize the ExtType and accept the extension as valid. ???
  */
 public class CertificatesValidator {
     // TODO: from https://spec.torproject.org/tor-spec/relay-keys.html#identity

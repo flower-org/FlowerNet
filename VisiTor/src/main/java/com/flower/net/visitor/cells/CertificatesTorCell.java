@@ -13,7 +13,7 @@ import java.util.List;
 import static com.flower.net.visitor.cells.CellCommand.CERTS;
 
 public class CertificatesTorCell extends AbstractTorCell {
-    protected final List<TorCertificate> certificates = new ArrayList<>();
+    public final List<TorCertificate> certificates = new ArrayList<>();
 
     public CertificatesTorCell(int circuitId, List<TorCertificate> certificateList) {
         super(circuitId, CERTS);

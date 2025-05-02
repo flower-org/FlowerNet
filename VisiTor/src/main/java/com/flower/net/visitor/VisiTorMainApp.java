@@ -20,7 +20,7 @@ public class VisiTorMainApp {
     @FXML @Nullable Label serverInfoLabel;
     @FXML @Nullable TabPane tabs;
 
-    DirectoryInfoForm directoryInfoForm;
+    @Nullable DirectoryInfoForm directoryInfoForm;
 
     public VisiTorMainApp() {
         //This form is created automatically.

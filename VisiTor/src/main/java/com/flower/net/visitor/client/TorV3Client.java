@@ -4,6 +4,7 @@ import com.flower.crypt.PkiUtil;
 import com.flower.net.visitor.cells.NetInfoTorCell;
 import com.flower.net.visitor.cells.TorCell;
 import com.flower.net.visitor.cells.VersionsTorCell;
+import com.flower.net.visitor.certificates.TorUtils;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -79,6 +80,9 @@ public class TorV3Client implements TorClient {
                                         //LOGGER.info("Received certificate: " + cert.getSubjectDN());
                                         // You can add your validation logic here
                                         LOGGER.info(PkiUtil.getCertificateAsPem(cert));
+
+                                        // TODO: this digest should be verified in Certificate Validator against signingCertificate key
+                                        System.out.println(TorUtils.bytesToHex(TorUtils.getCertificateSHA256Digest(cert)));
                                     }
                                 } catch (Exception e) {
                                     LOGGER.error("Failed to retrieve peer certificates", e);
@@ -105,13 +109,16 @@ public class TorV3Client implements TorClient {
                             @Override
                             protected void channelRead0(ChannelHandlerContext ctx, TorCell msg) {
                                 Consumer<TorCell> listener = cellListener.get();
-                                listener.accept(msg);
+                                if (listener != null) {
+                                    listener.accept(msg);
+                                }
                             }
                         });
                 }
             });
     }
 
+    // TODO: Set specifically for connection?
     public Consumer<TorCell> setCellListener(Consumer<TorCell> listener) {
         return cellListener.getAndSet(listener);
     }
@@ -145,17 +152,17 @@ public class TorV3Client implements TorClient {
 
     @Override
     public Future<String> loadDirectory() {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public Future<String> connect2() {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public Future<String> extend2() {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override

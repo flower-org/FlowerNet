@@ -76,6 +76,8 @@ dependencies {
     implementation 'org.apache.commons:commons-lang3:3.13.0'
     implementation 'org.jfxtras:jfxtras-controls:17-r1'
 
+    implementation 'org.bouncycastle:bcpkix-jdk15on:1.65'
+
     implementation group: 'org.openjfx', name: 'javafx-base', version: javafx.version, classifier: 'win'
     implementation group: 'org.openjfx', name: 'javafx-base', version: javafx.version, classifier: 'mac'
     //implementation group: 'org.openjfx', name: 'javafx-base', version: javafx.version, classifier: 'mac-aarch64'
@@ -135,7 +137,7 @@ tasks.withType(JavaCompile) {
             //Exclude Immutables generated code
             excludedPaths.set("$buildDir/generated/sources/.*")
             check("NullAway", CheckSeverity.ERROR)
-            option("NullAway:AnnotatedPackages", "com.flower.visitor")
+            option("NullAway:AnnotatedPackages", "com.flower.net.visitor")
         }
     } else {
         options.errorprone {

@@ -1,5 +1,10 @@
 package com.flower.net.visitor.certificates;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateEncodingException;
+
 public class TorUtils {
     public static final int FIXED_CELL_LEN = 512;
     public static final int FIXED_CELL_BODY_LEN = 509;
@@ -33,5 +38,15 @@ public class TorUtils {
             hexString.append(hex);
         }
         return hexString.toString();
+    }
+
+    public static byte[] getCertificateSHA256Digest(Certificate certificate) {
+        try {
+            byte[] encodedCert = certificate.getEncoded();
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return digest.digest(encodedCert);
+        } catch (CertificateEncodingException | NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

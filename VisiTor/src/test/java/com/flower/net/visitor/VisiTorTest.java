@@ -2,7 +2,10 @@ package com.flower.net.visitor;
 
 import com.flower.crypt.PkiUtil;
 import com.flower.net.utils.IpAddressUtil;
+import com.flower.net.visitor.cells.CertificatesTorCell;
 import com.flower.net.visitor.cells.NetInfoTorCell;
+import com.flower.net.visitor.certificates.CertificatesValidator;
+import com.flower.net.visitor.certificates.TorCertificateValidationException;
 import com.flower.net.visitor.client.TorV3Client;
 import io.netty.channel.Channel;
 
@@ -37,6 +40,14 @@ public class VisiTorTest {
                                         checkNotNull(myAddresses.get(0)),
                                         List.of());
                         client.sendNetInfo(channel, myNetInfo);
+                    } else if (torCell instanceof CertificatesTorCell) {
+                        try {
+                            CertificatesValidator.verifyCertificates(((CertificatesTorCell)torCell).certificates);
+                            System.out.println("Certificate verification success");
+                        } catch (TorCertificateValidationException e) {
+                            throw new RuntimeException(e);
+                        }
+
                     }
                 });
 

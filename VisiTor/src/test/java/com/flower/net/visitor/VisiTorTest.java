@@ -3,7 +3,6 @@ package com.flower.net.visitor;
 import com.flower.crypt.PkiUtil;
 import com.flower.net.utils.IpAddressUtil;
 import com.flower.net.visitor.cells.NetInfoTorCell;
-import com.flower.net.visitor.cells.TorCell;
 import com.flower.net.visitor.client.TorV3Client;
 import io.netty.channel.Channel;
 
@@ -13,8 +12,6 @@ import org.junit.jupiter.api.Test;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -25,11 +22,12 @@ public class VisiTorTest {
     public void test0() throws SSLException, InterruptedException {
         TorV3Client client = new TorV3Client(TRUST_MANAGER, 50000);
         //client.establishConnection(IpAddressUtil.fromString("1.1.1.1"), 443);
-        Promise<Channel> channelPromise = client.establishConnection(IpAddressUtil.fromString("131.188.40.189"), 443);
+        Promise<Channel> channelPromise = client.establishTLSConnection(IpAddressUtil.fromString("131.188.40.189"), 443);
 
         channelPromise.addListener(future -> {
             if (future.isSuccess()) {
                 Channel channel = (Channel)future.getNow();
+
                 client.setCellListener(torCell -> {
                     System.out.println("Received TorCell " + torCell);
                     if (torCell instanceof NetInfoTorCell) {
@@ -37,7 +35,7 @@ public class VisiTorTest {
                         NetInfoTorCell myNetInfo =
                                 new NetInfoTorCell(0, 0,
                                         checkNotNull(myAddresses.get(0)),
-                                        List.of(NetInfoTorCell.EMPTY_ADDRESS));
+                                        List.of());
                         client.sendNetInfo(channel, myNetInfo);
                     }
                 });

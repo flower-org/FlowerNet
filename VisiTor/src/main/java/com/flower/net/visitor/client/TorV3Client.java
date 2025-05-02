@@ -116,7 +116,7 @@ public class TorV3Client implements TorClient {
         return cellListener.getAndSet(listener);
     }
 
-    public Promise<Channel> establishConnection(InetAddress connectAddress, int connectPort) {
+    public Promise<Channel> establishTLSConnection(InetAddress connectAddress, int connectPort) {
         // Aggressive approach - if we can create more channels, create more
         Promise<Channel> channelPromise = new DefaultPromise<>(bootstrap.config().group().next());
         ChannelFuture connectFuture;

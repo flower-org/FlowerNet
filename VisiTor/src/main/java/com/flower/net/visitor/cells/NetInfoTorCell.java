@@ -11,7 +11,6 @@ import java.util.List;
 
 import static com.flower.net.visitor.cells.CellCommand.NETINFO;
 import static com.flower.net.visitor.certificates.TorUtils.FIXED_CELL_BODY_LEN;
-import static com.flower.net.visitor.certificates.TorUtils.FIXED_CELL_LEN;
 
 /**
  * From https://spec.torproject.org/tor-spec/negotiating-channels.html#NETINFO-cells
@@ -29,7 +28,6 @@ import static com.flower.net.visitor.certificates.TorUtils.FIXED_CELL_LEN;
  */
 public class NetInfoTorCell extends AbstractTorCell {
     enum NetInfoAddressType {
-        NONE(0x00),
 	    IP_V4(0x04),
     	IP_V6(0x06);
 
@@ -71,8 +69,6 @@ public class NetInfoTorCell extends AbstractTorCell {
                     '}';
         }
     }
-
-    public static final NetInfoAddress EMPTY_ADDRESS = new NetInfoAddress(NetInfoAddressType.NONE, new byte[4]);
 
     /** Timestamp */
     public final long rawTime;

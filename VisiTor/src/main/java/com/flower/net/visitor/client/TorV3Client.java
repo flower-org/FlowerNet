@@ -83,6 +83,7 @@ public class TorV3Client implements TorClient {
 
                                         // TODO: this digest should be verified in Certificate Validator against signingCertificate key
                                         System.out.println(TorUtils.bytesToHex(TorUtils.getCertificateSHA256Digest(cert)));
+                                        System.out.println(TorUtils.bytesToHex(TorUtils.getKeySHA256Digest(cert.getPublicKey())));
                                     }
                                 } catch (Exception e) {
                                     LOGGER.error("Failed to retrieve peer certificates", e);

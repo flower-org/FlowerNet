@@ -101,7 +101,8 @@ public class TorCertificate {
     @Override
     public String toString() {
         if (edCertificate != null) return certificateType + "\n" + edCertificate + "\n";
-        if (certificate != null) return certificateType + "\n" + certificate.getIssuerX500Principal() + "\n";
+        if (certificate != null) return certificateType + "\n" + certificate.getIssuerX500Principal() + " " +
+                certificate.getPublicKey() + " " + TorUtils.bytesToHex(TorUtils.getKeySHA256Digest(certificate.getPublicKey())) + "\n";
         if (rsaEdCertificate != null) return certificateType + "\n" + rsaEdCertificate + "\n";
         throw new RuntimeException("Inner certificate not set.");
     }

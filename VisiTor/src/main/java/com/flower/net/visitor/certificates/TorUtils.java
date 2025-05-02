@@ -1,7 +1,12 @@
 package com.flower.net.visitor.certificates;
 
+import org.bouncycastle.asn1.pkcs.RSAPublicKey;
+
+import java.io.IOException;
+import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
 
@@ -48,5 +53,30 @@ public class TorUtils {
         } catch (CertificateEncodingException | NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static byte[] getKeySHA256Digest(PublicKey key) {
+        try {
+            byte[] rawKeyBytes = getPKCS1Encoded(key);
+            MessageDigest digest = MessageDigest.getInstance("SHA-1");
+            digest.update(rawKeyBytes);
+            return digest.digest();
+        } catch (IOException | NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static byte[] getPKCS1Encoded(PublicKey publicKey) throws IOException {
+        if (!(publicKey instanceof java.security.interfaces.RSAPublicKey)) {
+            throw new IllegalArgumentException("Public key is not an RSA key");
+        }
+
+        java.security.interfaces.RSAPublicKey rsaPublicKey = (java.security.interfaces.RSAPublicKey) publicKey;
+        BigInteger modulus = rsaPublicKey.getModulus();
+        BigInteger publicExponent = rsaPublicKey.getPublicExponent();
+
+        // Create the PKCS#1 structure
+        RSAPublicKey pkcs1Key = new RSAPublicKey(modulus, publicExponent);
+        return pkcs1Key.getEncoded();
     }
 }

@@ -25,7 +25,7 @@ public class VisiTorTest {
     public void test0() throws SSLException, InterruptedException {
         TorV3Client client = new TorV3Client(TRUST_MANAGER, 50000);
         //client.establishConnection(IpAddressUtil.fromString("1.1.1.1"), 443);
-        Promise<Channel> channelPromise = client.establishTLSConnection(IpAddressUtil.fromString("131.188.40.189"), 443);
+        Promise<Channel> channelPromise = client.establishTLSConnection(IpAddressUtil.fromString("199.58.81.140"), 443);
 
         channelPromise.addListener(future -> {
             if (future.isSuccess()) {

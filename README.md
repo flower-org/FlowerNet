@@ -7,7 +7,7 @@ gradle shadowJar
 ```
 
 Абстрактно: 
-- если SOCKSs это SOCKS5 over TLS,
+- если SOCKS5s это SOCKS5 over TLS,
 
 - то SOCKS+ это SOCKS5 over QUIC,
     - который может инкапсулировать TCP в streams

@@ -2,7 +2,7 @@ plugins {
     id 'java'
     id 'application'
     id 'org.openjfx.javafxplugin' version '0.1.0'
-    id 'org.beryx.jlink' version '2.24.1'
+    id 'org.beryx.runtime' version '2.0.1'
     id "net.ltgt.errorprone" version "3.0.1"
     id "com.github.johnrengelman.shadow" version "7.1.2"
 }
@@ -35,6 +35,24 @@ tasks.withType(JavaCompile) {
 application {
     mainModule = 'com.flower.net.socksui'
     mainClass = 'com.flower.net.socksui.SocksUiLauncher'
+}
+
+def jpackageVersion = version.toString().replaceFirst(/-.*/, '')
+def projectName = "SocksUi"
+
+runtime {
+    imageDir = layout.buildDirectory.dir("image").get().asFile
+    options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages', '--ignore-signing-information']
+    launcher {
+        jvmArgs = ['-Dfile.encoding=UTF-8']
+    }
+
+    jpackage {
+        imageName = projectName
+        installerName = projectName
+        appVersion = jpackageVersion
+        installerType = 'app-image'
+    }
 }
 
 javafx {
@@ -133,7 +151,7 @@ tasks.withType(JavaCompile) {
 
         options.errorprone {
             //Exclude Immutables generated code
-            excludedPaths.set("$buildDir/generated/sources/.*")
+            excludedPaths.set(".*[\\\\/]generated[\\\\/]sources[\\\\/].*")
             check("NullAway", CheckSeverity.ERROR)
             option("NullAway:AnnotatedPackages", "com.flower.socksui")
         }

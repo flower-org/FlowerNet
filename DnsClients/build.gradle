@@ -65,7 +65,7 @@ tasks.withType(JavaCompile) {
     if (!name.toLowerCase().contains("test") && !name.toLowerCase().contains("build")) {
         options.errorprone {
             check("NullAway", CheckSeverity.ERROR)
-            excludedPaths.set("$buildDir/generated/sources/.*")
+            excludedPaths.set(".*[\\\\/]build[\\\\/]generated[\\\\/]sources[\\\\/].*")
             option("NullAway:AnnotatedPackages", "com.flower")
         }
     } else {

@@ -135,7 +135,7 @@ tasks.withType(JavaCompile) {
 
         options.errorprone {
             //Exclude Immutables generated code
-            excludedPaths.set("$buildDir/generated/sources/.*")
+            excludedPaths.set(".*[\\\\/]build[\\\\/]generated[\\\\/]sources[\\\\/].*")
             check("NullAway", CheckSeverity.ERROR)
             option("NullAway:AnnotatedPackages", "com.flower.net.visitor")
         }

@@ -1,9 +1,9 @@
 plugins {
-    id 'java'
     id 'application'
-    id 'org.openjfx.javafxplugin' version '0.1.0'
+    id 'com.flower.java-base'
+    id 'com.flower.errorprone'
+    id 'com.flower.javafx'
     id 'org.beryx.runtime' version '2.0.1'
-    id "net.ltgt.errorprone" version "3.0.1"
     id "com.github.johnrengelman.shadow" version "7.1.2"
 }
 
@@ -16,20 +16,6 @@ repositories {
 
 ext {
     junitVersion = '5.8.1'
-}
-
-sourceCompatibility = '17'
-targetCompatibility = '17'
-
-compileJava {
-    options.compilerArgs << '-parameters'
-}
-compileTestJava {
-    options.compilerArgs << '-parameters'
-}
-
-tasks.withType(JavaCompile) {
-    options.encoding = 'UTF-8'
 }
 
 application {
@@ -55,16 +41,6 @@ runtime {
     }
 }
 
-javafx {
-    version = '21.0.1'
-    modules = ['javafx.controls', 'javafx.fxml', 'javafx.graphics', 'javafx.media']
-}
-
-sourceSets {
-    main { java { srcDir 'src/main' } }
-    test { java { srcDir 'src/test' } }
-}
-
 dependencies {
     implementation project(':CryptCore')
     implementation project(':JavaFxUtils')
@@ -74,7 +50,6 @@ dependencies {
     implementation project(':SocksChainServer')
 
     annotationProcessor "org.immutables:value:2.9.2"
-    annotationProcessor "com.uber.nullaway:nullaway:0.7.9"
 
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.13.0'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.0'
@@ -121,14 +96,6 @@ dependencies {
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:${junitVersion}")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junitVersion}")
-
-    compileOnly "com.google.code.findbugs:jsr305:3.0.2"
-    errorprone "com.google.errorprone:error_prone_core:2.10.0"
-    errorproneJavac "com.google.errorprone:javac:9+181-r4173-1"
-}
-
-test {
-    useJUnitPlatform()
 }
 
 // build jar:
@@ -143,21 +110,6 @@ jar {
     }
 }
 
-import net.ltgt.gradle.errorprone.CheckSeverity
-
-tasks.withType(JavaCompile) {
-    // remove the if condition if you want to run NullAway on test code
-    if (!name.toLowerCase().contains("test") && !name.toLowerCase().contains("build")) {
-
-        options.errorprone {
-            //Exclude Immutables generated code
-            excludedPaths.set(".*[\\\\/]generated[\\\\/]sources[\\\\/].*")
-            check("NullAway", CheckSeverity.ERROR)
-            option("NullAway:AnnotatedPackages", "com.flower.socksui")
-        }
-    } else {
-        options.errorprone {
-            check("DoNotMock", CheckSeverity.WARN)
-        }
-    }
+flowerErrorProne {
+    annotatedPackages = ['com.flower.net.socksui']
 }

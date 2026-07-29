@@ -41,9 +41,9 @@ jobs:
           java-version: '17'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/gradle-build-action@v3
         with:
-          gradle-version: '8.14'
+          gradle-version: 8.5
 
       - name: Build SocksUi app image
         run: gradle :SocksUi:jpackageImage

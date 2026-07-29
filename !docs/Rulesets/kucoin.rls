@@ -1,0 +1,51 @@
+---
+addressRecords:
+- access: "ALLOW"
+  dstHost: "assets.staticimg.com"
+  dstPort: 443
+  creationTimestamp: 1783323635492
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "assets-currency.kucoin.com"
+  dstPort: 443
+  creationTimestamp: 1783323671985
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "gcaptcha4.geetest.com"
+  dstPort: 443
+  creationTimestamp: 1783323792066
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "static.geevisit.com"
+  dstPort: 443
+  creationTimestamp: 1783323822167
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "www.kucoin.com"
+  dstPort: 443
+  creationTimestamp: 1783323605843
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "sentry-v2.staticimg.co"
+  dstPort: 443
+  creationTimestamp: 1783323657729
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "kucoin.com"
+  dstPort: 443
+  creationTimestamp: 1783323413064
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "gcaptcha4.gsensebot.com"
+  dstPort: 443
+  creationTimestamp: 1783323790275
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "static.geetest.com"
+  dstPort: 443
+  creationTimestamp: 1783323820290
+  isWildcard: false
+hostRecords: []
+portRecords: []
+wildcardAddressRecords: []
+wildcardHostRecords: []

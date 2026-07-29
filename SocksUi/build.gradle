@@ -43,6 +43,7 @@ def projectName = "SocksUi"
 runtime {
     imageDir = layout.buildDirectory.dir("image").get().asFile
     options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages', '--ignore-signing-information']
+    addModules('jdk.crypto.cryptoki', 'java.xml', 'java.scripting', 'java.logging', 'java.prefs', 'jdk.unsupported', 'java.management', 'java.desktop')
     launcher {
         jvmArgs = ['-Dfile.encoding=UTF-8']
     }

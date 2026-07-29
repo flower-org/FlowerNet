@@ -1,0 +1,20 @@
+plugins {
+    id 'application'
+    id 'com.flower.java-base'
+    id 'org.beryx.runtime'
+}
+
+runtime {
+    imageDir = layout.buildDirectory.dir('image').get().asFile
+    options = [
+            '--strip-debug',
+            '--compress', '2',
+            '--no-header-files',
+            '--no-man-pages',
+            '--ignore-signing-information'
+    ]
+
+    launcher {
+        jvmArgs = ['-Dfile.encoding=UTF-8']
+    }
+}

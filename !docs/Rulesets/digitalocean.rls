@@ -1,0 +1,26 @@
+---
+addressRecords:
+- access: "ALLOW"
+  dstHost: "www.digitalocean.com"
+  dstPort: 443
+  creationTimestamp: 1785585817636
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "digitalocean.com"
+  dstPort: 443
+  creationTimestamp: 1785585846966
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "cloud.digitalocean.com"
+  dstPort: 443
+  creationTimestamp: 1785585830253
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "ui-cdn.digitalocean-ui.com"
+  dstPort: 443
+  creationTimestamp: 1785585861961
+  isWildcard: false
+hostRecords: []
+portRecords: []
+wildcardAddressRecords: []
+wildcardHostRecords: []

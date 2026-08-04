@@ -2,8 +2,12 @@ name: Release Socks UI
 
 on:
   push:
+    branches:
+      - 'feature/flower-build-lib'
     tags:
       - 'v*'
+env:
+  RELEASE_VERSION: ${{ inputs.version || (github.ref_type == 'tag' && github.ref_name) || '0.2.3-test' }}
 
 jobs:
   release:
@@ -48,10 +52,18 @@ jobs:
       - name: Build and verify platform JAR
         run: >-
           gradle :SocksUi:verifyPlatformJar
-          -PreleaseVersion=${{ github.ref_name }}
+          -PreleaseVersion=${{ env.RELEASE_VERSION }}
           -PreleasePlatform=${{ matrix.platform }}
 
+      - name: Upload test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SocksUi-${{ env.RELEASE_VERSION }}-${{ matrix.platform }}
+          path: SocksUi/build/libs/*-${{ matrix.platform }}.jar
+          if-no-files-found: error
+
       - name: Upload JAR to release
+        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
           files: SocksUi/build/libs/*-${{ matrix.platform }}.jar

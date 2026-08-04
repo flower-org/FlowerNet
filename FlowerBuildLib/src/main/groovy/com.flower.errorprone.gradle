@@ -1,0 +1,53 @@
+import com.flower.buildlib.FlowerErrorProneExtension
+import net.ltgt.gradle.errorprone.CheckSeverity
+
+plugins {
+    id 'com.flower.java-base'
+    id 'net.ltgt.errorprone'
+}
+
+def flowerErrorProne = extensions.create(
+        'flowerErrorProne',
+        FlowerErrorProneExtension
+)
+
+dependencies {
+    annotationProcessor 'com.uber.nullaway:nullaway:0.7.9'
+    compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
+    errorprone 'com.google.errorprone:error_prone_core:2.10.0'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    if (!name.toLowerCase().contains('test') && !name.toLowerCase().contains('build')) {
+        options.errorprone {
+            excludedPaths.set(
+                    '.*[\\\\/]build[\\\\/]generated[\\\\/]sources[\\\\/].*'
+            )
+            check('NullAway', CheckSeverity.ERROR)
+        }
+    } else {
+        options.errorprone {
+            check('DoNotMock', CheckSeverity.WARN)
+        }
+    }
+}
+
+afterEvaluate {
+    def packages = flowerErrorProne.annotatedPackages.getOrElse([])
+
+    if (packages.empty) {
+        throw new GradleException(
+                "Plugin 'com.flower.errorprone' requires " +
+                        'flowerErrorProne.annotatedPackages'
+        )
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        if (!name.toLowerCase().contains('test') && !name.toLowerCase().contains('build')) {
+            options.errorprone.option(
+                    'NullAway:AnnotatedPackages',
+                    packages.join(',')
+            )
+        }
+    }
+}

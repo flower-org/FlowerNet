@@ -125,7 +125,7 @@ public class MainApp {
     }
 
     public void openClientCertificateTab() {
-        keyProvider = buildMainKeyProvider(mainStage);
+        keyProvider = buildMainKeyProvider(checkNotNull(mainStage));
         keyProvider.initPreferences();
 
         final Tab tab = new Tab("Client cert", keyProvider.tabContent());
@@ -135,7 +135,7 @@ public class MainApp {
     }
 
     public void openServerTab() {
-        serverForm = new ServerForm(this, keyProvider);
+        serverForm = new ServerForm(this, checkNotNull(keyProvider));
         serverForm.setStage(checkNotNull(mainStage));
         final Tab tab = new Tab("Server", serverForm);
         tab.setClosable(false);

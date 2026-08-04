@@ -1,3 +1,12 @@
+pluginManagement {
+    includeBuild('FlowerBuildLib')
+
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
 rootProject.name = 'FlowerNet'
 include 'CryptCore'
 include 'DnsClients'

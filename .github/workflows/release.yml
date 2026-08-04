@@ -2,12 +2,11 @@ name: Release Socks UI
 
 on:
   push:
-    branches:
-      - 'feature/flower-build-lib'
     tags:
       - 'v*'
+
 env:
-  RELEASE_VERSION: ${{ inputs.version || (github.ref_type == 'tag' && github.ref_name) || '0.2.3-test' }}
+  RELEASE_VERSION: ${{ github.ref_name }}
 
 jobs:
   release:

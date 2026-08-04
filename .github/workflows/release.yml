@@ -9,12 +9,12 @@ env:
   RELEASE_VERSION: ${{ github.ref_name }}
 
 jobs:
-  release:
+  build:
     name: Build ${{ matrix.platform }} JAR
     runs-on: ${{ matrix.os }}
 
     permissions:
-      contents: write
+      contents: read
 
     strategy:
       fail-fast: false
@@ -54,16 +54,32 @@ jobs:
           --project-prop "releaseVersion=${{ env.RELEASE_VERSION }}"
           --project-prop "releasePlatform=${{ matrix.platform }}"
 
-      - name: Upload test artifact
+      - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: SocksUi-${{ env.RELEASE_VERSION }}-${{ matrix.platform }}
           path: SocksUi/build/libs/*-${{ matrix.platform }}.jar
           if-no-files-found: error
 
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: SocksUi-${{ env.RELEASE_VERSION }}-*
+          path: release-artifacts
+          merge-multiple: true
+
       - name: Upload JAR to release
-        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
-          files: SocksUi/build/libs/*-${{ matrix.platform }}.jar
+          files: release-artifacts/*.jar
           fail_on_unmatched_files: true

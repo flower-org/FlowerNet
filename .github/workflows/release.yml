@@ -52,8 +52,8 @@ jobs:
       - name: Build and verify platform JAR
         run: >-
           gradle :SocksUi:verifyPlatformJar
-          -PreleaseVersion=${{ env.RELEASE_VERSION }}
-          -PreleasePlatform=${{ matrix.platform }}
+          --project-prop "releaseVersion=${{ env.RELEASE_VERSION }}"
+          --project-prop "releasePlatform=${{ matrix.platform }}"
 
       - name: Upload test artifact
         uses: actions/upload-artifact@v4

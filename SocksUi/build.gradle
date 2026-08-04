@@ -1,3 +1,5 @@
+import java.util.zip.ZipFile
+
 plugins {
     id 'application'
     id 'com.flower.java-base'
@@ -8,7 +10,10 @@ plugins {
 }
 
 group 'com.flower.socksui'
-version '0.2.3-amd64'
+version = providers.gradleProperty('releaseVersion')
+        .orElse('0.2.3')
+        .map { it.replaceFirst(/^v/, '') }
+        .get()
 
 repositories {
     mavenCentral()
@@ -62,31 +67,6 @@ dependencies {
     implementation 'org.apache.commons:commons-lang3:3.13.0'
     implementation 'org.jfxtras:jfxtras-controls:17-r1'
 
-    implementation group: 'org.openjfx', name: 'javafx-base', version: javafx.version, classifier: 'win'
-    implementation group: 'org.openjfx', name: 'javafx-base', version: javafx.version, classifier: 'mac'
-    //implementation group: 'org.openjfx', name: 'javafx-base', version: javafx.version, classifier: 'mac-aarch64'
-    implementation group: 'org.openjfx', name: 'javafx-base', version: javafx.version, classifier: 'linux'
-
-    implementation group: 'org.openjfx', name: 'javafx-controls', version: javafx.version, classifier: 'win'
-    implementation group: 'org.openjfx', name: 'javafx-controls', version: javafx.version, classifier: 'mac'
-    //implementation group: 'org.openjfx', name: 'javafx-controls', version: javafx.version, classifier: 'mac-aarch64'
-    implementation group: 'org.openjfx', name: 'javafx-controls', version: javafx.version, classifier: 'linux'
-
-    implementation group: 'org.openjfx', name: 'javafx-fxml', version: javafx.version, classifier: 'win'
-    implementation group: 'org.openjfx', name: 'javafx-fxml', version: javafx.version, classifier: 'mac'
-    //implementation group: 'org.openjfx', name: 'javafx-fxml', version: javafx.version, classifier: 'mac-aarch64'
-    implementation group: 'org.openjfx', name: 'javafx-fxml', version: javafx.version, classifier: 'linux'
-
-    implementation group: 'org.openjfx', name: 'javafx-graphics', version: javafx.version, classifier: 'win'
-    implementation group: 'org.openjfx', name: 'javafx-graphics', version: javafx.version, classifier: 'mac'
-    //implementation group: 'org.openjfx', name: 'javafx-graphics', version: javafx.version, classifier: 'mac-aarch64'
-    implementation group: 'org.openjfx', name: 'javafx-graphics', version: javafx.version, classifier: 'linux'
-
-    implementation group: 'org.openjfx', name: 'javafx-media', version: javafx.version, classifier: 'win'
-    implementation group: 'org.openjfx', name: 'javafx-media', version: javafx.version, classifier: 'mac'
-    //implementation group: 'org.openjfx', name: 'javafx-media', version: javafx.version, classifier: 'mac-aarch64'
-    implementation group: 'org.openjfx', name: 'javafx-media', version: javafx.version, classifier: 'linux'
-
     testImplementation("org.junit.jupiter:junit-jupiter-api:${junitVersion}")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:${junitVersion}")
 }
@@ -105,4 +85,45 @@ jar {
 
 flowerErrorProne {
     annotatedPackages = ['com.flower.net.socksui']
+}
+
+def releasePlatform = providers.gradleProperty('releasePlatform')
+
+tasks.named('shadowJar') {
+    archiveClassifier.set(releasePlatform.orElse('all'))
+}
+
+tasks.register('verifyPlatformJar') {
+    dependsOn tasks.named('shadowJar')
+
+    doLast {
+        def platform = releasePlatform.orNull
+        def nativeMarkers = [
+                'windows-x64': 'glass.dll',
+                'linux-x64'  : 'libglass.so',
+                'macos-arm64': 'libglass.dylib'
+        ]
+        def expectedMarker = nativeMarkers[platform]
+
+        if (expectedMarker == null) {
+            throw new GradleException(
+                    "Set -PreleasePlatform to one of: ${nativeMarkers.keySet().join(', ')}"
+            )
+        }
+
+        def jarFile = tasks.named('shadowJar').get().archiveFile.get().asFile
+        def entries = [] as Set
+        new ZipFile(jarFile).withCloseable { archive ->
+            archive.entries().each { entry ->
+                entries.add(entry.name.tokenize('/').last())
+            }
+        }
+        def includedMarkers = nativeMarkers.values().findAll { entries.contains(it) }
+
+        if (includedMarkers != [expectedMarker]) {
+            throw new GradleException(
+                    "${jarFile.name} must contain only ${expectedMarker}, found: ${includedMarkers}"
+            )
+        }
+    }
 }

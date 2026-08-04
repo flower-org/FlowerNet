@@ -41,8 +41,12 @@ runtime {
 
 dependencies {
     implementation project(':CryptCore')
-    implementation project(':JavaFxUtils')
-    implementation project(':KeyManagerFx')
+    implementation(project(':JavaFxUtils')) {
+        exclude group: 'org.openjfx'
+    }
+    implementation(project(':KeyManagerFx')) {
+        exclude group: 'org.openjfx'
+    }
     implementation project(':NetConfig')
     implementation project(':NetCore')
     implementation project(':SocksChainServer')

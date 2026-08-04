@@ -3,7 +3,7 @@ name: Release Socks UI
 on:
   push:
     tags:
-      - 'v*'
+      - '[0-9]+.[0-9]+.[0-9]+'
 
 env:
   RELEASE_VERSION: ${{ github.ref_name }}

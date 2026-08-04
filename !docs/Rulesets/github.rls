@@ -1,0 +1,36 @@
+---
+addressRecords:
+- access: "ALLOW"
+  dstHost: "avatars.githubusercontent.com"
+  dstPort: 443
+  creationTimestamp: 1785591700529
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "github.com"
+  dstPort: 443
+  creationTimestamp: 1785591376511
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "api.github.com"
+  dstPort: 443
+  creationTimestamp: 1785591574422
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "release-assets.githubusercontent.com"
+  dstPort: 443
+  creationTimestamp: 1785591702980
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "github.githubassets.com"
+  dstPort: 443
+  creationTimestamp: 1785591531656
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "objects-origin.githubusercontent.com"
+  dstPort: 443
+  creationTimestamp: 1785591586282
+  isWildcard: false
+hostRecords: []
+portRecords: []
+wildcardAddressRecords: []
+wildcardHostRecords: []

@@ -1,0 +1,66 @@
+---
+addressRecords:
+- access: "ALLOW"
+  dstHost: "www.tradingview.com"
+  dstPort: 443
+  creationTimestamp: 1785234741344
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "s.tradingview.com"
+  dstPort: 443
+  creationTimestamp: 1785234290821
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "pushstream.tradingview.com"
+  dstPort: 443
+  creationTimestamp: 1785233803581
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "scanner.tradingview.com"
+  dstPort: 443
+  creationTimestamp: 1785234779209
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "widgetdata.tradingview.com"
+  dstPort: 443
+  creationTimestamp: 1785233746994
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "news-mediator.tradingview.com"
+  dstPort: 443
+  creationTimestamp: 1785234776872
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "www.tradingview-widget.com"
+  dstPort: 443
+  creationTimestamp: 1785233741225
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "data.tradingview.com"
+  dstPort: 443
+  creationTimestamp: 1785234759252
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "static.tradingview.com"
+  dstPort: 443
+  creationTimestamp: 1785234749562
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "s3.tradingview.com"
+  dstPort: 443
+  creationTimestamp: 1785233717006
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "s3-symbol-logo.tradingview.com"
+  dstPort: 443
+  creationTimestamp: 1785233793763
+  isWildcard: false
+- access: "ALLOW"
+  dstHost: "www.multicoincharts.com"
+  dstPort: 443
+  creationTimestamp: 1785233703365
+  isWildcard: false
+hostRecords: []
+portRecords: []
+wildcardAddressRecords: []
+wildcardHostRecords: []

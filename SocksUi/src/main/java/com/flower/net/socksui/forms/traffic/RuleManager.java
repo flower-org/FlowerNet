@@ -26,6 +26,12 @@ public abstract class RuleManager {
         this.filter = filter;
     }
 
+    protected String clearRulesMsg() { return "Delete all rules?"; }
+    protected String clearAllowRulesMsg() { return "Delete all Alow rules?"; }
+    protected String clearDenyRulesMsg() {
+        return "Delete all Deny rules?";
+    }
+
     /** Open TrafficRule dialog */
     public void newRule() {
         try {
@@ -107,8 +113,6 @@ public abstract class RuleManager {
         refreshAndRestoreCursor();
     }
 
-    protected String clearRulesMsg() { return "Delete all rules?"; }
-
     /** Clear inner filter rules */
     public void clearRules() {
         if (JavaFxUtils.showYesNoDialog(clearRulesMsg()) == JavaFxUtils.YesNo.YES) {
@@ -117,18 +121,12 @@ public abstract class RuleManager {
         }
     }
 
-    protected String clearAllowRulesMsg() { return "Delete all Alow rules?"; }
-
     /** Clear inner filter ALLOW rules */
     public void clearAllowRules() {
         if (JavaFxUtils.showYesNoDialog(clearAllowRulesMsg()) == JavaFxUtils.YesNo.YES) {
             filter.clearFilterType(Access.ALLOW);
             refreshAndRestoreCursor();
         }
-    }
-
-    protected String clearDenyRulesMsg() {
-        return "Delete all Deny rules?";
     }
 
     /** Clear inner filter DENY rules */
@@ -156,7 +154,7 @@ public abstract class RuleManager {
         refreshAndRestoreCursor();
     }
 
-    Access flipFilterType(Access type) {
+    protected Access flipFilterType(Access type) {
         switch (type) {
             case DENY: return Access.ALLOW;
             case ALLOW: return Access.DENY;

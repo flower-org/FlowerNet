@@ -56,7 +56,7 @@ public class ConfigSslContextBuilder {
         } else if (keyManager != null && trustManagerFactory != null) {
             return FlowerSslContextBuilder.buildSslContext(keyManager, trustManagerFactory);
         } else {
-            return FlowerSslContextBuilder.buildSslContext(keyManager);
+            throw new RuntimeException("Unexpected state: keyManager or trustManagerFactory is null");
         }
     }
 

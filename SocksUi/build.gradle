@@ -75,7 +75,7 @@ dependencies {
     implementation project(':SocksChainServer')
 
     annotationProcessor "org.immutables:value:2.9.2"
-    annotationProcessor "com.uber.nullaway:nullaway:0.7.9"
+    annotationProcessor "com.uber.nullaway:nullaway:0.10.26"
 
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.13.0'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.0'

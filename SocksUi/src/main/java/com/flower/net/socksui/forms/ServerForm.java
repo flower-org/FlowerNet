@@ -135,6 +135,15 @@ public class ServerForm extends AnchorPane implements Refreshable, ProxyChainPro
         refreshContent();
     }
 
+    /**
+     * For PKCS#11, this returns a KeyManagerFactory with all token certificates,
+     * not only the one selected in UI.
+     * That's why it may look like an "incorrect" certificate (chosen in UI) worked fine with the server,
+     * but in reality the TLS client is using a different certificate from the PKCS#11 token, which was picked
+     * automatically out of the list of all certs on the token by TLSHandler.
+     *
+     * TODO: restrict choice to the selected certificate only.
+     */
     protected Supplier<KeyManagerFactory> getKeyManagerSupplier() {
         return () -> ((RsaKeyProvider)keyProvider).getKeyManagerFactory();
     }

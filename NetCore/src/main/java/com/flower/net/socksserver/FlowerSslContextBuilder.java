@@ -19,7 +19,7 @@ public class FlowerSslContextBuilder {
             "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
             "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256");
 
-    public static SslContext buildSslContext(KeyManagerFactory serverKeyManager) throws SSLException {
+    public static SslContext buildServerSslContextWithDefaultTrustManager(KeyManagerFactory serverKeyManager) throws SSLException {
         return io.netty.handler.ssl.SslContextBuilder
                 .forServer(serverKeyManager)
                 .protocols(TLS_PROTOCOLS)

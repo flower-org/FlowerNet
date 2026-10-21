@@ -1,8 +1,9 @@
-package com.flower.net.socksui.forms.traffic;
+package com.flower.net.ruler.forms.traffic;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
+import com.flower.fxutils.Refreshable;
 import com.flower.net.conntrack.ConnectionFilter;
 import com.flower.net.config.access.Access;
 import com.flower.net.conntrack.allowdenylist.AddressFilterList;
@@ -11,9 +12,8 @@ import com.flower.net.conntrack.allowdenylist.ImmutableHostRecord;
 import com.flower.net.conntrack.allowdenylist.ImmutablePortRecord;
 import com.flower.net.conntrack.allowdenylist.AllowDenyConnectionFilter;
 import com.flower.fxutils.JavaFxUtils;
-import com.flower.net.socksui.MainApp;
-import com.flower.net.socksui.forms.ConnectionMonitorForm;
-import com.flower.net.socksui.forms.Refreshable;
+import com.flower.net.ruler.interfaces.ConnectionsTextSetter;
+import com.flower.net.ruler.interfaces.DeniedHostsListener;
 import com.flower.net.utils.IpAddressUtil;
 import com.google.common.collect.Streams;
 import javafx.application.Platform;
@@ -80,9 +80,9 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     final AtomicLong totalConnections;
     final AtomicLong allowedConnections;
     final AtomicLong prohibitedConnections;
-    final MainApp mainForm;
+    final ConnectionsTextSetter mainForm;
 
-    @Nullable ConnectionMonitorForm connectionMonitorForm;
+    @Nullable DeniedHostsListener connectionMonitorForm;
 
     RuleManager mainRuleManager;
     RuleManager tmpRuleManager;
@@ -91,11 +91,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         this.stage = stage;
     }
 
-    public void setConnectionMonitorForm(ConnectionMonitorForm connectionMonitorForm) {
+    public void setConnectionMonitorForm(DeniedHostsListener connectionMonitorForm) {
         this.connectionMonitorForm = connectionMonitorForm;
     }
 
-    public TrafficControlForm(MainApp mainForm) {
+    public TrafficControlForm(ConnectionsTextSetter mainForm) {
         FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("TrafficControlForm.fxml"));
         fxmlLoader.setRoot(this);
         fxmlLoader.setController(this);

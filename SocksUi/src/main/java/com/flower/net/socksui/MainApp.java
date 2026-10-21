@@ -1,9 +1,10 @@
 package com.flower.net.socksui;
 
 import com.flower.fxutils.JavaFxUtils;
+import com.flower.net.ruler.interfaces.ConnectionsTextSetter;
 import com.flower.net.socksui.forms.ConnectionMonitorForm;
 import com.flower.net.socksui.forms.ServerForm;
-import com.flower.net.socksui.forms.traffic.TrafficControlForm;
+import com.flower.net.ruler.forms.traffic.TrafficControlForm;
 import com.flower.crypt.keys.forms.MultiKeyProvider;
 import com.flower.crypt.keys.forms.RsaFileKeyProvider;
 import com.flower.crypt.keys.forms.RsaPkcs11KeyProvider;
@@ -28,7 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static com.flower.fxutils.JavaFxUtils.YesNo.NO;
 import static com.google.common.base.Preconditions.checkNotNull;
 
-public class MainApp {
+public class MainApp implements ConnectionsTextSetter {
     @Nullable Stage mainStage;
 
     @FXML @Nullable Label connectionsLabel;

@@ -1,11 +1,13 @@
 package com.flower.net.socksui.forms;
 
+import com.flower.fxutils.Refreshable;
 import com.flower.net.conntrack.ConnectionId;
 import com.flower.net.conntrack.ConnectionInfo;
 import com.flower.net.conntrack.ConnectionListener;
 import com.flower.net.conntrack.Destination;
+import com.flower.net.ruler.interfaces.DeniedHostsListener;
 import com.flower.net.socksui.MainApp;
-import com.flower.net.socksui.forms.traffic.TrafficControlForm;
+import com.flower.net.ruler.forms.traffic.TrafficControlForm;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -27,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import static com.flower.net.config.access.Access.DENY;
 import static com.google.common.base.Preconditions.checkNotNull;
 
-public class ConnectionMonitorForm extends AnchorPane implements Refreshable, ConnectionListener {
+public class ConnectionMonitorForm extends AnchorPane implements Refreshable, ConnectionListener, DeniedHostsListener {
     final static Logger LOGGER = LoggerFactory.getLogger(ConnectionMonitorForm.class);
 
     public static class ConnectionInfoWrapper {

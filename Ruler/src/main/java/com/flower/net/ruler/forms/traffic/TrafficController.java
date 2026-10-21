@@ -1,4 +1,4 @@
-package com.flower.net.socksui.forms.traffic;
+package com.flower.net.ruler.forms.traffic;
 
 public interface TrafficController {
     void clearCapturedData();

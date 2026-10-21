@@ -3,6 +3,7 @@ package com.flower.net.socksui.forms;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
+import com.flower.fxutils.Refreshable;
 import com.flower.net.conntrack.ConnectionFilter;
 import com.flower.net.conntrack.ConnectionListener;
 import com.flower.net.config.chainconf.ProxyChainProvider;

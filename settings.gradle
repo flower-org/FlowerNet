@@ -10,3 +10,5 @@ include 'Socks5sServer'
 include 'SocksChainServer'
 include 'SocksUi'
 include 'VisiTor'
+include 'Ruler'
+

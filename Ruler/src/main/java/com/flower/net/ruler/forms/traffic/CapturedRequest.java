@@ -1,4 +1,4 @@
-package com.flower.net.socksui.forms.traffic;
+package com.flower.net.ruler.forms.traffic;
 
 import com.flower.net.config.access.Access;
 

@@ -46,13 +46,13 @@ public class TrafficRule {
         }
     }
 
-    public String getHost() {
+    @Nullable public String getHost() {
         if (addressRecord != null) {
             return addressRecord.dstHost();
         } else if (hostRecord != null) {
             return hostRecord.dstHost();
         } else if (portRecord != null) {
-            return "";
+            return null;
         } else {
             throw new IllegalStateException("Either addressRecord or hostRecord or portRecord should be not null");
         }

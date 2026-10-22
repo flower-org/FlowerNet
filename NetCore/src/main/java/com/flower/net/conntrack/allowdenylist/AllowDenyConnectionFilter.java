@@ -16,8 +16,6 @@ import static com.flower.net.conntrack.allowdenylist.AddressFilterList.PortRecor
 
 // TODO: extensive test coverage
 public class AllowDenyConnectionFilter {
-    final List<Pair<AddressFilterList, Boolean>> addressLists;
-
     //Priority 0
     final ConcurrentHashMap<String, ConcurrentHashMap<Integer, AddressRecord>> addressRecords;
     //Priority 1
@@ -56,7 +54,6 @@ public class AllowDenyConnectionFilter {
 
 
     public AllowDenyConnectionFilter() {
-        addressLists = new ArrayList<>();
         addressRecords = new ConcurrentHashMap<>();
         hostRecords = new ConcurrentHashMap<>();
         portRecords = new ConcurrentHashMap<>();
@@ -254,14 +251,14 @@ public class AllowDenyConnectionFilter {
                 .build();
     }
 
-    public AddressFilterList getLocalUpdatesDiff() {
+    /*public AddressFilterList getLocalUpdatesDiff() {
         AllowDenyConnectionFilter otherFilter = new AllowDenyConnectionFilter();
         for (Pair<AddressFilterList, Boolean> filterListEntry : addressLists) {
             otherFilter.addList(filterListEntry.getKey(), filterListEntry.getValue());
         }
 
         return getNewOrUpdatedRecords(this, otherFilter, true);
-    }
+    }*/
 
 /*    public AddressFilterList getUpdatesDiff(List<AddressFilterList> baseLists) {
         AllowDenyConnectionFilter otherFilter = new AllowDenyConnectionFilter();

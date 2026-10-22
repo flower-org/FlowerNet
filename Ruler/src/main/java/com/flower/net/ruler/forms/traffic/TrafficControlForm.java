@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
 import com.flower.fxutils.Refreshable;
+import com.flower.net.config.access.Protocol;
 import com.flower.net.conntrack.ConnectionFilter;
 import com.flower.net.config.access.Access;
 import com.flower.net.conntrack.allowdenylist.AddressFilterList;
@@ -33,6 +34,7 @@ import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.List;
 import java.util.Map;
@@ -333,8 +335,17 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 if (checkNotNull(captureRequestsCheckBox).selectedProperty().get()) {
                     CaptureFilter captureFilter = getCaptureFilter();
                     if (captureFilter.matchCapturedRecord(check.checkResult, check.isRuleMatched)) {
+                        String hostOrIpFrom = null;
+                        int port = -1;
+                        if (from instanceof InetSocketAddress isa) {
+                            hostOrIpFrom = (isa.getAddress() != null)
+                                    ? isa.getAddress().getHostAddress() // resolved -> IP
+                                    : isa.getHostString();              // unresolved -> original host
+                            port = isa.getPort();
+                        }
+
                         CapturedRequest capturedRequest = new CapturedRequest(dstHost, dstPort, check.checkResult,
-                                check.isRuleMatched, check.isDirectIpBlock, from);
+                                check.isRuleMatched, Protocol.TCP, check.isDirectIpBlock, hostOrIpFrom, port);
                         capturedRequests.add(capturedRequest);
                         try {
                             int max = Integer.parseInt(checkNotNull(maxRequests).textProperty().get());

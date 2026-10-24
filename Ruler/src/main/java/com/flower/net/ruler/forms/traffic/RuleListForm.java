@@ -31,6 +31,8 @@ import java.io.StringWriter;
 import java.net.SocketAddress;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.prefs.Preferences;
 
 import static com.flower.net.conntrack.allowdenylist.AddressFilterList.AddressRecord;
@@ -43,6 +45,9 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
     final static Logger LOGGER = LoggerFactory.getLogger(RuleListForm.class);
 
     final static String TRAFFIC_RULES_PREF = "trafficRulesPref";
+
+    static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory())
+            .registerModule(new GuavaModule());
 
     @Nullable Stage stage;
 
@@ -73,9 +78,7 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
         Preferences userPreferences = Preferences.userRoot();
         try {
             String trafficRules = userPreferences.get(TRAFFIC_RULES_PREF, "");
-            ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
-                    .registerModule(new GuavaModule());
-            AddressFilterList addressFilterList = mapper.readValue(trafficRules, AddressFilterList.class);
+            AddressFilterList addressFilterList = YAML_MAPPER.readValue(trafficRules, AddressFilterList.class);
             innerFilter.addList(addressFilterList, true);
         } catch (Exception e) {}
 
@@ -147,112 +150,84 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
 
     @Override
     public void allow(String host, int port) {
-        AddressRecord addressRecord = ImmutableAddressRecord.builder()
-                .dstHost(host)
-                .dstPort(port)
-                .access(Access.ALLOW)
-                .creationTimestamp(System.currentTimeMillis())
-                .isWildcard(false)
-                .build();
-        AddressRecord existingRule = mainRuleManager.filter.addAddressRecord(addressRecord, false);
-        if (existingRule != null && !AddressRecord.recordsEqual(existingRule, addressRecord)) {
-            //Ask to reload
-            if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                mainRuleManager.filter.addAddressRecord(addressRecord, true);
-            }
-        }
-        refreshContent();
+        addAddressRule(host, port, Access.ALLOW);
     }
 
     @Override
     public void deny(String host, int port) {
-        AddressRecord addressRecord = ImmutableAddressRecord.builder()
-                .dstHost(host)
-                .dstPort(port)
-                .access(Access.DENY)
-                .creationTimestamp(System.currentTimeMillis())
-                .isWildcard(false)
-                .build();
-        AddressRecord existingRule = mainRuleManager.filter.addAddressRecord(addressRecord, false);
-        if (existingRule != null && !AddressRecord.recordsEqual(existingRule, addressRecord)) {
-            //Ask to reload
-            if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                mainRuleManager.filter.addAddressRecord(addressRecord, true);
-            }
-        }
-        checkNotNull(connectionMonitorForm).checkDeniedHosts();
-        refreshContent();
+        addAddressRule(host, port, Access.DENY);
     }
 
     @Override
     public void allowPort(int port) {
-        PortRecord portRecord = ImmutablePortRecord.builder()
-                .dstPort(port)
-                .access(Access.ALLOW)
-                .creationTimestamp(System.currentTimeMillis())
-                .build();
-        PortRecord existingRule = mainRuleManager.filter.addPortRecord(portRecord, false);
-        if (existingRule != null && !PortRecord.recordsEqual(existingRule, portRecord)) {
-            //Ask to reload
-            if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                mainRuleManager.filter.addPortRecord(portRecord, true);
-            }
-        }
-        refreshContent();
+        addPortRule(port, Access.ALLOW);
     }
 
     @Override
     public void denyPort(int port) {
-        PortRecord portRecord = ImmutablePortRecord.builder()
-                .dstPort(port)
-                .access(Access.DENY)
-                .creationTimestamp(System.currentTimeMillis())
-                .build();
-        PortRecord existingRule = mainRuleManager.filter.addPortRecord(portRecord, false);
-        if (existingRule != null && !PortRecord.recordsEqual(existingRule, portRecord)) {
-            //Ask to reload
-            if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                mainRuleManager.filter.addPortRecord(portRecord, true);
-            }
-        }
-        checkNotNull(connectionMonitorForm).checkDeniedHosts();
-        refreshContent();
+        addPortRule(port, Access.DENY);
     }
 
     @Override
     public void allowHost(String host) {
-        HostRecord hostRecord = ImmutableHostRecord.builder()
-                .dstHost(host)
-                .access(Access.ALLOW)
-                .creationTimestamp(System.currentTimeMillis())
-                .isWildcard(false)
-                .build();
-        HostRecord existingRule = mainRuleManager.filter.addHostRecord(hostRecord, false);
-        if (existingRule != null && !HostRecord.recordsEqual(existingRule, hostRecord)) {
-            //Ask to reload
-            if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                mainRuleManager.filter.addHostRecord(hostRecord, true);
-            }
-        }
-        refreshContent();
+        addHostRule(host, Access.ALLOW);
     }
 
     @Override
     public void denyHost(String host) {
-        HostRecord hostRecord = ImmutableHostRecord.builder()
+        addHostRule(host, Access.DENY);
+    }
+
+    void addAddressRule(String host, int port, Access access) {
+        AddressRecord addressRecord = ImmutableAddressRecord.builder()
                 .dstHost(host)
-                .access(Access.DENY)
+                .dstPort(port)
+                .access(access)
                 .creationTimestamp(System.currentTimeMillis())
                 .isWildcard(false)
                 .build();
-        HostRecord existingRule = mainRuleManager.filter.addHostRecord(hostRecord, false);
-        if (existingRule != null && !HostRecord.recordsEqual(existingRule, hostRecord)) {
-            //Ask to reload
+        addRuleConfirmOverwrite(addressRecord, access,
+                mainRuleManager.filter::addAddressRecord, AddressRecord::recordsEqual);
+    }
+
+    void addHostRule(String host, Access access) {
+        HostRecord hostRecord = ImmutableHostRecord.builder()
+                .dstHost(host)
+                .access(access)
+                .creationTimestamp(System.currentTimeMillis())
+                .isWildcard(false)
+                .build();
+        addRuleConfirmOverwrite(hostRecord, access,
+                mainRuleManager.filter::addHostRecord, HostRecord::recordsEqual);
+    }
+
+    void addPortRule(int port, Access access) {
+        PortRecord portRecord = ImmutablePortRecord.builder()
+                .dstPort(port)
+                .access(access)
+                .creationTimestamp(System.currentTimeMillis())
+                .build();
+        addRuleConfirmOverwrite(portRecord, access,
+                mainRuleManager.filter::addPortRecord, PortRecord::recordsEqual);
+    }
+
+    /**
+     * Adds a record without overriding; if a different rule already exists for the same key,
+     * asks the user whether to overwrite it.
+     * @param addRecord (record, overrideExisting) -> previously existing record, or null
+     */
+    <R> void addRuleConfirmOverwrite(R record, Access access,
+                                     BiFunction<R, Boolean, R> addRecord,
+                                     BiPredicate<R, R> recordsEqual) {
+        R existingRule = addRecord.apply(record, false);
+        if (existingRule != null && !recordsEqual.test(existingRule, record)) {
             if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
-                mainRuleManager.filter.addHostRecord(hostRecord, true);
+                R unused = addRecord.apply(record, true);
             }
         }
-        checkNotNull(connectionMonitorForm).checkDeniedHosts();
+        if (access == Access.DENY) {
+            checkNotNull(connectionMonitorForm).checkDeniedHosts();
+        }
         refreshContent();
     }
 
@@ -268,9 +243,7 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
             AddressFilterList addressFilterList = mainRuleManager.filter.getFullList();
 
             StringWriter writer = new StringWriter();
-            ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
-                    .registerModule(new GuavaModule());
-            mapper.writeValue(writer, addressFilterList);
+            YAML_MAPPER.writeValue(writer, addressFilterList);
 
             String filterList = writer.getBuffer().toString();
 
@@ -367,12 +340,10 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
                 }
                 AddressFilterList addressFilterList = mainRuleManager.filter.getFullList();
 
-                ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
-                        .registerModule(new GuavaModule());
-                mapper.writeValue(configFile, addressFilterList);
+                YAML_MAPPER.writeValue(configFile, addressFilterList);
 
                 Alert alert = new Alert(Alert.AlertType.INFORMATION, "Traffic filter ruleset saved to : " + configFile.getPath(), ButtonType.OK);
-                LOGGER.error("Traffic filter ruleset saved to : " + configFile.getPath());
+                LOGGER.info("Traffic filter ruleset saved to: {}", configFile.getPath());
                 alert.showAndWait();
             }
         } catch (Exception e) {
@@ -391,13 +362,12 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
             File configFile = fileChooser.showOpenDialog(checkNotNull(stage));
 
             if (configFile != null) {
-                ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
-                        .registerModule(new GuavaModule());
 
-                AddressFilterList addressFilterList = mapper.readValue(configFile, AddressFilterList.class);
+                AddressFilterList addressFilterList = YAML_MAPPER.readValue(configFile, AddressFilterList.class);
 
                 mainRuleManager.filter.clear();
                 mainRuleManager.filter.addList(addressFilterList, true);
+                checkNotNull(connectionMonitorForm).checkDeniedHosts();
             }
             refreshContent();
         } catch (Exception e) {

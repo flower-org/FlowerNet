@@ -34,7 +34,7 @@
                 </AnchorPane>
                 <AnchorPane>
                    <children>
-                      <TableView fx:id="trafficRulesTable" layoutY="-8.0" AnchorPane.bottomAnchor="8.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="-8.0">
+                      <TableView fx:id="trafficRulesTable" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                          <columns>
                             <TableColumn minWidth="500.0" prefWidth="500.0" text="Host">
                                <cellValueFactory>

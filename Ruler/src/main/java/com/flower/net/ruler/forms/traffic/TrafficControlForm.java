@@ -5,6 +5,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
 import com.flower.fxutils.Refreshable;
 import com.flower.net.config.access.Protocol;
+import com.flower.net.conntrack.AutoAddRulesMode;
 import com.flower.net.conntrack.ConnectionFilter;
 import com.flower.net.config.access.Access;
 import com.flower.net.conntrack.allowdenylist.AddressFilterList;
@@ -209,12 +210,6 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
             default:
                 throw new IllegalStateException("Unknown filter list mode");
         }
-    }
-
-    public enum AutoAddRulesMode {
-        NONE,
-        AUTO_ALLOW,
-        AUTO_DENY
     }
 
     AutoAddRulesMode getAutoAddRulesMode() {

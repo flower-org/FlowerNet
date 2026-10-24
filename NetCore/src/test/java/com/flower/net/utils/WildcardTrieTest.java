@@ -158,7 +158,7 @@ class WildcardTrieTest {
     }
 
     @Test
-    void testRandomizedAgainstWildcardMatcher() {
+    void testRandomizedAgainstReferenceMatcher() {
         Random random = new Random(12345);
         String alphabet = "ab.";
         String patternAlphabet = "ab.*?";
@@ -201,7 +201,7 @@ class WildcardTrieTest {
                 Map<Integer, int[]> expPorts = new HashMap<>();
                 for (Map.Entry<String, int[]> e : model.entrySet()) {
                     String[] parts = e.getKey().split("\\|", -1);
-                    if (!WildcardMatcher.isMatch(text, parts[0])) { continue; }
+                    if (!referenceMatch(text, parts[0])) { continue; }
                     int port = Integer.parseInt(parts[1]);
                     if (port == -1) {
                         expHostAllow += e.getValue()[0];
@@ -220,6 +220,93 @@ class WildcardTrieTest {
                 }
             }
         }
+    }
+
+    @Test
+    void testExactMatch() {
+        assertTrue(isMatch("flower", "flower"));
+    }
+
+    @Test
+    void testSingleCharWildcard() {
+        assertTrue(isMatch("flower", "f?ower"));
+        assertTrue(isMatch("hello", "h?llo"));
+        assertFalse(isMatch("world", "w?rldd"));
+    }
+
+    @Test
+    void testMultiCharWildcard() {
+        assertTrue(isMatch("flower", "f*er"));
+        assertTrue(isMatch("abcdef", "a*d*f"));
+        assertTrue(isMatch("abc", "*"));
+        assertTrue(isMatch("", "*"));
+    }
+
+    @Test
+    void testMixedWildcards() {
+        assertTrue(isMatch("abcdef", "a*d?f"));
+        assertFalse(isMatch("abcdef", "a*d?e"));
+    }
+
+    @Test
+    void testNoMatch() {
+        assertFalse(isMatch("flower", "flow"));
+        assertFalse(isMatch("hello", "h?l?o?"));
+        assertFalse(isMatch("abc", "a*c?"));
+    }
+
+    @Test
+    void testEmptyTextAndPattern() {
+        assertTrue(isMatch("", ""));
+        assertFalse(isMatch("", "?"));
+        assertTrue(isMatch("", "*"));
+    }
+
+    @Test
+    void testBacktracking() {
+        assertTrue(isMatch("rjdokrjdokrjdokrjdok", "*jdok"));
+        assertTrue(isMatch("baaabab", "*****ba*****ab"));
+    }
+
+    @Test
+    void testMatchReportsPatternShape() {
+        WildcardTrie trie = new WildcardTrie();
+        trie.addHostRule("*.g??gle.com", DENY);
+        List<WildcardTrie.Match> matches = trie.match("www.google.com");
+        assertEquals(1, matches.size());
+        assertEquals(9, matches.get(0).literalCount());
+        assertEquals(2, matches.get(0).anyCharCount());
+        assertEquals(1, matches.get(0).starRunCount());
+
+        WildcardTrie starTrie = new WildcardTrie();
+        starTrie.addHostRule("**a***b*", DENY);
+        assertEquals(3, starTrie.match("ab").get(0).starRunCount());
+    }
+
+    private static boolean isMatch(String text, String pattern) {
+        WildcardTrie trie = new WildcardTrie();
+        trie.addHostRule(pattern, ALLOW);
+        return trie.matchHostRules(text).hasAllow();
+    }
+
+    /** Straightforward DP matcher, used as an oracle for randomized tests. */
+    private static boolean referenceMatch(String text, String pattern) {
+        boolean[][] dp = new boolean[text.length() + 1][pattern.length() + 1];
+        dp[0][0] = true;
+        for (int j = 1; j <= pattern.length(); j++) {
+            dp[0][j] = dp[0][j - 1] && pattern.charAt(j - 1) == '*';
+        }
+        for (int i = 1; i <= text.length(); i++) {
+            for (int j = 1; j <= pattern.length(); j++) {
+                char pc = pattern.charAt(j - 1);
+                if (pc == '*') {
+                    dp[i][j] = dp[i][j - 1] || dp[i - 1][j];
+                } else {
+                    dp[i][j] = dp[i - 1][j - 1] && (pc == '?' || pc == text.charAt(i - 1));
+                }
+            }
+        }
+        return dp[text.length()][pattern.length()];
     }
 
     private static String randomString(Random random, String alphabet, int length) {

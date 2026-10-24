@@ -17,7 +17,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Trie of wildcard patterns supporting '*' (any sequence, including empty) and '?' (any single character),
- * with the same semantics as {@link WildcardMatcher}.
+ * matched against the whole text.
  * <p>
  * Each pattern can carry host rules (pattern only) and address rules (pattern + port), each either ALLOW or DENY.
  * Rules are reference-counted: a rule added N times must be removed N times before it disappears.
@@ -41,9 +41,20 @@ public class WildcardTrie {
 
     /** Rule counts for a pattern ending at a trie node. */
     static class RuleCounts {
+        // Pattern shape, for specificity ranking: number of literal (non-wildcard) chars, number of '?',
+        // and number of '*' runs (consecutive '*' count as one, as "a**b" is equivalent to "a*b")
+        final int literalCount;
+        final int anyCharCount;
+        final int starRunCount;
         int allowHostRuleCount;
         int denyHostRuleCount;
         final Map<Integer, PortAccess> portAccess = new HashMap<>();
+
+        RuleCounts(int literalCount, int anyCharCount, int starRunCount) {
+            this.literalCount = literalCount;
+            this.anyCharCount = anyCharCount;
+            this.starRunCount = starRunCount;
+        }
 
         boolean isEmpty() {
             return allowHostRuleCount == 0 && denyHostRuleCount == 0 && portAccess.isEmpty();
@@ -104,10 +115,16 @@ public class WildcardTrie {
 
     /** Immutable snapshot of the rules of one pattern that matched the text. */
     public static final class Match {
+        private final int literalCount;
+        private final int anyCharCount;
+        private final int starRunCount;
         private final AccessCounts hostAccess;
         private final Map<Integer, AccessCounts> portAccess;
 
         Match(RuleCounts rules) {
+            this.literalCount = rules.literalCount;
+            this.anyCharCount = rules.anyCharCount;
+            this.starRunCount = rules.starRunCount;
             this.hostAccess = new AccessCounts(rules.allowHostRuleCount, rules.denyHostRuleCount);
             Map<Integer, AccessCounts> ports = new HashMap<>();
             for (Map.Entry<Integer, PortAccess> e : rules.portAccess.entrySet()) {
@@ -116,6 +133,12 @@ public class WildcardTrie {
             this.portAccess = Collections.unmodifiableMap(ports);
         }
 
+        /** @return number of literal (non-wildcard) characters in the matched pattern. */
+        public int literalCount() { return literalCount; }
+        /** @return number of '?' characters in the matched pattern. */
+        public int anyCharCount() { return anyCharCount; }
+        /** @return number of '*' runs in the matched pattern; consecutive '*' count as one. */
+        public int starRunCount() { return starRunCount; }
         public AccessCounts hostAccess() { return hostAccess; }
         public Map<Integer, AccessCounts> portAccess() { return portAccess; }
 
@@ -126,7 +149,9 @@ public class WildcardTrie {
 
         @Override
         public String toString() {
-            return "Match{hostAccess=" + hostAccess + ", portAccess=" + portAccess + '}';
+            return "Match{literalCount=" + literalCount + ", anyCharCount=" + anyCharCount
+                    + ", starRunCount=" + starRunCount
+                    + ", hostAccess=" + hostAccess + ", portAccess=" + portAccess + '}';
         }
     }
 
@@ -295,13 +320,25 @@ public class WildcardTrie {
 
     private RuleCounts getOrCreateRules(String pattern) {
         Node node = root;
+        int literalCount = 0;
+        int anyCharCount = 0;
+        int starRunCount = 0;
         for (int i = 0; i < pattern.length(); i++) {
             char c = pattern.charAt(i);
+            if (c == ANY_SEQUENCE) {
+                if (i == 0 || pattern.charAt(i - 1) != ANY_SEQUENCE) {
+                    starRunCount++;
+                }
+            } else if (c == ANY_CHAR) {
+                anyCharCount++;
+            } else {
+                literalCount++;
+            }
             node = node.children.computeIfAbsent(c, k -> new Node(k == ANY_SEQUENCE));
         }
         RuleCounts rules = node.rules;
         if (rules == null) {
-            rules = new RuleCounts();
+            rules = new RuleCounts(literalCount, anyCharCount, starRunCount);
             node.rules = rules;
         }
         return rules;

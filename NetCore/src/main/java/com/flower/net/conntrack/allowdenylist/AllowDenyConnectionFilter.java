@@ -1,7 +1,9 @@
 package com.flower.net.conntrack.allowdenylist;
 
 import com.flower.net.config.access.Access;
-import com.flower.net.utils.WildcardMatcher;
+import com.flower.net.utils.WildcardTrie;
+import com.flower.net.utils.WildcardTrie.AccessCounts;
+import com.flower.net.utils.WildcardTrie.Match;
 import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nullable;
@@ -9,12 +11,23 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
 
 import static com.flower.net.conntrack.allowdenylist.AddressFilterList.AddressRecord;
 import static com.flower.net.conntrack.allowdenylist.AddressFilterList.HostRecord;
 import static com.flower.net.conntrack.allowdenylist.AddressFilterList.PortRecord;
 
-// TODO: extensive test coverage
+/**
+ * Wildcard rules (priorities 2 and 3) are indexed in a {@link WildcardTrie}. When several wildcard patterns match,
+ * the most specific one wins (see {@link #compareSpecificity}); on a specificity tie DENY wins.
+ * <p>
+ * A read/write lock keeps the record maps and the trie consistent: mutations take the write lock,
+ * lookups take the read lock and so see a consistent state while running concurrently with each other.
+ * Do not mutate the maps returned by getters directly.
+ * {@link #getNewOrUpdatedRecords} takes no lock (it spans two filters), so its result is best-effort.
+ */
 public class AllowDenyConnectionFilter {
     //Priority 0
     final ConcurrentHashMap<String, ConcurrentHashMap<Integer, AddressRecord>> addressRecords;
@@ -26,6 +39,9 @@ public class AllowDenyConnectionFilter {
     final ConcurrentHashMap<String, HostRecord> wildcardHostRecords;
     //Priority 4
     final ConcurrentHashMap<Integer, PortRecord> portRecords;
+    // Index of wildcardAddressRecords and wildcardHostRecords
+    final WildcardTrie wildcardTrie;
+    final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     public AllowDenyConnectionFilter(List<Pair<AddressFilterList, Boolean>> addressLists) {
         this();
@@ -59,32 +75,40 @@ public class AllowDenyConnectionFilter {
         portRecords = new ConcurrentHashMap<>();
         wildcardAddressRecords = new ConcurrentHashMap<>();
         wildcardHostRecords = new ConcurrentHashMap<>();
+        wildcardTrie = new WildcardTrie();
     }
 
     public boolean isListOverrideRequired(AddressFilterList list) {
-        for (AddressRecord addressRecord : list.addressRecords()) {
-            if (isAddressRecordOverrideRequired(addressRecord)) { return true; }
+        lock.readLock().lock();
+        try {
+            for (AddressRecord addressRecord : list.addressRecords()) {
+                if (isAddressRecordOverrideRequired(addressRecord)) { return true; }
+            }
+            for (HostRecord hostRecord : list.hostRecords()) {
+                if (isHostRecordOverrideRequired(hostRecord)) { return true; }
+            }
+            for (PortRecord portRecord : list.portRecords()) {
+                if (isPortRecordOverrideRequired(portRecord)) { return true; }
+            }
+            for (AddressRecord addressRecord : list.wildcardAddressRecords()) {
+                if (isAddressRecordOverrideRequired(addressRecord)) { return true; }
+            }
+            for (HostRecord hostRecord : list.wildcardHostRecords()) {
+                if (isHostRecordOverrideRequired(hostRecord)) { return true; }
+            }
+            return false;
+    
+        } finally {
+            lock.readLock().unlock();
         }
-        for (HostRecord hostRecord : list.hostRecords()) {
-            if (isHostRecordOverrideRequired(hostRecord)) { return true; }
-        }
-        for (PortRecord portRecord : list.portRecords()) {
-            if (isPortRecordOverrideRequired(portRecord)) { return true; }
-        }
-        for (AddressRecord addressRecord : list.wildcardAddressRecords()) {
-            if (isAddressRecordOverrideRequired(addressRecord)) { return true; }
-        }
-        for (HostRecord hostRecord : list.wildcardHostRecords()) {
-            if (isHostRecordOverrideRequired(hostRecord)) { return true; }
-        }
-        return false;
     }
 
     boolean isAddressRecordOverrideRequired(AddressRecord addressRecord) {
         Map<Integer, AddressRecord> portMap =
                 addressRecord.isWildcard() ?
-                        wildcardAddressRecords.computeIfAbsent(addressRecord.dstHost(), k -> new ConcurrentHashMap<>())
-                        : addressRecords.computeIfAbsent(addressRecord.dstHost(), k -> new ConcurrentHashMap<>());
+                        wildcardAddressRecords.get(addressRecord.dstHost())
+                        : addressRecords.get(addressRecord.dstHost());
+        if (portMap == null) { return false; }
         AddressRecord oldRecord = portMap.get(addressRecord.dstPort());
         return oldRecord != null && !AddressRecord.recordsEqual(addressRecord, oldRecord);
     }
@@ -101,49 +125,95 @@ public class AllowDenyConnectionFilter {
     }
 
     public void addList(AddressFilterList list, boolean overrideExisting) {
-        for (AddressRecord addressRecord : list.addressRecords()) {
-            addAddressRecord(addressRecord, overrideExisting);
-        }
-        for (HostRecord hostRecord : list.hostRecords()) {
-            addHostRecord(hostRecord, overrideExisting);
-        }
-        for (PortRecord portRecord : list.portRecords()) {
-            addPortRecord(portRecord, overrideExisting);
-        }
-        for (AddressRecord addressRecord : list.wildcardAddressRecords()) {
-            addAddressRecord(addressRecord, overrideExisting);
-        }
-        for (HostRecord hostRecord : list.wildcardHostRecords()) {
-            addHostRecord(hostRecord, overrideExisting);
+        lock.writeLock().lock();
+        try {
+            for (AddressRecord addressRecord : list.addressRecords()) {
+                addAddressRecord(addressRecord, overrideExisting);
+            }
+            for (HostRecord hostRecord : list.hostRecords()) {
+                addHostRecord(hostRecord, overrideExisting);
+            }
+            for (PortRecord portRecord : list.portRecords()) {
+                addPortRecord(portRecord, overrideExisting);
+            }
+            for (AddressRecord addressRecord : list.wildcardAddressRecords()) {
+                addAddressRecord(addressRecord, overrideExisting);
+            }
+            for (HostRecord hostRecord : list.wildcardHostRecords()) {
+                addHostRecord(hostRecord, overrideExisting);
+            }
+    
+        } finally {
+            lock.writeLock().unlock();
         }
     }
 
     @Nullable public AddressRecord addAddressRecord(AddressRecord addressRecord, boolean overrideExisting) {
-        Map<Integer, AddressRecord> portMap =
-                addressRecord.isWildcard() ?
-                        wildcardAddressRecords.computeIfAbsent(addressRecord.dstHost(), k -> new ConcurrentHashMap<>())
-                        : addressRecords.computeIfAbsent(addressRecord.dstHost(), k -> new ConcurrentHashMap<>());
-        if (overrideExisting) {
-            return portMap.put(addressRecord.dstPort(), addressRecord);
-        } else {
-            return portMap.putIfAbsent(addressRecord.dstPort(), addressRecord);
+        lock.writeLock().lock();
+        try {
+            Map<Integer, AddressRecord> portMap =
+                    addressRecord.isWildcard() ?
+                            wildcardAddressRecords.computeIfAbsent(addressRecord.dstHost(), k -> new ConcurrentHashMap<>())
+                            : addressRecords.computeIfAbsent(addressRecord.dstHost(), k -> new ConcurrentHashMap<>());
+            if (overrideExisting) {
+                AddressRecord oldRecord = portMap.put(addressRecord.dstPort(), addressRecord);
+                if (addressRecord.isWildcard()) {
+                    if (oldRecord != null) {
+                        wildcardTrie.removeAddressRule(oldRecord.dstHost(), oldRecord.dstPort(), oldRecord.access());
+                    }
+                    wildcardTrie.addAddressRule(addressRecord.dstHost(), addressRecord.dstPort(), addressRecord.access());
+                }
+                return oldRecord;
+            } else {
+                AddressRecord oldRecord = portMap.putIfAbsent(addressRecord.dstPort(), addressRecord);
+                if (oldRecord == null && addressRecord.isWildcard()) {
+                    wildcardTrie.addAddressRule(addressRecord.dstHost(), addressRecord.dstPort(), addressRecord.access());
+                }
+                return oldRecord;
+            }
+    
+        } finally {
+            lock.writeLock().unlock();
         }
     }
 
     @Nullable public HostRecord addHostRecord(HostRecord hostRecord, boolean overrideExisting) {
-        final Map<String, HostRecord> hostRecords = hostRecord.isWildcard() ? this.wildcardHostRecords : this.hostRecords;
-        if (overrideExisting) {
-            return hostRecords.put(hostRecord.dstHost(), hostRecord);
-        } else {
-            return hostRecords.putIfAbsent(hostRecord.dstHost(), hostRecord);
+        lock.writeLock().lock();
+        try {
+            final Map<String, HostRecord> hostRecords = hostRecord.isWildcard() ? this.wildcardHostRecords : this.hostRecords;
+            if (overrideExisting) {
+                HostRecord oldRecord = hostRecords.put(hostRecord.dstHost(), hostRecord);
+                if (hostRecord.isWildcard()) {
+                    if (oldRecord != null) {
+                        wildcardTrie.removeHostRule(oldRecord.dstHost(), oldRecord.access());
+                    }
+                    wildcardTrie.addHostRule(hostRecord.dstHost(), hostRecord.access());
+                }
+                return oldRecord;
+            } else {
+                HostRecord oldRecord = hostRecords.putIfAbsent(hostRecord.dstHost(), hostRecord);
+                if (oldRecord == null && hostRecord.isWildcard()) {
+                    wildcardTrie.addHostRule(hostRecord.dstHost(), hostRecord.access());
+                }
+                return oldRecord;
+            }
+    
+        } finally {
+            lock.writeLock().unlock();
         }
     }
 
     @Nullable public PortRecord addPortRecord(PortRecord portRecord, boolean overrideExisting) {
-        if (overrideExisting) {
-            return portRecords.put(portRecord.dstPort(), portRecord);
-        } else {
-            return portRecords.putIfAbsent(portRecord.dstPort(), portRecord);
+        lock.writeLock().lock();
+        try {
+            if (overrideExisting) {
+                return portRecords.put(portRecord.dstPort(), portRecord);
+            } else {
+                return portRecords.putIfAbsent(portRecord.dstPort(), portRecord);
+            }
+    
+        } finally {
+            lock.writeLock().unlock();
         }
     }
 
@@ -152,103 +222,150 @@ public class AllowDenyConnectionFilter {
     }
 
     public @Nullable AddressRecord removeAddressRecord(String host, Integer port, boolean isWildcard) {
-        Map<Integer, AddressRecord> portMap = isWildcard ? wildcardAddressRecords.get(host) : addressRecords.get(host);
-        if (portMap == null) {
-            return null;
-        } else {
-            // I don't want to remove empty portMaps from addressRecords here to avoid race conditions
-            return portMap.remove(port);
+        lock.writeLock().lock();
+        try {
+            Map<Integer, AddressRecord> portMap = isWildcard ? wildcardAddressRecords.get(host) : addressRecords.get(host);
+            if (portMap == null) {
+                return null;
+            } else {
+                // I don't want to remove empty portMaps from addressRecords here to avoid race conditions
+                AddressRecord oldRecord = portMap.remove(port);
+                if (oldRecord != null && isWildcard) {
+                    wildcardTrie.removeAddressRule(oldRecord.dstHost(), oldRecord.dstPort(), oldRecord.access());
+                }
+                return oldRecord;
+            }
+    
+        } finally {
+            lock.writeLock().unlock();
         }
     }
 
     public @Nullable HostRecord removeHostRecord(HostRecord hostRecord) {
-        final Map<String, HostRecord> hostRecords = hostRecord.isWildcard() ? this.wildcardHostRecords : this.hostRecords;
-        return hostRecords.remove(hostRecord.dstHost());
+        lock.writeLock().lock();
+        try {
+            final Map<String, HostRecord> hostRecords = hostRecord.isWildcard() ? this.wildcardHostRecords : this.hostRecords;
+            HostRecord oldRecord = hostRecords.remove(hostRecord.dstHost());
+            if (oldRecord != null && hostRecord.isWildcard()) {
+                wildcardTrie.removeHostRule(oldRecord.dstHost(), oldRecord.access());
+            }
+            return oldRecord;
+    
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
 
     public @Nullable PortRecord removePortRecord(PortRecord portRecord) {
-        return portRecords.remove(portRecord.dstPort());
+        lock.writeLock().lock();
+        try {
+            return portRecords.remove(portRecord.dstPort());
+    
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
 
     public void clear() {
-        addressRecords.clear();
-        hostRecords.clear();
-        portRecords.clear();
-        wildcardAddressRecords.clear();
-        wildcardHostRecords.clear();
+        lock.writeLock().lock();
+        try {
+            addressRecords.clear();
+            hostRecords.clear();
+            portRecords.clear();
+            wildcardAddressRecords.clear();
+            wildcardHostRecords.clear();
+            wildcardTrie.clear();
+    
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
 
     public void clearFilterType(Access access) {
-        for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> addressRecord : addressRecords.entrySet()) {
-            ConcurrentHashMap<Integer, AddressRecord> portMap = addressRecord.getValue();
-            for (Map.Entry<Integer, AddressRecord> portRecord : portMap.entrySet()) {
-                if (portRecord.getValue().access() == access) {
-                    portMap.remove(portRecord.getKey());
+        lock.writeLock().lock();
+        try {
+            for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> addressRecord : addressRecords.entrySet()) {
+                ConcurrentHashMap<Integer, AddressRecord> portMap = addressRecord.getValue();
+                for (Map.Entry<Integer, AddressRecord> portRecord : portMap.entrySet()) {
+                    if (portRecord.getValue().access() == access) {
+                        portMap.remove(portRecord.getKey());
+                    }
                 }
             }
-        }
-        for (Map.Entry<String, HostRecord> hostRecord : hostRecords.entrySet()) {
-            if (hostRecord.getValue().access() == access) {
-                hostRecords.remove(hostRecord.getKey());
-            }
-        }
-        for (Map.Entry<Integer, PortRecord> portRecord : portRecords.entrySet()) {
-            if (portRecord.getValue().access() == access) {
-                portRecords.remove(portRecord.getKey());
-            }
-        }
-        for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> wildcardAddressRecord : wildcardAddressRecords.entrySet()) {
-            ConcurrentHashMap<Integer, AddressRecord> portMap = wildcardAddressRecord.getValue();
-            for (Map.Entry<Integer, AddressRecord> portRecord : portMap.entrySet()) {
-                if (portRecord.getValue().access() == access) {
-                    portMap.remove(portRecord.getKey());
+            for (Map.Entry<String, HostRecord> hostRecord : hostRecords.entrySet()) {
+                if (hostRecord.getValue().access() == access) {
+                    hostRecords.remove(hostRecord.getKey());
                 }
             }
-        }
-        for (Map.Entry<String, HostRecord> wildcardHostRecord : wildcardHostRecords.entrySet()) {
-            if (wildcardHostRecord.getValue().access() == access) {
-                wildcardHostRecords.remove(wildcardHostRecord.getKey());
+            for (Map.Entry<Integer, PortRecord> portRecord : portRecords.entrySet()) {
+                if (portRecord.getValue().access() == access) {
+                    portRecords.remove(portRecord.getKey());
+                }
             }
+            for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> wildcardAddressRecord : wildcardAddressRecords.entrySet()) {
+                ConcurrentHashMap<Integer, AddressRecord> portMap = wildcardAddressRecord.getValue();
+                for (Map.Entry<Integer, AddressRecord> portRecord : portMap.entrySet()) {
+                    AddressRecord record = portRecord.getValue();
+                    if (record.access() == access && portMap.remove(portRecord.getKey(), record)) {
+                        wildcardTrie.removeAddressRule(record.dstHost(), record.dstPort(), record.access());
+                    }
+                }
+            }
+            for (Map.Entry<String, HostRecord> wildcardHostRecord : wildcardHostRecords.entrySet()) {
+                HostRecord record = wildcardHostRecord.getValue();
+                if (record.access() == access && wildcardHostRecords.remove(wildcardHostRecord.getKey(), record)) {
+                    wildcardTrie.removeHostRule(record.dstHost(), record.access());
+                }
+            }
+    
+        } finally {
+            lock.writeLock().unlock();
         }
     }
 
 
     public AddressFilterList getFullList() {
-        List<AddressRecord> addressRecords = new ArrayList<>();
-        List<HostRecord> hostRecords = new ArrayList<>();
-        List<PortRecord> portRecords = new ArrayList<>();
+        lock.readLock().lock();
+        try {
+            List<AddressRecord> addressRecords = new ArrayList<>();
+            List<HostRecord> hostRecords = new ArrayList<>();
+            List<PortRecord> portRecords = new ArrayList<>();
 
-        for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> addressEntry : this.addressRecords.entrySet()) {
-            for (Map.Entry<Integer, AddressRecord> addressPortEntry : addressEntry.getValue().entrySet()) {
-                addressRecords.add(addressPortEntry.getValue());
+            for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> addressEntry : this.addressRecords.entrySet()) {
+                for (Map.Entry<Integer, AddressRecord> addressPortEntry : addressEntry.getValue().entrySet()) {
+                    addressRecords.add(addressPortEntry.getValue());
+                }
             }
-        }
-        for (Map.Entry<String, HostRecord> hostEntry : this.hostRecords.entrySet()) {
-            hostRecords.add(hostEntry.getValue());
-        }
-        for (Map.Entry<Integer, PortRecord> portEntry : this.portRecords.entrySet()) {
-            portRecords.add(portEntry.getValue());
-        }
-
-        List<AddressRecord> wildcardAddressRecords = new ArrayList<>();
-        List<HostRecord> wildcardHostRecords = new ArrayList<>();
-
-        for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> addressEntry : this.wildcardAddressRecords.entrySet()) {
-            for (Map.Entry<Integer, AddressRecord> addressPortEntry : addressEntry.getValue().entrySet()) {
-                wildcardAddressRecords.add(addressPortEntry.getValue());
+            for (Map.Entry<String, HostRecord> hostEntry : this.hostRecords.entrySet()) {
+                hostRecords.add(hostEntry.getValue());
             }
-        }
-        for (Map.Entry<String, HostRecord> hostEntry : this.wildcardHostRecords.entrySet()) {
-            wildcardHostRecords.add(hostEntry.getValue());
-        }
+            for (Map.Entry<Integer, PortRecord> portEntry : this.portRecords.entrySet()) {
+                portRecords.add(portEntry.getValue());
+            }
 
-        return ImmutableAddressFilterList.builder()
-                .addressRecords(addressRecords)
-                .hostRecords(hostRecords)
-                .portRecords(portRecords)
-                .wildcardAddressRecords(wildcardAddressRecords)
-                .wildcardHostRecords(wildcardHostRecords)
-                .build();
+            List<AddressRecord> wildcardAddressRecords = new ArrayList<>();
+            List<HostRecord> wildcardHostRecords = new ArrayList<>();
+
+            for (Map.Entry<String, ConcurrentHashMap<Integer, AddressRecord>> addressEntry : this.wildcardAddressRecords.entrySet()) {
+                for (Map.Entry<Integer, AddressRecord> addressPortEntry : addressEntry.getValue().entrySet()) {
+                    wildcardAddressRecords.add(addressPortEntry.getValue());
+                }
+            }
+            for (Map.Entry<String, HostRecord> hostEntry : this.wildcardHostRecords.entrySet()) {
+                wildcardHostRecords.add(hostEntry.getValue());
+            }
+
+            return ImmutableAddressFilterList.builder()
+                    .addressRecords(addressRecords)
+                    .hostRecords(hostRecords)
+                    .portRecords(portRecords)
+                    .wildcardAddressRecords(wildcardAddressRecords)
+                    .wildcardHostRecords(wildcardHostRecords)
+                    .build();
+    
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 
     /*public AddressFilterList getLocalUpdatesDiff() {
@@ -359,83 +476,102 @@ public class AllowDenyConnectionFilter {
     }
 
     @Nullable public Access getRecordRule(String dstHost, int dstPort) {
-        // Priority 0 - exact hostname/port match
-        Map<Integer, AddressRecord> portMap = addressRecords.get(dstHost);
-        if (portMap != null) {
-            AddressRecord record = portMap.get(dstPort);
-            if (record != null) {
-                if (record.access() == Access.ALLOW) {
-                    return Access.ALLOW;
-                } else if (record.access() == Access.DENY) {
-                    return Access.DENY;
-                } else {
-                    throw new IllegalArgumentException("Unknown filter type: " + record.access());
+        lock.readLock().lock();
+        try {
+            // Priority 0 - exact hostname/port match
+            Map<Integer, AddressRecord> portMap = addressRecords.get(dstHost);
+            if (portMap != null) {
+                AddressRecord record = portMap.get(dstPort);
+                if (record != null) {
+                    if (record.access() == Access.ALLOW) {
+                        return Access.ALLOW;
+                    } else if (record.access() == Access.DENY) {
+                        return Access.DENY;
+                    } else {
+                        throw new IllegalArgumentException("Unknown filter type: " + record.access());
+                    }
                 }
             }
-        }
 
-        // Priority 1 - hostname match (without port)
-        HostRecord hostRecord = hostRecords.get(dstHost);
-        if (hostRecord != null) {
-            if (hostRecord.access() == Access.ALLOW) {
-                return Access.ALLOW;
-            } else if (hostRecord.access() == Access.DENY) {
-                return Access.DENY;
-            } else {
-                throw new IllegalArgumentException("Unknown filter type: " + hostRecord.access());
-            }
-        }
-
-        // Priority 2 - wildcard hostname/port match
-        Map<Integer, AddressRecord> wildcardPortMap = getWildcardResource(dstHost, wildcardAddressRecords);
-        if (wildcardPortMap != null) {
-            AddressRecord record = wildcardPortMap.get(dstPort);
-
-            if (record != null) {
-                if (record.access() == Access.ALLOW) {
+            // Priority 1 - hostname match (without port)
+            HostRecord hostRecord = hostRecords.get(dstHost);
+            if (hostRecord != null) {
+                if (hostRecord.access() == Access.ALLOW) {
                     return Access.ALLOW;
-                } else if (record.access() == Access.DENY) {
+                } else if (hostRecord.access() == Access.DENY) {
                     return Access.DENY;
                 } else {
-                    throw new IllegalArgumentException("Unknown filter type: " + record.access());
+                    throw new IllegalArgumentException("Unknown filter type: " + hostRecord.access());
                 }
             }
-        }
 
-        // Priority 3 - wildcard hostname match (without port)
-        HostRecord wildcardHostRecord = getWildcardResource(dstHost, wildcardHostRecords);
-        if (wildcardHostRecord != null) {
-            if (wildcardHostRecord.access() == Access.ALLOW) {
-                return Access.ALLOW;
-            } else if (wildcardHostRecord.access() == Access.DENY) {
-                return Access.DENY;
-            } else {
-                throw new IllegalArgumentException("Unknown filter type: " + wildcardHostRecord.access());
+            List<Match> wildcardMatches = wildcardTrie.match(dstHost);
+
+            // Priority 2 - wildcard hostname/port match (most specific pattern wins)
+            Access wildcardAddressAccess = resolveMostSpecific(wildcardMatches, match -> match.portAccess(dstPort));
+            if (wildcardAddressAccess != null) {
+                return wildcardAddressAccess;
+            }
+
+            // Priority 3 - wildcard hostname match (without port, most specific pattern wins)
+            Access wildcardHostAccess = resolveMostSpecific(wildcardMatches, Match::hostAccess);
+            if (wildcardHostAccess != null) {
+                return wildcardHostAccess;
+            }
+
+            // Priority 4 - port match (without hostname)
+            PortRecord portRecord = portRecords.get(dstPort);
+            if (portRecord != null) {
+                if (portRecord.access() == Access.ALLOW) {
+                    return Access.ALLOW;
+                } else if (portRecord.access() == Access.DENY) {
+                    return Access.DENY;
+                } else {
+                    throw new IllegalArgumentException("Unknown filter type: " + portRecord.access());
+                }
+            }
+
+            return null;
+    
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    /** @return access of the most specific matching pattern having rules of interest; DENY wins on a tie. */
+    static @Nullable Access resolveMostSpecific(List<Match> matches, Function<Match, AccessCounts> rulesOfInterest) {
+        @Nullable Match best = null;
+        boolean hasAllow = false;
+        boolean hasDeny = false;
+        for (Match match : matches) {
+            AccessCounts counts = rulesOfInterest.apply(match);
+            if (counts.isEmpty()) { continue; }
+            int cmp = best == null ? 1 : compareSpecificity(match, best);
+            if (cmp > 0) {
+                best = match;
+                hasAllow = counts.hasAllow();
+                hasDeny = counts.hasDeny();
+            } else if (cmp == 0) {
+                hasAllow |= counts.hasAllow();
+                hasDeny |= counts.hasDeny();
             }
         }
-
-        // Priority 4 - port match (without hostname)
-        PortRecord portRecord = portRecords.get(dstPort);
-        if (portRecord != null) {
-            if (portRecord.access() == Access.ALLOW) {
-                return Access.ALLOW;
-            } else if (portRecord.access() == Access.DENY) {
-                return Access.DENY;
-            } else {
-                throw new IllegalArgumentException("Unknown filter type: " + portRecord.access());
-            }
-        }
-
+        if (hasDeny) { return Access.DENY; }
+        if (hasAllow) { return Access.ALLOW; }
         return null;
     }
 
-    private @Nullable <T> T getWildcardResource(String text, Map<String, T> wildcardAddressRecords) {
-        for (Map.Entry<String, T> entry : wildcardAddressRecords.entrySet()) {
-            String pattern = entry.getKey();
-            if (WildcardMatcher.isMatch(text, pattern)) {
-                return entry.getValue();
-            }
-        }
-        return null;
+    /**
+     * Specificity, in order of precedence:
+     * more literal characters wins; then more '?' wins (a '?' is narrower than a '*');
+     * then fewer '*' runs wins (an extra '*' anywhere can only widen a pattern).
+     * @return positive if match1's pattern is more specific than match2's, negative if less, 0 if equally specific.
+     */
+    static int compareSpecificity(Match match1, Match match2) {
+        int cmp = Integer.compare(match1.literalCount(), match2.literalCount());
+        if (cmp != 0) { return cmp; }
+        cmp = Integer.compare(match1.anyCharCount(), match2.anyCharCount());
+        if (cmp != 0) { return cmp; }
+        return Integer.compare(match2.starRunCount(), match1.starRunCount());
     }
 }

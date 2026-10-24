@@ -2,7 +2,6 @@ package com.flower.net.conntrack.allowdenylist;
 
 import com.flower.net.config.access.Access;
 import com.flower.net.utils.WildcardTrie;
-import com.flower.net.utils.WildcardTrie.AccessCounts;
 import com.flower.net.utils.WildcardTrie.Match;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -14,16 +13,18 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import static com.flower.net.conntrack.allowdenylist.AddressFilterList.AddressRecord;
 import static com.flower.net.conntrack.allowdenylist.AddressFilterList.HostRecord;
 import static com.flower.net.conntrack.allowdenylist.AddressFilterList.PortRecord;
 
 /**
- * Wildcard rules (priorities 2 and 3) are indexed in a {@link WildcardTrie}. When several wildcard patterns match,
+ * Wildcard rules (priorities 2 and 3) are indexed in two {@link WildcardTrie}s, one per record type.
+ * When several wildcard patterns match,
  * the most specific one wins (see {@link #compareSpecificity}); on a specificity tie DENY wins.
  * <p>
- * A read/write lock keeps the record maps and the trie consistent: mutations take the write lock,
+ * A read/write lock keeps the record maps and the tries consistent: mutations take the write lock,
  * lookups take the read lock and so see a consistent state while running concurrently with each other.
  * Do not mutate the maps returned by getters directly.
  * {@link #getNewOrUpdatedRecords} takes no lock (it spans two filters), so its result is best-effort.
@@ -40,7 +41,8 @@ public class AllowDenyConnectionFilter {
     //Priority 4
     final ConcurrentHashMap<Integer, PortRecord> portRecords;
     // Index of wildcardAddressRecords and wildcardHostRecords
-    final WildcardTrie wildcardTrie;
+    final WildcardTrie<AddressRecord> wildcardAddressTrie;
+    final WildcardTrie<HostRecord> wildcardHostTrie;
     final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     public AllowDenyConnectionFilter(List<Pair<AddressFilterList, Boolean>> addressLists) {
@@ -75,7 +77,8 @@ public class AllowDenyConnectionFilter {
         portRecords = new ConcurrentHashMap<>();
         wildcardAddressRecords = new ConcurrentHashMap<>();
         wildcardHostRecords = new ConcurrentHashMap<>();
-        wildcardTrie = new WildcardTrie();
+        wildcardAddressTrie = new WildcardTrie<>();
+        wildcardHostTrie = new WildcardTrie<>();
     }
 
     public boolean isListOverrideRequired(AddressFilterList list) {
@@ -159,15 +162,15 @@ public class AllowDenyConnectionFilter {
                 AddressRecord oldRecord = portMap.put(addressRecord.dstPort(), addressRecord);
                 if (addressRecord.isWildcard()) {
                     if (oldRecord != null) {
-                        wildcardTrie.removeAddressRule(oldRecord.dstHost(), oldRecord.dstPort(), oldRecord.access());
+                        wildcardAddressTrie.removePatternValue(oldRecord.dstHost(), oldRecord);
                     }
-                    wildcardTrie.addAddressRule(addressRecord.dstHost(), addressRecord.dstPort(), addressRecord.access());
+                    wildcardAddressTrie.addPatternValue(addressRecord.dstHost(), addressRecord);
                 }
                 return oldRecord;
             } else {
                 AddressRecord oldRecord = portMap.putIfAbsent(addressRecord.dstPort(), addressRecord);
                 if (oldRecord == null && addressRecord.isWildcard()) {
-                    wildcardTrie.addAddressRule(addressRecord.dstHost(), addressRecord.dstPort(), addressRecord.access());
+                    wildcardAddressTrie.addPatternValue(addressRecord.dstHost(), addressRecord);
                 }
                 return oldRecord;
             }
@@ -185,15 +188,15 @@ public class AllowDenyConnectionFilter {
                 HostRecord oldRecord = hostRecords.put(hostRecord.dstHost(), hostRecord);
                 if (hostRecord.isWildcard()) {
                     if (oldRecord != null) {
-                        wildcardTrie.removeHostRule(oldRecord.dstHost(), oldRecord.access());
+                        wildcardHostTrie.removePatternValue(oldRecord.dstHost(), oldRecord);
                     }
-                    wildcardTrie.addHostRule(hostRecord.dstHost(), hostRecord.access());
+                    wildcardHostTrie.addPatternValue(hostRecord.dstHost(), hostRecord);
                 }
                 return oldRecord;
             } else {
                 HostRecord oldRecord = hostRecords.putIfAbsent(hostRecord.dstHost(), hostRecord);
                 if (oldRecord == null && hostRecord.isWildcard()) {
-                    wildcardTrie.addHostRule(hostRecord.dstHost(), hostRecord.access());
+                    wildcardHostTrie.addPatternValue(hostRecord.dstHost(), hostRecord);
                 }
                 return oldRecord;
             }
@@ -231,7 +234,7 @@ public class AllowDenyConnectionFilter {
                 // I don't want to remove empty portMaps from addressRecords here to avoid race conditions
                 AddressRecord oldRecord = portMap.remove(port);
                 if (oldRecord != null && isWildcard) {
-                    wildcardTrie.removeAddressRule(oldRecord.dstHost(), oldRecord.dstPort(), oldRecord.access());
+                    wildcardAddressTrie.removePatternValue(oldRecord.dstHost(), oldRecord);
                 }
                 return oldRecord;
             }
@@ -247,7 +250,7 @@ public class AllowDenyConnectionFilter {
             final Map<String, HostRecord> hostRecords = hostRecord.isWildcard() ? this.wildcardHostRecords : this.hostRecords;
             HostRecord oldRecord = hostRecords.remove(hostRecord.dstHost());
             if (oldRecord != null && hostRecord.isWildcard()) {
-                wildcardTrie.removeHostRule(oldRecord.dstHost(), oldRecord.access());
+                wildcardHostTrie.removePatternValue(oldRecord.dstHost(), oldRecord);
             }
             return oldRecord;
     
@@ -274,7 +277,8 @@ public class AllowDenyConnectionFilter {
             portRecords.clear();
             wildcardAddressRecords.clear();
             wildcardHostRecords.clear();
-            wildcardTrie.clear();
+            wildcardAddressTrie.clear();
+            wildcardHostTrie.clear();
     
         } finally {
             lock.writeLock().unlock();
@@ -307,14 +311,14 @@ public class AllowDenyConnectionFilter {
                 for (Map.Entry<Integer, AddressRecord> portRecord : portMap.entrySet()) {
                     AddressRecord record = portRecord.getValue();
                     if (record.access() == access && portMap.remove(portRecord.getKey(), record)) {
-                        wildcardTrie.removeAddressRule(record.dstHost(), record.dstPort(), record.access());
+                        wildcardAddressTrie.removePatternValue(record.dstHost(), record);
                     }
                 }
             }
             for (Map.Entry<String, HostRecord> wildcardHostRecord : wildcardHostRecords.entrySet()) {
                 HostRecord record = wildcardHostRecord.getValue();
                 if (record.access() == access && wildcardHostRecords.remove(wildcardHostRecord.getKey(), record)) {
-                    wildcardTrie.removeHostRule(record.dstHost(), record.access());
+                    wildcardHostTrie.removePatternValue(record.dstHost(), record);
                 }
             }
     
@@ -505,16 +509,16 @@ public class AllowDenyConnectionFilter {
                 }
             }
 
-            List<Match> wildcardMatches = wildcardTrie.match(dstHost);
-
             // Priority 2 - wildcard hostname/port match (most specific pattern wins)
-            Access wildcardAddressAccess = resolveMostSpecific(wildcardMatches, match -> match.portAccess(dstPort));
+            Access wildcardAddressAccess = resolveMostSpecific(wildcardAddressTrie.matchText(dstHost),
+                    record -> record.dstPort() == dstPort, AddressRecord::access);
             if (wildcardAddressAccess != null) {
                 return wildcardAddressAccess;
             }
 
             // Priority 3 - wildcard hostname match (without port, most specific pattern wins)
-            Access wildcardHostAccess = resolveMostSpecific(wildcardMatches, Match::hostAccess);
+            Access wildcardHostAccess = resolveMostSpecific(wildcardHostTrie.matchText(dstHost),
+                    record -> true, HostRecord::access);
             if (wildcardHostAccess != null) {
                 return wildcardHostAccess;
             }
@@ -532,28 +536,40 @@ public class AllowDenyConnectionFilter {
             }
 
             return null;
-    
         } finally {
             lock.readLock().unlock();
         }
     }
 
-    /** @return access of the most specific matching pattern having rules of interest; DENY wins on a tie. */
-    static @Nullable Access resolveMostSpecific(List<Match> matches, Function<Match, AccessCounts> rulesOfInterest) {
-        @Nullable Match best = null;
+    /**
+     * @return access of the applicable records under the most specific matching pattern; DENY wins on a tie.
+     *         Null if no matching pattern has applicable records.
+     */
+    static <T> @Nullable Access resolveMostSpecific(List<Match<T>> matches, Predicate<T> isApplicable,
+                                                   Function<T, Access> accessOf) {
+        @Nullable Match<T> best = null;
         boolean hasAllow = false;
         boolean hasDeny = false;
-        for (Match match : matches) {
-            AccessCounts counts = rulesOfInterest.apply(match);
-            if (counts.isEmpty()) { continue; }
+        for (Match<T> match : matches) {
+            boolean matchAllow = false;
+            boolean matchDeny = false;
+            for (T record : match.values()) {
+                if (!isApplicable.test(record)) { continue; }
+                if (accessOf.apply(record) == Access.DENY) {
+                    matchDeny = true;
+                } else {
+                    matchAllow = true;
+                }
+            }
+            if (!matchAllow && !matchDeny) { continue; }
             int cmp = best == null ? 1 : compareSpecificity(match, best);
             if (cmp > 0) {
                 best = match;
-                hasAllow = counts.hasAllow();
-                hasDeny = counts.hasDeny();
+                hasAllow = matchAllow;
+                hasDeny = matchDeny;
             } else if (cmp == 0) {
-                hasAllow |= counts.hasAllow();
-                hasDeny |= counts.hasDeny();
+                hasAllow |= matchAllow;
+                hasDeny |= matchDeny;
             }
         }
         if (hasDeny) { return Access.DENY; }
@@ -567,7 +583,7 @@ public class AllowDenyConnectionFilter {
      * then fewer '*' runs wins (an extra '*' anywhere can only widen a pattern).
      * @return positive if match1's pattern is more specific than match2's, negative if less, 0 if equally specific.
      */
-    static int compareSpecificity(Match match1, Match match2) {
+    static int compareSpecificity(Match<?> match1, Match<?> match2) {
         int cmp = Integer.compare(match1.literalCount(), match2.literalCount());
         if (cmp != 0) { return cmp; }
         cmp = Integer.compare(match1.anyCharCount(), match2.anyCharCount());

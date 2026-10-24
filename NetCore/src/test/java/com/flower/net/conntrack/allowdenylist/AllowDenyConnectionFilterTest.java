@@ -28,13 +28,13 @@ class AllowDenyConnectionFilterTest {
     }
 
     private static int compareSpecificity(String pattern1, String pattern2) {
-        WildcardTrie trie1 = new WildcardTrie();
-        trie1.addHostRule(pattern1, ALLOW);
-        WildcardTrie trie2 = new WildcardTrie();
-        trie2.addHostRule(pattern2, ALLOW);
+        WildcardTrie<String> trie1 = new WildcardTrie<>();
+        trie1.addPatternValue(pattern1, pattern1);
+        WildcardTrie<String> trie2 = new WildcardTrie<>();
+        trie2.addPatternValue(pattern2, pattern2);
         // Match each pattern against itself with wildcards removed, which every pattern accepts
-        Match match1 = trie1.match(pattern1.replace("*", "").replace('?', 'x')).get(0);
-        Match match2 = trie2.match(pattern2.replace("*", "").replace('?', 'x')).get(0);
+        Match<String> match1 = trie1.matchText(pattern1.replace("*", "").replace('?', 'x')).get(0);
+        Match<String> match2 = trie2.matchText(pattern2.replace("*", "").replace('?', 'x')).get(0);
         return AllowDenyConnectionFilter.compareSpecificity(match1, match2);
     }
 
@@ -120,14 +120,14 @@ class AllowDenyConnectionFilterTest {
 
         filter.removeHostRecord(host("*.com", DENY, true));
         assertNull(filter.getRecordRule("a.com", 80));
-        assertTrue(filter.wildcardTrie.isEmpty());
+        assertTrue(filter.wildcardHostTrie.isEmpty() && filter.wildcardAddressTrie.isEmpty());
 
         filter.addAddressRecord(address("*.com", 80, ALLOW, true), true);
         filter.addAddressRecord(address("*.com", 80, DENY, true), true);
         assertEquals(DENY, filter.getRecordRule("a.com", 80));
         filter.removeAddressRecord("*.com", 80, true);
         assertNull(filter.getRecordRule("a.com", 80));
-        assertTrue(filter.wildcardTrie.isEmpty());
+        assertTrue(filter.wildcardHostTrie.isEmpty() && filter.wildcardAddressTrie.isEmpty());
     }
 
     @Test
@@ -144,7 +144,7 @@ class AllowDenyConnectionFilterTest {
 
         filter.clear();
         assertNull(filter.getRecordRule("a.com", 80));
-        assertTrue(filter.wildcardTrie.isEmpty());
+        assertTrue(filter.wildcardHostTrie.isEmpty() && filter.wildcardAddressTrie.isEmpty());
     }
 
     @Test

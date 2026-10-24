@@ -1,7 +1,5 @@
 package com.flower.net.utils;
 
-import com.flower.net.config.access.Access;
-
 import javax.annotation.Nullable;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -16,222 +14,154 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * Trie of wildcard patterns supporting '*' (any sequence, including empty) and '?' (any single character),
- * matched against the whole text.
+ * Multimap from wildcard patterns to sets of values, supporting '*' (any sequence, including empty)
+ * and '?' (any single character), matched against the whole text.
  * <p>
- * Each pattern can carry host rules (pattern only) and address rules (pattern + port), each either ALLOW or DENY.
- * Rules are reference-counted: a rule added N times must be removed N times before it disappears.
+ * Each pattern holds a set of values: adding an equal value twice keeps one, and a pattern disappears
+ * once its last value is removed.
  * <p>
  * Patterns are stored verbatim (e.g. "a**b" and "a*b" are distinct patterns), so that removal mirrors addition.
  * <p>
+ * Each {@link Match} carries the matched pattern's shape (literal, '?' and '*'-run counts) so callers can rank
+ * overlapping matches by specificity; the trie itself imposes no ordering.
+ * <p>
  * Thread-safe via RWLock: matches run concurrently under a read lock, mutations are exclusive.
+ * Copy-on-write: each pattern's value set is immutable and replaced on mutation, so lookups hand out
+ * the stored sets without copying, and returned sets never change.
+ *
+ * @param <T> value type; must have consistent equals/hashCode
  */
-public class WildcardTrie {
+public class WildcardTrie<T> {
     static final char ANY_SEQUENCE = '*';
     static final char ANY_CHAR = '?';
 
-    static class PortAccess {
-        int allowCount;
-        int denyCount;
-
-        boolean isEmpty() {
-            return allowCount == 0 && denyCount == 0;
-        }
-    }
-
-    /** Rule counts for a pattern ending at a trie node. */
-    static class RuleCounts {
+    /** Immutable: values of a pattern ending at a trie node, plus the pattern's shape. Replaced on mutation. */
+    static final class Entry<T> {
         // Pattern shape, for specificity ranking: number of literal (non-wildcard) chars, number of '?',
         // and number of '*' runs (consecutive '*' count as one, as "a**b" is equivalent to "a*b")
         final int literalCount;
         final int anyCharCount;
         final int starRunCount;
-        int allowHostRuleCount;
-        int denyHostRuleCount;
-        final Map<Integer, PortAccess> portAccess = new HashMap<>();
+        // Unmodifiable and never mutated after construction
+        final Set<T> values;
 
-        RuleCounts(int literalCount, int anyCharCount, int starRunCount) {
+        Entry(int literalCount, int anyCharCount, int starRunCount, Set<T> values) {
             this.literalCount = literalCount;
             this.anyCharCount = anyCharCount;
             this.starRunCount = starRunCount;
+            this.values = values;
         }
 
-        boolean isEmpty() {
-            return allowHostRuleCount == 0 && denyHostRuleCount == 0 && portAccess.isEmpty();
+        Entry<T> withValues(Set<T> newValues) {
+            return new Entry<>(literalCount, anyCharCount, starRunCount, newValues);
         }
     }
 
-    static class Node {
-        final Map<Character, Node> children = new HashMap<>();
+    static class Node<T> {
+        final Map<Character, Node<T>> children = new HashMap<>();
         // True if this node is reached via a '*' edge; such a node can consume any number of characters.
         final boolean isStar;
-        @Nullable RuleCounts rules;
+        @Nullable Entry<T> entry;
 
         Node(boolean isStar) {
             this.isStar = isStar;
         }
 
         boolean isRemovable() {
-            return rules == null && children.isEmpty();
+            return entry == null && children.isEmpty();
         }
     }
 
-    /** Immutable allow/deny rule counts. */
-    public static final class AccessCounts {
-        public static final AccessCounts EMPTY = new AccessCounts(0, 0);
-
-        private final int allowCount;
-        private final int denyCount;
-
-        public AccessCounts(int allowCount, int denyCount) {
-            this.allowCount = allowCount;
-            this.denyCount = denyCount;
-        }
-
-        public int allowCount() { return allowCount; }
-        public int denyCount() { return denyCount; }
-        public boolean hasAllow() { return allowCount > 0; }
-        public boolean hasDeny() { return denyCount > 0; }
-        public boolean isEmpty() { return allowCount == 0 && denyCount == 0; }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) { return true; }
-            if (!(o instanceof AccessCounts)) { return false; }
-            AccessCounts that = (AccessCounts) o;
-            return allowCount == that.allowCount && denyCount == that.denyCount;
-        }
-
-        @Override
-        public int hashCode() {
-            return 31 * allowCount + denyCount;
-        }
-
-        @Override
-        public String toString() {
-            return "AccessCounts{allow=" + allowCount + ", deny=" + denyCount + '}';
-        }
-    }
-
-    /** Immutable snapshot of the rules of one pattern that matched the text. */
-    public static final class Match {
+    /** Immutable snapshot of one pattern that matched the text: its values and shape. */
+    public static final class Match<T> {
+        private final Set<T> values;
         private final int literalCount;
         private final int anyCharCount;
         private final int starRunCount;
-        private final AccessCounts hostAccess;
-        private final Map<Integer, AccessCounts> portAccess;
 
-        Match(RuleCounts rules) {
-            this.literalCount = rules.literalCount;
-            this.anyCharCount = rules.anyCharCount;
-            this.starRunCount = rules.starRunCount;
-            this.hostAccess = new AccessCounts(rules.allowHostRuleCount, rules.denyHostRuleCount);
-            Map<Integer, AccessCounts> ports = new HashMap<>();
-            for (Map.Entry<Integer, PortAccess> e : rules.portAccess.entrySet()) {
-                ports.put(e.getKey(), new AccessCounts(e.getValue().allowCount, e.getValue().denyCount));
-            }
-            this.portAccess = Collections.unmodifiableMap(ports);
+        Match(Entry<T> entry) {
+            this.values = entry.values;
+            this.literalCount = entry.literalCount;
+            this.anyCharCount = entry.anyCharCount;
+            this.starRunCount = entry.starRunCount;
         }
 
+        /** @return values stored under the matched pattern. */
+        public Set<T> values() { return values; }
         /** @return number of literal (non-wildcard) characters in the matched pattern. */
         public int literalCount() { return literalCount; }
         /** @return number of '?' characters in the matched pattern. */
         public int anyCharCount() { return anyCharCount; }
         /** @return number of '*' runs in the matched pattern; consecutive '*' count as one. */
         public int starRunCount() { return starRunCount; }
-        public AccessCounts hostAccess() { return hostAccess; }
-        public Map<Integer, AccessCounts> portAccess() { return portAccess; }
-
-        public AccessCounts portAccess(int port) {
-            AccessCounts counts = portAccess.get(port);
-            return counts == null ? AccessCounts.EMPTY : counts;
-        }
 
         @Override
         public String toString() {
-            return "Match{literalCount=" + literalCount + ", anyCharCount=" + anyCharCount
-                    + ", starRunCount=" + starRunCount
-                    + ", hostAccess=" + hostAccess + ", portAccess=" + portAccess + '}';
+            return "Match{values=" + values + ", literalCount=" + literalCount + ", anyCharCount=" + anyCharCount
+                    + ", starRunCount=" + starRunCount + '}';
         }
     }
 
-    private final Node root = new Node(false);
+    private final Node<T> root = new Node<>(false);
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     // ---------------------------------------- Mutations ----------------------------------------
 
-    public void addHostRule(String pattern, Access access) {
+    /** @return true if the value was not yet present under the pattern. */
+    public boolean addPatternValue(String pattern, T value) {
         lock.writeLock().lock();
         try {
-            RuleCounts rules = getOrCreateRules(pattern);
-            if (access == Access.ALLOW) {
-                rules.allowHostRuleCount++;
-            } else {
-                rules.denyHostRuleCount++;
+            Node<T> node = getOrCreateNode(pattern);
+            Entry<T> entry = node.entry;
+            if (entry == null) {
+                node.entry = newEntry(pattern, Collections.singleton(value));
+                return true;
             }
-        } finally {
-            lock.writeLock().unlock();
-        }
-    }
-
-    public void addAddressRule(String pattern, int port, Access access) {
-        lock.writeLock().lock();
-        try {
-            PortAccess portAccess = getOrCreateRules(pattern).portAccess.computeIfAbsent(port, k -> new PortAccess());
-            if (access == Access.ALLOW) {
-                portAccess.allowCount++;
-            } else {
-                portAccess.denyCount++;
-            }
-        } finally {
-            lock.writeLock().unlock();
-        }
-    }
-
-    /** @return true if a host rule with the given pattern and access existed and its count was decremented. */
-    public boolean removeHostRule(String pattern, Access access) {
-        lock.writeLock().lock();
-        try {
-            List<Node> path = findPath(pattern);
-            if (path == null) { return false; }
-            RuleCounts rules = path.get(path.size() - 1).rules;
-            if (rules == null) { return false; }
-            if (access == Access.ALLOW) {
-                if (rules.allowHostRuleCount == 0) { return false; }
-                rules.allowHostRuleCount--;
-            } else {
-                if (rules.denyHostRuleCount == 0) { return false; }
-                rules.denyHostRuleCount--;
-            }
-            cleanup(pattern, path);
+            if (entry.values.contains(value)) { return false; }
+            Set<T> newValues = new HashSet<>(entry.values);
+            newValues.add(value);
+            node.entry = entry.withValues(Collections.unmodifiableSet(newValues));
             return true;
         } finally {
             lock.writeLock().unlock();
         }
     }
 
-    /** @return true if an address rule with the given pattern, port and access existed and its count was decremented. */
-    public boolean removeAddressRule(String pattern, int port, Access access) {
+    /** @return true if the value was present under the pattern and got removed. */
+    public boolean removePatternValue(String pattern, T value) {
         lock.writeLock().lock();
         try {
-            List<Node> path = findPath(pattern);
+            List<Node<T>> path = findPath(pattern);
             if (path == null) { return false; }
-            RuleCounts rules = path.get(path.size() - 1).rules;
-            if (rules == null) { return false; }
-            PortAccess portAccess = rules.portAccess.get(port);
-            if (portAccess == null) { return false; }
-            if (access == Access.ALLOW) {
-                if (portAccess.allowCount == 0) { return false; }
-                portAccess.allowCount--;
+            Node<T> node = path.get(path.size() - 1);
+            Entry<T> entry = node.entry;
+            if (entry == null || !entry.values.contains(value)) { return false; }
+            if (entry.values.size() == 1) {
+                node.entry = null;
+                prune(pattern, path);
             } else {
-                if (portAccess.denyCount == 0) { return false; }
-                portAccess.denyCount--;
+                Set<T> newValues = new HashSet<>(entry.values);
+                newValues.remove(value);
+                node.entry = entry.withValues(Collections.unmodifiableSet(newValues));
             }
-            if (portAccess.isEmpty()) {
-                rules.portAccess.remove(port);
-            }
-            cleanup(pattern, path);
             return true;
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    /** @return values that were stored under the pattern; empty if none. */
+    public Set<T> removePattern(String pattern) {
+        lock.writeLock().lock();
+        try {
+            List<Node<T>> path = findPath(pattern);
+            if (path == null) { return Collections.emptySet(); }
+            Node<T> node = path.get(path.size() - 1);
+            Entry<T> entry = node.entry;
+            if (entry == null) { return Collections.emptySet(); }
+            node.entry = null;
+            prune(pattern, path);
+            return entry.values;
         } finally {
             lock.writeLock().unlock();
         }
@@ -241,9 +171,27 @@ public class WildcardTrie {
         lock.writeLock().lock();
         try {
             root.children.clear();
-            root.rules = null;
+            root.entry = null;
         } finally {
             lock.writeLock().unlock();
+        }
+    }
+
+    // ---------------------------------------- Lookups ----------------------------------------
+
+    /**
+     * Exact lookup by pattern (no wildcard matching; use {@link #matchText} for that).
+     * @return immutable snapshot of values stored under the pattern; empty if none.
+     */
+    public Set<T> getPatternValues(String pattern) {
+        lock.readLock().lock();
+        try {
+            List<Node<T>> path = findPath(pattern);
+            if (path == null) { return Collections.emptySet(); }
+            Entry<T> entry = path.get(path.size() - 1).entry;
+            return entry == null ? Collections.emptySet() : entry.values;
+        } finally {
+            lock.readLock().unlock();
         }
     }
 
@@ -256,17 +204,15 @@ public class WildcardTrie {
         }
     }
 
-    // ---------------------------------------- Lookups ----------------------------------------
-
-    /** @return rules of every pattern matching the text, one entry per matched pattern. */
-    public List<Match> match(String text) {
+    /** @return one entry per stored pattern matching the text, in no particular order. */
+    public List<Match<T>> matchText(String text) {
         lock.readLock().lock();
         try {
-            List<Match> matches = new ArrayList<>();
-            for (Node node : matchNodes(text)) {
-                RuleCounts rules = node.rules;
-                if (rules != null) {
-                    matches.add(new Match(rules));
+            List<Match<T>> matches = new ArrayList<>();
+            for (Node<T> node : matchNodes(text)) {
+                Entry<T> entry = node.entry;
+                if (entry != null) {
+                    matches.add(new Match<>(entry));
                 }
             }
             return matches;
@@ -275,51 +221,18 @@ public class WildcardTrie {
         }
     }
 
-    /** @return host rule counts summed across all patterns matching the text. */
-    public AccessCounts matchHostRules(String text) {
-        lock.readLock().lock();
-        try {
-            int allow = 0;
-            int deny = 0;
-            for (Node node : matchNodes(text)) {
-                RuleCounts rules = node.rules;
-                if (rules != null) {
-                    allow += rules.allowHostRuleCount;
-                    deny += rules.denyHostRuleCount;
-                }
-            }
-            return allow == 0 && deny == 0 ? AccessCounts.EMPTY : new AccessCounts(allow, deny);
-        } finally {
-            lock.readLock().unlock();
-        }
-    }
-
-    /** @return address rule counts for the port, summed across all patterns matching the text. */
-    public AccessCounts matchAddressRules(String text, int port) {
-        lock.readLock().lock();
-        try {
-            int allow = 0;
-            int deny = 0;
-            for (Node node : matchNodes(text)) {
-                RuleCounts rules = node.rules;
-                if (rules != null) {
-                    PortAccess portAccess = rules.portAccess.get(port);
-                    if (portAccess != null) {
-                        allow += portAccess.allowCount;
-                        deny += portAccess.denyCount;
-                    }
-                }
-            }
-            return allow == 0 && deny == 0 ? AccessCounts.EMPTY : new AccessCounts(allow, deny);
-        } finally {
-            lock.readLock().unlock();
-        }
-    }
-
     // ---------------------------------------- Internals ----------------------------------------
 
-    private RuleCounts getOrCreateRules(String pattern) {
-        Node node = root;
+    private Node<T> getOrCreateNode(String pattern) {
+        Node<T> node = root;
+        for (int i = 0; i < pattern.length(); i++) {
+            node = node.children.computeIfAbsent(pattern.charAt(i), k -> new Node<>(k == ANY_SEQUENCE));
+        }
+        return node;
+    }
+
+    /** Computes the pattern's shape once, when the pattern's entry is first created. */
+    private static <T> Entry<T> newEntry(String pattern, Set<T> values) {
         int literalCount = 0;
         int anyCharCount = 0;
         int starRunCount = 0;
@@ -334,20 +247,14 @@ public class WildcardTrie {
             } else {
                 literalCount++;
             }
-            node = node.children.computeIfAbsent(c, k -> new Node(k == ANY_SEQUENCE));
         }
-        RuleCounts rules = node.rules;
-        if (rules == null) {
-            rules = new RuleCounts(literalCount, anyCharCount, starRunCount);
-            node.rules = rules;
-        }
-        return rules;
+        return new Entry<>(literalCount, anyCharCount, starRunCount, values);
     }
 
     /** @return nodes from root to the pattern's end node (inclusive), or null if the pattern is absent. */
-    @Nullable private List<Node> findPath(String pattern) {
-        List<Node> path = new ArrayList<>(pattern.length() + 1);
-        Node node = root;
+    @Nullable private List<Node<T>> findPath(String pattern) {
+        List<Node<T>> path = new ArrayList<>(pattern.length() + 1);
+        Node<T> node = root;
         path.add(node);
         for (int i = 0; i < pattern.length(); i++) {
             node = node.children.get(pattern.charAt(i));
@@ -357,15 +264,10 @@ public class WildcardTrie {
         return path;
     }
 
-    /** Drops empty rules at the pattern's end node and prunes now-empty branches bottom-up. */
-    private static void cleanup(String pattern, List<Node> path) {
-        Node last = path.get(path.size() - 1);
-        RuleCounts rules = last.rules;
-        if (rules != null && rules.isEmpty()) {
-            last.rules = null;
-        }
+    /** Prunes now-empty branches bottom-up along the pattern's path. */
+    private static <T> void prune(String pattern, List<Node<T>> path) {
         for (int i = path.size() - 1; i > 0; i--) {
-            Node node = path.get(i);
+            Node<T> node = path.get(i);
             if (!node.isRemovable()) { break; }
             path.get(i - 1).children.remove(pattern.charAt(i - 1));
         }
@@ -375,18 +277,18 @@ public class WildcardTrie {
      * NFA-style simulation over the trie: keeps the set of nodes reachable after consuming each prefix of the text.
      * Each node is visited at most once per text position, so cost is O(text.length * trieSize) in the worst case.
      */
-    private Set<Node> matchNodes(String text) {
-        Set<Node> current = new HashSet<>();
+    private Set<Node<T>> matchNodes(String text) {
+        Set<Node<T>> current = new HashSet<>();
         current.add(root);
         addStarClosure(current);
 
         for (int i = 0; i < text.length() && !current.isEmpty(); i++) {
             char c = text.charAt(i);
-            Set<Node> next = new HashSet<>();
-            for (Node node : current) {
-                Node exact = node.children.get(c);
+            Set<Node<T>> next = new HashSet<>();
+            for (Node<T> node : current) {
+                Node<T> exact = node.children.get(c);
                 if (exact != null) { next.add(exact); }
-                Node anyChar = node.children.get(ANY_CHAR);
+                Node<T> anyChar = node.children.get(ANY_CHAR);
                 if (anyChar != null) { next.add(anyChar); }
                 if (node.isStar) { next.add(node); }
             }
@@ -397,10 +299,10 @@ public class WildcardTrie {
     }
 
     /** '*' can match an empty sequence, so a '*' child is reachable without consuming input. */
-    private static void addStarClosure(Set<Node> nodes) {
-        Deque<Node> work = new ArrayDeque<>(nodes);
+    private static <T> void addStarClosure(Set<Node<T>> nodes) {
+        Deque<Node<T>> work = new ArrayDeque<>(nodes);
         while (!work.isEmpty()) {
-            Node star = work.pop().children.get(ANY_SEQUENCE);
+            Node<T> star = work.pop().children.get(ANY_SEQUENCE);
             if (star != null && nodes.add(star)) {
                 work.push(star);
             }

@@ -1,11 +1,11 @@
 package com.flower.net.ruler.forms.traffic;
 
+import com.flower.fxutils.JavaFxUtils;
 import com.flower.fxutils.Refreshable;
+import com.flower.net.config.access.Access;
 import com.flower.net.config.access.Protocol;
 import com.flower.net.conntrack.AutoAddRulesMode;
 import com.flower.net.conntrack.ConnectionFilter;
-import com.flower.net.config.access.Access;
-import com.flower.fxutils.JavaFxUtils;
 import com.flower.net.ruler.interfaces.ConnectionsTextSetter;
 import com.flower.net.ruler.interfaces.DeniedHostsListener;
 import com.flower.net.utils.IpAddressUtil;
@@ -14,7 +14,17 @@ import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
-import javafx.scene.control.*;
+import javafx.scene.Node;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -52,7 +62,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     @Nullable @FXML ComboBox<String> autoAddComboBox;
     @Nullable @FXML TabPane ruleListsTabPane;
     @Nullable @FXML MenuButton appendMenuButton;
-    @Nullable @FXML RawCaptureForm rawCaptureForm;
+    @Nullable @FXML TabPane captureTabPane;
 
     final AtomicLong totalConnections;
     final AtomicLong allowedConnections;
@@ -66,6 +76,8 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     /** List in the selected tab: target for allow/deny actions and auto-add */
     volatile @Nullable RuleListForm selectedRuleList;
     volatile AutoAddRulesMode autoAddRulesMode = AutoAddRulesMode.NONE;
+    /** Capture views in tab order; snapshot replaced on the UI thread, read on connection threads */
+    volatile List<CaptureForm> captureForms = List.of();
 
     /** Numbering for new lists; never reused within a session */
     int untitledListCounter = 0;
@@ -101,7 +113,12 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         prohibitedConnections = new AtomicLong(0);
         this.mainForm = mainForm;
 
-        checkNotNull(rawCaptureForm).setConnectionFilter(this);
+        TabPane captureTabs = checkNotNull(captureTabPane);
+        captureTabs.getTabs().addListener((ListChangeListener<Tab>) change ->
+                captureForms = captureTabs.getTabs().stream().map(tab -> (CaptureForm) tab.getContent()).toList());
+        addCaptureForm("Capture Stats", new CaptureStatsForm());
+        addCaptureForm("Raw Capture", new RawCaptureForm());
+        captureTabs.getSelectionModel().selectFirst();
 
         ComboBox<String> autoAddCombo = checkNotNull(autoAddComboBox);
         autoAddCombo.valueProperty().addListener((obs, oldValue, newValue) -> autoAddRulesMode = toAutoAddRulesMode(newValue));
@@ -122,6 +139,12 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         rebuildAppendMenu();
         persistDelay.setOnFinished(event -> persistRuleLists());
         restoreRuleLists();
+    }
+
+    /** Adds a capture view as a tab; it receives captures while its tab is open */
+    <T extends Node & CaptureForm> void addCaptureForm(String title, T captureForm) {
+        captureForm.setConnectionFilter(this);
+        checkNotNull(captureTabPane).getTabs().add(new Tab(title, captureForm));
     }
 
     // ------------ Persistence across restarts ------------
@@ -436,10 +459,15 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         final CheckResult finalCheck = check;
 
         if (from != null) {
-            RawCaptureForm captureForm = checkNotNull(rawCaptureForm);
-            if (captureForm.isCaptureEnabled()) {
-                captureForm.addCapture(CapturedRequest.of(dstHost, dstPort, finalCheck.checkResult,
-                        finalCheck.isRuleMatched, Protocol.TCP, finalCheck.isDirectIpBlock, from));
+            CapturedRequest capturedRequest = null;
+            for (CaptureForm captureForm : captureForms) {
+                if (captureForm.isCaptureEnabled()) {
+                    if (capturedRequest == null) {
+                        capturedRequest = CapturedRequest.of(dstHost, dstPort, finalCheck.checkResult,
+                                finalCheck.isRuleMatched, Protocol.TCP, finalCheck.isDirectIpBlock, from);
+                    }
+                    captureForm.addCapture(capturedRequest);
+                }
             }
 
             totalConnections.incrementAndGet();

@@ -21,7 +21,7 @@ import java.util.prefs.Preferences;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-public class RawCaptureForm extends AnchorPane {
+public class RawCaptureForm extends AnchorPane implements CaptureForm {
     final static String CAPTURE_FLAG_PREF = "captureFlagPref";
     final static int DEFAULT_MAX_REQUESTS = 50;
 
@@ -66,6 +66,7 @@ public class RawCaptureForm extends AnchorPane {
         captureFilterChange();
     }
 
+    @Override
     public void setConnectionFilter(ConnectionFilter connectionFilter) {
         this.connectionFilter = connectionFilter;
     }
@@ -117,6 +118,7 @@ public class RawCaptureForm extends AnchorPane {
     }
 
     /** Thread-safe. Callers may check this before building a CapturedRequest. */
+    @Override
     public boolean isCaptureEnabled() {
         return captureEnabled;
     }
@@ -125,6 +127,7 @@ public class RawCaptureForm extends AnchorPane {
      * Thread-safe: may be called from connection threads. Shows the request if capture is on and the filter matches.
      * The caller decides what is worth capturing (e.g. skips re-checks of existing connections, where from == null).
      */
+    @Override
     public void addCapture(CapturedRequest capturedRequest) {
         if (!captureEnabled) {
             return;

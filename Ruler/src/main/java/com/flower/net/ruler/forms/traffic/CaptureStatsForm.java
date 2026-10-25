@@ -29,7 +29,7 @@ import java.util.prefs.Preferences;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /** Like RawCaptureForm, but shows captured requests aggregated by destination host:port */
-public class CaptureStatsForm extends AnchorPane {
+public class CaptureStatsForm extends AnchorPane implements CaptureForm {
     final static String CAPTURE_FLAG_PREF = "captureStatsFlagPref";
     final static int DEFAULT_MAX_REQUESTS = 50;
 
@@ -91,6 +91,7 @@ public class CaptureStatsForm extends AnchorPane {
         captureFilterChange();
     }
 
+    @Override
     public void setConnectionFilter(ConnectionFilter connectionFilter) {
         this.connectionFilter = connectionFilter;
     }
@@ -142,6 +143,7 @@ public class CaptureStatsForm extends AnchorPane {
     }
 
     /** Thread-safe. Callers may check this before building a CapturedRequest. */
+    @Override
     public boolean isCaptureEnabled() {
         return captureEnabled;
     }
@@ -151,6 +153,7 @@ public class CaptureStatsForm extends AnchorPane {
      * if capture is on and the filter matches.
      * The caller decides what is worth capturing (e.g. skips re-checks of existing connections, where from == null).
      */
+    @Override
     public void addCapture(CapturedRequest capturedRequest) {
         if (!captureEnabled) {
             return;

@@ -65,6 +65,7 @@ public class RuleListForm extends AnchorPane implements Refreshable {
     RuleManager mainRuleManager;
 
     @Nullable @FXML CheckBox activeCheckBox;
+    @Nullable @FXML Button revertButton;
     /** On/off state for UI thread consumers (bound to the checkbox); listen to react to changes */
     final BooleanProperty active = new SimpleBooleanProperty(true);
     /** Mirror of {@link #active} safe to read from connection-handling threads */
@@ -181,6 +182,8 @@ public class RuleListForm extends AnchorPane implements Refreshable {
         checkBox.textProperty().bind(Bindings.when(active).then("On").otherwise("Off"));
         checkBox.textFillProperty().bind(Bindings.when(active).then(Color.GREEN).otherwise(Color.RED));
         active.addListener((obs, oldValue, newValue) -> isActive = newValue);
+        // enabled for clean lists too: re-reads a file that couldn't be read on restore
+        checkNotNull(revertButton).disableProperty().bind(file.isNull());
 
         markSaved();
         refreshContent();
@@ -554,22 +557,58 @@ public class RuleListForm extends AnchorPane implements Refreshable {
             File configFile = fileChooser.showOpenDialog(checkNotNull(stage));
 
             if (configFile != null) {
-
-                AddressFilterList addressFilterList = YAML_MAPPER.readValue(configFile, AddressFilterList.class);
-
-                mainRuleManager.filter.clear();
-                mainRuleManager.filter.addList(addressFilterList, true);
-                file.set(configFile);
-                setListName(configFile.getName());
-                markSaved();
-                notifyRulesChanged();
+                readFromFile(configFile);
             }
-            refreshContent();
         } catch (Exception e) {
             Alert alert = new Alert(Alert.AlertType.ERROR, "Error loading config file: " + e, ButtonType.OK);
             LOGGER.error("Error loading config file: ", e);
             alert.showAndWait();
         }
+    }
+
+    /**
+     * Discard pending changes and reload the list from its file. Also retries a file that couldn't be read before.
+     * The list is left unchanged if the file can't be read.
+     */
+    public void revertRules() {
+        File currentFile = file.get();
+        if (currentFile == null) {
+            Alert alert = new Alert(Alert.AlertType.WARNING,
+                    "\"" + getListName() + "\" was never saved to a file, nothing to revert to.", ButtonType.OK);
+            alert.showAndWait();
+            return;
+        }
+        if (!currentFile.isFile()) {
+            Alert alert = new Alert(Alert.AlertType.WARNING, "File not found: " + currentFile.getPath(), ButtonType.OK);
+            LOGGER.warn("Can't revert \"{}\", file not found: {}", getListName(), currentFile.getPath());
+            alert.showAndWait();
+            return;
+        }
+        if (isDirty() && JavaFxUtils.showYesNoDialog(
+                "Discard unsaved changes in \"" + getListName() + "\" and reload " + currentFile.getPath() + "?") != JavaFxUtils.YesNo.YES) {
+            return;
+        }
+        try {
+            readFromFile(currentFile);
+            LOGGER.info("Traffic filter ruleset reverted to: {}", currentFile.getPath());
+        } catch (Exception e) {
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Error reverting to " + currentFile.getPath() + ": " + e, ButtonType.OK);
+            LOGGER.error("Error reverting to {}: ", currentFile.getPath(), e);
+            alert.showAndWait();
+        }
+    }
+
+    /** Replace all rules with the file content and associate the list with that file; nothing changes if reading fails. */
+    void readFromFile(File configFile) throws IOException {
+        AddressFilterList addressFilterList = YAML_MAPPER.readValue(configFile, AddressFilterList.class);
+
+        mainRuleManager.filter.clear();
+        mainRuleManager.filter.addList(addressFilterList, true);
+        file.set(configFile);
+        setListName(configFile.getName());
+        markSaved();
+        notifyRulesChanged();
+        refreshAndRestoreTableCursor();
     }
 
     /** Snapshot of all rules in this list. */

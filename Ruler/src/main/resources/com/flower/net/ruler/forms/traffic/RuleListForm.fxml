@@ -29,6 +29,8 @@
                             <Button mnemonicParsing="false" onAction="#clearRules" text="Clear rules" />
                                     <Button mnemonicParsing="false" onAction="#clearAllowRules" text="Clear AllowList" />
                                     <Button mnemonicParsing="false" onAction="#clearDenyRules" text="Clear DenyList" />
+                            <Separator orientation="VERTICAL" prefHeight="200.0" />
+                            <Button fx:id="revertButton" mnemonicParsing="false" onAction="#revertRules" text="Revert" />
                          </items>
                       </ToolBar>
                    </children>

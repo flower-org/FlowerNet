@@ -8,22 +8,26 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.prefs.Preferences;
 
 import static com.flower.net.ruler.forms.traffic.RuleListForm.YAML_MAPPER;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Persists rule list tabs across restarts in a dedicated preferences node:
  * <ul>
  *   <li>{@value #INDEX_KEY} - all lists in tab order: file reference for file-based lists, key reference for untitled ones;</li>
- *   <li>{@value #UNTITLED_KEY_PREFIX}N - rules of the N-th untitled list (one value each, as values are limited to
- *   {@link Preferences#MAX_VALUE_LENGTH} chars).</li>
+ *   <li>{@value #UNTITLED_KEY_PREFIX}N - rules of an untitled list (one value each, as values are limited to
+ *   {@link Preferences#MAX_VALUE_LENGTH} chars). The key sticks to the list for its lifetime, so if the current
+ *   version can't be saved, the previously saved one is kept and restored.</li>
  * </ul>
- * File-based lists are re-read from their files on restore. Every save rewrites the node and removes all keys
- * not referenced by the new index, so nothing is left dangling.
+ * File-based lists are re-read from their files on restore. Every save removes all keys not referenced
+ * by the new index, so nothing is left dangling.
  */
 class RuleListsPreferences {
     final static Logger LOGGER = LoggerFactory.getLogger(RuleListsPreferences.class);
@@ -96,6 +100,9 @@ class RuleListsPreferences {
                     String name = entry.name() == null ? TrafficControlForm.UNTITLED_LIST_NAME.trim() : entry.name();
                     RuleListForm ruleList = RuleListForm.restoreUntitled(name, rules);
                     ruleList.setActive(entry.active());
+                    if (rulesYaml != null) {
+                        ruleList.preferencesKey = entry.key();
+                    }
                     ruleLists.add(ruleList);
                 }
             }
@@ -104,7 +111,8 @@ class RuleListsPreferences {
     }
 
     /**
-     * Save lists in the given (tab) order. Lists that don't fit into a preference value are left out.
+     * Save lists in the given (tab) order. If an untitled list can't be saved (e.g. doesn't fit into a preference
+     * value), its previously saved version is kept; if there is none, the list is left out.
      * UI thread only.
      * @return error messages for anything that couldn't be saved; empty on success
      */
@@ -114,45 +122,72 @@ class RuleListsPreferences {
 
     static List<String> save(Preferences node, List<RuleListForm> ruleLists) {
         List<String> errors = new ArrayList<>();
-        List<Entry> entries = new ArrayList<>();
-        Map<String, String> values = new LinkedHashMap<>();
-
-        // Prepare and validate everything before writing, so a failure never leaves the index and lists inconsistent
-        for (RuleListForm ruleList : ruleLists) {
-            File file = ruleList.getFile();
-            if (file != null) {
-                entries.add(new Entry(EntryType.FILE, file.getPath(), null, null, ruleList.activeProperty().get()));
-                continue;
-            }
-
-            String rulesYaml;
-            try {
-                rulesYaml = YAML_MAPPER.writeValueAsString(ruleList.getRules());
-            } catch (Exception e) {
-                LOGGER.error("Can't serialize rule list \"{}\"", ruleList.getListName(), e);
-                errors.add("\"" + ruleList.getListName() + "\": " + e);
-                continue;
-            }
-            if (rulesYaml.length() > Preferences.MAX_VALUE_LENGTH) {
-                LOGGER.error("Rule list \"{}\" is too large to be kept in preferences: {} > {} chars",
-                        ruleList.getListName(), rulesYaml.length(), Preferences.MAX_VALUE_LENGTH);
-                errors.add("\"" + ruleList.getListName() + "\" is too large (" + rulesYaml.length()
-                        + " of max " + Preferences.MAX_VALUE_LENGTH + " chars)");
-                continue;
-            }
-
-            String key = UNTITLED_KEY_PREFIX + values.size();
-            values.put(key, rulesYaml);
-            entries.add(new Entry(EntryType.UNTITLED, null, key, ruleList.getListName(), ruleList.activeProperty().get()));
-        }
-
         try {
+            Set<String> existingKeys = Set.of(node.keys());
+            // Keys owned by open lists, plus keys still in the node, are not handed out to new lists
+            Set<String> takenKeys = new HashSet<>(existingKeys);
+            for (RuleListForm ruleList : ruleLists) {
+                if (ruleList.getFile() == null && ruleList.preferencesKey != null) {
+                    takenKeys.add(ruleList.preferencesKey);
+                }
+            }
+
+            List<Entry> entries = new ArrayList<>();
+            Map<String, String> values = new LinkedHashMap<>();
+            Set<String> keptKeys = new HashSet<>();
+            int nextKeyNumber = 0;
+
+            // Prepare and validate everything before writing, so a failure never leaves the index and lists inconsistent
+            for (RuleListForm ruleList : ruleLists) {
+                boolean active = ruleList.activeProperty().get();
+                File file = ruleList.getFile();
+                if (file != null) {
+                    ruleList.preferencesKey = null;
+                    entries.add(new Entry(EntryType.FILE, file.getPath(), null, null, active));
+                    continue;
+                }
+
+                String error = null;
+                String rulesYaml = null;
+                try {
+                    rulesYaml = YAML_MAPPER.writeValueAsString(ruleList.getRules());
+                    if (rulesYaml.length() > Preferences.MAX_VALUE_LENGTH) {
+                        error = "is too large (" + rulesYaml.length() + " of max " + Preferences.MAX_VALUE_LENGTH + " chars)";
+                    }
+                } catch (Exception e) {
+                    LOGGER.error("Can't serialize rule list \"{}\"", ruleList.getListName(), e);
+                    error = "can't be serialized: " + e;
+                }
+
+                String key = ruleList.preferencesKey;
+                if (error == null) {
+                    if (key == null) {
+                        while (takenKeys.contains(UNTITLED_KEY_PREFIX + nextKeyNumber)) {
+                            nextKeyNumber++;
+                        }
+                        key = UNTITLED_KEY_PREFIX + nextKeyNumber;
+                        takenKeys.add(key);
+                        ruleList.preferencesKey = key;
+                    }
+                    values.put(key, checkNotNull(rulesYaml));
+                } else if (key != null && existingKeys.contains(key)) {
+                    LOGGER.error("Rule list \"{}\" {}; keeping its previously saved version", ruleList.getListName(), error);
+                    errors.add("\"" + ruleList.getListName() + "\" " + error + " - its previously saved version will be restored");
+                    keptKeys.add(key);
+                } else {
+                    LOGGER.error("Rule list \"{}\" {}; no previously saved version to keep", ruleList.getListName(), error);
+                    errors.add("\"" + ruleList.getListName() + "\" " + error + " - it will be lost");
+                    continue;
+                }
+                entries.add(new Entry(EntryType.UNTITLED, null, key, ruleList.getListName(), active));
+            }
+
             String indexYaml = YAML_MAPPER.writeValueAsString(new Index(entries));
             if (indexYaml.length() > Preferences.MAX_VALUE_LENGTH) {
                 LOGGER.error("Rule lists index is too large to be kept in preferences: {} > {} chars",
                         indexYaml.length(), Preferences.MAX_VALUE_LENGTH);
                 errors.add("List of open rule lists is too large (" + indexYaml.length()
-                        + " of max " + Preferences.MAX_VALUE_LENGTH + " chars), nothing saved");
+                        + " of max " + Preferences.MAX_VALUE_LENGTH + " chars) - the previously saved state will be restored");
                 return errors;
             }
 
@@ -160,7 +195,7 @@ class RuleListsPreferences {
             values.forEach(node::put);
             node.put(INDEX_KEY, indexYaml);
             for (String key : node.keys()) {
-                if (!key.equals(INDEX_KEY) && !values.containsKey(key)) {
+                if (!key.equals(INDEX_KEY) && !values.containsKey(key) && !keptKeys.contains(key)) {
                     node.remove(key);
                 }
             }

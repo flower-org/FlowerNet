@@ -39,6 +39,7 @@
                    <Button mnemonicParsing="false" onAction="#newRuleList" text="New list" />
                    <Button mnemonicParsing="false" onAction="#loadRuleList" text="Load list" />
                    <Button mnemonicParsing="false" onAction="#saveRuleList" text="Save list" />
+                   <Button mnemonicParsing="false" onAction="#saveRuleListAs" text="Save list as..." />
                    <Separator orientation="VERTICAL" prefHeight="200.0" />
                    <ComboBox fx:id="autoAddComboBox" prefWidth="150.0" value="No auto-add">
                        <items>

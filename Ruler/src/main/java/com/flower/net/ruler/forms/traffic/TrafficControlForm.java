@@ -189,7 +189,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 alert.setHeaderText("Unsaved changes");
                 ButtonType answer = alert.showAndWait().orElse(ButtonType.CANCEL);
                 if (answer == save) {
-                    if (!ruleList.saveToFile()) {
+                    if (!ruleList.saveRules()) {
                         schedulePersistRuleLists();
                         return false;
                     }
@@ -204,11 +204,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         if (!errors.isEmpty()) {
             ButtonType closeAnyway = new ButtonType("Close anyway", ButtonBar.ButtonData.OK_DONE);
             Alert alert = new Alert(Alert.AlertType.ERROR,
-                    "Some rule lists can't be kept until the next start and will be lost:\n\n"
+                    "Some rule lists can't be saved for the next start:\n\n"
                             + String.join("\n", errors)
                             + "\n\nSave them to files to keep them.",
                     closeAnyway, ButtonType.CANCEL);
-            alert.setHeaderText("Rule lists will be lost");
+            alert.setHeaderText("Rule lists not saved");
             if (alert.showAndWait().orElse(ButtonType.CANCEL) != closeAnyway) {
                 return false;
             }
@@ -281,7 +281,14 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     public void saveRuleList() {
         RuleListForm ruleList = getSelectedRuleListOrWarn();
         if (ruleList != null) {
-            ruleList.saveRules();
+            boolean unused = ruleList.saveRules();
+        }
+    }
+
+    public void saveRuleListAs() {
+        RuleListForm ruleList = getSelectedRuleListOrWarn();
+        if (ruleList != null) {
+            boolean unused = ruleList.saveRulesAs();
         }
     }
 

@@ -73,6 +73,8 @@ public class RuleListForm extends AnchorPane implements Refreshable {
     @Nullable RulesChangedListener rulesChangedListener;
 
     final StringProperty listName;
+    /** Preferences key holding this untitled list across restarts, owned by {@link RuleListsPreferences}; null if not stored yet */
+    @Nullable String preferencesKey;
     /** File this list was last saved to / loaded from; null if never */
     final ObjectProperty<File> file = new SimpleObjectProperty<>(null);
     /** True when the list content differs from what was last saved to / loaded from a file */
@@ -473,8 +475,11 @@ public class RuleListForm extends AnchorPane implements Refreshable {
 
     // --------------- Save and Load from file ---------------
 
-    /** "Save as": writes the list to a chosen file and renames the list after that file. */
-    public void saveRules() {
+    /**
+     * "Save as": writes the list to a chosen file and renames the list after that file.
+     * @return true if saved; false if cancelled or failed (error already shown)
+     */
+    public boolean saveRulesAs() {
         try {
             FileChooser fileChooser = new FileChooser();
             fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Traffic filter ruleset (*.rls)", "*.rls"));
@@ -488,33 +493,34 @@ public class RuleListForm extends AnchorPane implements Refreshable {
                 fileChooser.setInitialFileName(currentFile.getName());
             }
             File configFile = fileChooser.showSaveDialog(checkNotNull(stage));
-
-            if (configFile != null) {
-                if (!configFile.getName().endsWith(".rls")) {
-                    configFile = new File(configFile.getPath()  + ".rls");
-                }
-                writeToFile(configFile);
-
-                Alert alert = new Alert(Alert.AlertType.INFORMATION, "Traffic filter ruleset saved to : " + configFile.getPath(), ButtonType.OK);
-                LOGGER.info("Traffic filter ruleset saved to: {}", configFile.getPath());
-                alert.showAndWait();
+            if (configFile == null) {
+                return false;
             }
+            if (!configFile.getName().endsWith(".rls")) {
+                configFile = new File(configFile.getPath()  + ".rls");
+            }
+            writeToFile(configFile);
+
+            Alert alert = new Alert(Alert.AlertType.INFORMATION, "Traffic filter ruleset saved to : " + configFile.getPath(), ButtonType.OK);
+            LOGGER.info("Traffic filter ruleset saved to: {}", configFile.getPath());
+            alert.showAndWait();
+            return true;
         } catch (Exception e) {
             Alert alert = new Alert(Alert.AlertType.ERROR, "Error saving Traffic filter ruleset: " + e, ButtonType.OK);
             LOGGER.error("Error saving Traffic filter ruleset: ", e);
             alert.showAndWait();
+            return false;
         }
     }
 
     /**
-     * Save to the associated file without asking for a location; shows an error and returns false on failure.
-     * Lists without a file fall back to "Save as" and return false if that is cancelled.
+     * "Save": writes the list to its file without asking; lists without a file fall back to "Save as".
+     * @return true if saved; false if cancelled or failed (error already shown)
      */
-    public boolean saveToFile() {
+    public boolean saveRules() {
         File currentFile = file.get();
         if (currentFile == null) {
-            saveRules();
-            return file.get() != null && !isDirty();
+            return saveRulesAs();
         }
         try {
             writeToFile(currentFile);

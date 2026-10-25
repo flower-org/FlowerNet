@@ -14,30 +14,28 @@ import javafx.scene.control.MenuButton;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.AnchorPane;
-import javafx.stage.Stage;
-import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.function.BiConsumer;
 import java.util.prefs.Preferences;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class RawCaptureForm extends AnchorPane {
-    final static Logger LOGGER = LoggerFactory.getLogger(RawCaptureForm.class);
-
     final static String CAPTURE_FLAG_PREF = "captureFlagPref";
 
-    @Nullable Stage stage;
     @Nullable @FXML TextField maxRequests;
     @Nullable @FXML CheckBox captureRequestsCheckBox;
     @Nullable @FXML TableView<CapturedRequest> capturedRequestsTable;
     final ObservableList<CapturedRequest> capturedRequests;
     @Nullable @FXML MenuButton captureFilterMenuButton;
+    @Nullable @FXML CheckMenuItem matchedAllowedMenuItem;
+    @Nullable @FXML CheckMenuItem matchedProhibitedMenuItem;
+    @Nullable @FXML CheckMenuItem unmatchedAllowedMenuItem;
+    @Nullable @FXML CheckMenuItem unmatchedProhibitedMenuItem;
     @Nullable ConnectionFilter connectionFilter;
 
     public RawCaptureForm() {
@@ -54,75 +52,52 @@ public class RawCaptureForm extends AnchorPane {
         capturedRequests = FXCollections.observableArrayList();
         checkNotNull(capturedRequestsTable).itemsProperty().set(capturedRequests);
 
-        Preferences userPreferences = Preferences.userRoot();
-        String captureFlagStr = userPreferences.get(CAPTURE_FLAG_PREF, "");
-        boolean captureFlag = false;
-        if (!StringUtils.isBlank(captureFlagStr)) {
-            try {
-                captureFlag = Boolean.parseBoolean(captureFlagStr);
-            } catch (Exception e) { }
-        }
+        boolean captureFlag = Preferences.userRoot().getBoolean(CAPTURE_FLAG_PREF, false);
         checkNotNull(captureRequestsCheckBox).selectedProperty().set(captureFlag);
 
         captureFilterChange();
-    }
-
-    public void setStage(Stage stage) {
-        this.stage = stage;
     }
 
     public void setConnectionFilter(ConnectionFilter connectionFilter) {
         this.connectionFilter = connectionFilter;
     }
 
-    public void allowCapture() {
+    void withSelectedCapture(BiConsumer<ConnectionFilter, CapturedRequest> action) {
         CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
         if (capturedRequest != null) {
-            checkNotNull(connectionFilter).allow(capturedRequest.getHost(), capturedRequest.getPort());
+            action.accept(checkNotNull(connectionFilter), capturedRequest);
         }
+    }
+
+    public void allowCapture() {
+        withSelectedCapture((filter, request) -> filter.allow(request.getHost(), request.getPort()));
     }
 
     public void denyCapture() {
-        CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
-        if (capturedRequest != null) {
-            checkNotNull(connectionFilter).deny(capturedRequest.getHost(), capturedRequest.getPort());
-        }
+        withSelectedCapture((filter, request) -> filter.deny(request.getHost(), request.getPort()));
     }
 
     public void allowCaptureHost() {
-        CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
-        if (capturedRequest != null) {
-            checkNotNull(connectionFilter).allowHost(capturedRequest.getHost());
-        }
+        withSelectedCapture((filter, request) -> filter.allowHost(request.getHost()));
     }
 
     public void denyCaptureHost() {
-        CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
-        if (capturedRequest != null) {
-            checkNotNull(connectionFilter).denyHost(capturedRequest.getHost());
-        }
+        withSelectedCapture((filter, request) -> filter.denyHost(request.getHost()));
     }
 
     public void allowCapturePort() {
-        CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
-        if (capturedRequest != null) {
-            checkNotNull(connectionFilter).allowPort(capturedRequest.getPort());
-        }
+        withSelectedCapture((filter, request) -> filter.allowPort(request.getPort()));
     }
 
     public void denyCapturePort() {
-        CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
-        if (capturedRequest != null) {
-            checkNotNull(connectionFilter).denyPort(capturedRequest.getPort());
-        }
+        withSelectedCapture((filter, request) -> filter.denyPort(request.getPort()));
     }
 
     public CaptureFilter getCaptureFilter() {
-        MenuButton menuButton = checkNotNull(captureFilterMenuButton);
-        boolean matchedAllowed = ((CheckMenuItem)(menuButton).getItems().get(0)).selectedProperty().get();
-        boolean matchedProhibited = ((CheckMenuItem)menuButton.getItems().get(1)).selectedProperty().get();
-        boolean unmatchedAllowed = ((CheckMenuItem)menuButton.getItems().get(2)).selectedProperty().get();
-        boolean unmatchedProhibited = ((CheckMenuItem)menuButton.getItems().get(3)).selectedProperty().get();
+        boolean matchedAllowed = checkNotNull(matchedAllowedMenuItem).isSelected();
+        boolean matchedProhibited = checkNotNull(matchedProhibitedMenuItem).isSelected();
+        boolean unmatchedAllowed = checkNotNull(unmatchedAllowedMenuItem).isSelected();
+        boolean unmatchedProhibited = checkNotNull(unmatchedProhibitedMenuItem).isSelected();
 
         return new CaptureFilter(matchedAllowed, matchedProhibited, unmatchedAllowed, unmatchedProhibited);
     }

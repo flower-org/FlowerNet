@@ -6,8 +6,6 @@ import com.fasterxml.jackson.datatype.guava.GuavaModule;
 import com.flower.fxutils.JavaFxUtils;
 import com.flower.fxutils.Refreshable;
 import com.flower.net.config.access.Access;
-import com.flower.net.conntrack.AutoAddRulesMode;
-import com.flower.net.conntrack.ConnectionFilter;
 import com.flower.net.conntrack.allowdenylist.AddressFilterList;
 import com.flower.net.conntrack.allowdenylist.AllowDenyConnectionFilter;
 import com.flower.net.conntrack.allowdenylist.ImmutableAddressRecord;
@@ -37,7 +35,6 @@ import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
-import java.net.SocketAddress;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Map;
@@ -53,7 +50,7 @@ import static com.flower.net.conntrack.allowdenylist.AddressFilterList.HostRecor
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-public class RuleListForm extends AnchorPane implements Refreshable, ConnectionFilter {
+public class RuleListForm extends AnchorPane implements Refreshable {
     final static Logger LOGGER = LoggerFactory.getLogger(RuleListForm.class);
 
     final static String TRAFFIC_RULES_PREF = "trafficRulesPref";
@@ -66,9 +63,6 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
     @Nullable @FXML TableView<TrafficRule> trafficRulesTable;
     final ObservableList<TrafficRule> trafficRules;
     RuleManager mainRuleManager;
-
-    /** Set on the UI thread, read on connection-handling threads */
-    protected volatile AutoAddRulesMode autoAddRulesMode = AutoAddRulesMode.NONE;
 
     @Nullable @FXML ToggleButton activateToggleButton;
     /** On/off state for UI thread consumers (bound to the toggle button); listen to react to changes */
@@ -237,14 +231,6 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
         this.connectionMonitorForm = connectionMonitorForm;
     }
 
-    public AutoAddRulesMode getAutoAddRulesMode() {
-        return autoAddRulesMode;
-    }
-
-    public void setAutoAddRulesMode(AutoAddRulesMode autoAddRulesMode) {
-        this.autoAddRulesMode = autoAddRulesMode;
-    }
-
     // ------------ Traffic rule list ------------
 
     public void newRule() {
@@ -275,32 +261,26 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
         mainRuleManager.clearDenyRules();
     }
 
-    @Override
     public void allow(String host, int port) {
         addAddressRule(host, port, Access.ALLOW);
     }
 
-    @Override
     public void deny(String host, int port) {
         addAddressRule(host, port, Access.DENY);
     }
 
-    @Override
     public void allowPort(int port) {
         addPortRule(port, Access.ALLOW);
     }
 
-    @Override
     public void denyPort(int port) {
         addPortRule(port, Access.DENY);
     }
 
-    @Override
     public void allowHost(String host) {
         addHostRule(host, Access.ALLOW);
     }
 
-    @Override
     public void denyHost(String host) {
         addHostRule(host, Access.DENY);
     }
@@ -381,38 +361,37 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
         } catch (Exception e) {}
     }
 
-    @Nullable Access getAccess(String dstHost, int dstPort) {
+    /**
+     * Pure lookup: the access rule this list has for the destination, or null if no rule matches.
+     * Thread-safe; does not consider whether the list is active - that's the caller's decision.
+     */
+    public @Nullable Access getAccess(String dstHost, int dstPort) {
         return mainRuleManager.filter.getRecordRule(dstHost, dstPort);
     }
 
-    @Override
-    public @Nullable Access approveConnection(String dstHost, int dstPort, @Nullable SocketAddress from) {
-        Access access = getAccess(dstHost, dstPort);
-
-        if (access == null) {
-            AutoAddRulesMode autoAddRulesMode = this.autoAddRulesMode;
-            if (autoAddRulesMode == AutoAddRulesMode.AUTO_DENY || autoAddRulesMode == AutoAddRulesMode.AUTO_ALLOW) {
-                AddressRecord addressRecord = ImmutableAddressRecord.builder()
-                        .dstHost(dstHost)
-                        .dstPort(dstPort)
-                        .access(autoAddRulesMode == AutoAddRulesMode.AUTO_ALLOW ? Access.ALLOW : Access.DENY)
-                        .creationTimestamp(System.currentTimeMillis())
-                        .isWildcard(false)
-                        .build();
-                AddressRecord oldRule = mainRuleManager.filter.addAddressRecord(addressRecord, false);
-
-                // We need this check, because even when list is inactive we still want to auto-add.
-                if (oldRule == null) {
-                    Platform.runLater(() -> {
-                        rulesChanged();
-                        refreshContent();
-                    });
-                    return approveConnection(dstHost, dstPort, from);
-                }
-            }
+    /**
+     * Adds an address rule with the given access if this list has no rule for the destination yet.
+     * Meant to be called by the parent on the auto-add target list, once no active list matched.
+     * Works regardless of whether the list is active. Thread-safe, no user interaction.
+     * @return true if a rule was added
+     */
+    public boolean autoAddIfAbsent(String dstHost, int dstPort, Access access) {
+        AddressRecord addressRecord = ImmutableAddressRecord.builder()
+                .dstHost(dstHost)
+                .dstPort(dstPort)
+                .access(access)
+                .creationTimestamp(System.currentTimeMillis())
+                .isWildcard(false)
+                .build();
+        AddressRecord oldRule = mainRuleManager.filter.addAddressRecord(addressRecord, false);
+        if (oldRule != null) {
+            return false;
         }
-
-        return access;
+        Platform.runLater(() -> {
+            rulesChanged();
+            refreshContent();
+        });
+        return true;
     }
 
     List<TrafficRule> getRulesList(RuleManager ruleManager) {

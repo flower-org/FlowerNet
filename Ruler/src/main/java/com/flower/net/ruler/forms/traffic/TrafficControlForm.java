@@ -48,7 +48,7 @@ import static com.flower.net.conntrack.allowdenylist.AddressFilterList.AddressRe
 import static com.flower.net.conntrack.allowdenylist.AddressFilterList.HostRecord;
 import static com.flower.net.conntrack.allowdenylist.AddressFilterList.PortRecord;
 
-public class TrafficControlForm extends AnchorPane implements Refreshable, ConnectionFilter, TrafficController {
+public class TrafficControlForm extends AnchorPane implements Refreshable, ConnectionFilter {
     final static Logger LOGGER = LoggerFactory.getLogger(TrafficControlForm.class);
     final static String TRAFFIC_RULES_PREF = "trafficRulesPref";
     final static String TMP_TRAFFIC_RULES_PREF = "tmpTrafficRulesPref";
@@ -383,7 +383,6 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         );
     }
 
-    @Override
     public void clearCapturedData() {
         capturedRequests.clear();
         checkNotNull(trafficRulesTable).refresh();

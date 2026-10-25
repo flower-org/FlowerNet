@@ -68,6 +68,8 @@ public class CaptureStatsForm extends AnchorPane implements CaptureForm {
         SortedList<CaptureStatsEntry> sortedEntries = new SortedList<>(capturedRequests);
         sortedEntries.comparatorProperty().bind(table.comparatorProperty());
         table.setItems(sortedEntries);
+        // Most recently accessed first (sortType is DESCENDING in FXML)
+        table.getSortOrder().add(checkNotNull(lastAccessColumn));
 
         checkNotNull(lastAccessColumn).setCellFactory(column -> new TableCell<>() {
             @Override
@@ -81,7 +83,7 @@ public class CaptureStatsForm extends AnchorPane implements CaptureForm {
                 change -> change.getControlNewText().matches("\\d*") ? change : null));
 
         CheckBox captureCheckBox = checkNotNull(captureRequestsCheckBox);
-        captureCheckBox.setSelected(Preferences.userRoot().getBoolean(CAPTURE_FLAG_PREF, false));
+        captureCheckBox.setSelected(Preferences.userRoot().getBoolean(CAPTURE_FLAG_PREF, true));
         captureEnabled = captureCheckBox.isSelected();
         captureCheckBox.selectedProperty().addListener((obs, oldValue, newValue) -> {
             captureEnabled = newValue;

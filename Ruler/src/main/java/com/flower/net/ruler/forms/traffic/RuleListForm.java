@@ -73,6 +73,8 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
     @Nullable DeniedHostsListener connectionMonitorForm;
 
     final StringProperty listName;
+    /** File this list was last saved to / loaded from; null if never */
+    @Nullable File file;
     /** True when the list content differs from what was last saved to / loaded from a file */
     final BooleanProperty dirty = new SimpleBooleanProperty(false);
     /** Rule content as of the last save/load, used to detect when changes were reverted */
@@ -88,7 +90,9 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
     /** Open a list from a ruleset file; the list is named after the file. */
     public static RuleListForm fromFile(File file) throws IOException {
         AddressFilterList addressFilterList = YAML_MAPPER.readValue(file, AddressFilterList.class);
-        return new RuleListForm(file.getName(), addressFilterList);
+        RuleListForm ruleListForm = new RuleListForm(file.getName(), addressFilterList);
+        ruleListForm.file = file;
+        return ruleListForm;
     }
 
     public RuleListForm(String listName, @Nullable AddressFilterList initialRules) {
@@ -141,6 +145,10 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
 
         markSaved();
         refreshContent();
+    }
+
+    public @Nullable File getFile() {
+        return file;
     }
 
     public StringProperty listNameProperty() {
@@ -432,6 +440,13 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
             FileChooser fileChooser = new FileChooser();
             fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Traffic filter ruleset (*.rls)", "*.rls"));
             fileChooser.setTitle("Save Traffic filter ruleset");
+            if (file != null) {
+                File parentDir = file.getParentFile();
+                if (parentDir != null && parentDir.isDirectory()) {
+                    fileChooser.setInitialDirectory(parentDir);
+                }
+                fileChooser.setInitialFileName(file.getName());
+            }
             File configFile = fileChooser.showSaveDialog(checkNotNull(stage));
 
             if (configFile != null) {
@@ -441,6 +456,7 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
                 AddressFilterList addressFilterList = mainRuleManager.filter.getFullList();
 
                 YAML_MAPPER.writeValue(configFile, addressFilterList);
+                file = configFile;
                 setListName(configFile.getName());
                 markSaved();
 
@@ -473,6 +489,7 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
 
                 mainRuleManager.filter.clear();
                 mainRuleManager.filter.addList(addressFilterList, true);
+                file = configFile;
                 setListName(configFile.getName());
                 markSaved();
                 checkNotNull(connectionMonitorForm).checkDeniedHosts();

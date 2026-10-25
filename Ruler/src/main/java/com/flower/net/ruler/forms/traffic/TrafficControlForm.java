@@ -30,6 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.prefs.Preferences;
@@ -269,12 +270,37 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
             File file = fileChooser.showOpenDialog(checkNotNull(stage));
             if (file != null) {
-                addRuleList(RuleListForm.fromFile(file));
+                Tab existingTab = findTabByFile(file);
+                if (existingTab != null) {
+                    checkNotNull(ruleListsTabPane).getSelectionModel().select(existingTab);
+                } else {
+                    addRuleList(RuleListForm.fromFile(file));
+                }
             }
         } catch (Exception e) {
             Alert alert = new Alert(Alert.AlertType.ERROR, "Error loading rule list: " + e, ButtonType.OK);
             LOGGER.error("Error loading rule list: ", e);
             alert.showAndWait();
+        }
+    }
+
+    @Nullable Tab findTabByFile(File file) {
+        for (Tab tab : checkNotNull(ruleListsTabPane).getTabs()) {
+            File tabFile = ((RuleListForm) tab.getContent()).getFile();
+            if (tabFile != null && isSameFile(tabFile, file)) {
+                return tab;
+            }
+        }
+        return null;
+    }
+
+    static boolean isSameFile(File file1, File file2) {
+        try {
+            // resolves symlinks, case-insensitive file systems etc.
+            return Files.isSameFile(file1.toPath(), file2.toPath());
+        } catch (IOException e) {
+            // e.g. one of the files doesn't exist
+            return file1.toPath().toAbsolutePath().normalize().equals(file2.toPath().toAbsolutePath().normalize());
         }
     }
 

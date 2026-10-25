@@ -23,6 +23,7 @@
                             <CheckBox fx:id="captureRequestsCheckBox" mnemonicParsing="false" text="Capture:" />
                             <TextField fx:id="maxRequests" prefHeight="26.0" prefWidth="60.0" text="50" />
                             <Button mnemonicParsing="false" onAction="#clearCapturedData" text="Clear" />
+                            <Button mnemonicParsing="false" onAction="#removeSelectedEntry" text="Remove" />
                             <Separator orientation="VERTICAL" prefHeight="200.0" />
                             <Button mnemonicParsing="false" onAction="#allowCapture" text="Allow" />
                             <Button mnemonicParsing="false" onAction="#denyCapture" text="Deny" />
@@ -58,9 +59,9 @@
                                 <PropertyValueFactory property="port" />
                             </cellValueFactory>
                         </TableColumn>
-                        <TableColumn minWidth="100.0" prefWidth="100.0" sortType="DESCENDING" text="Count">
+                        <TableColumn minWidth="250.0" prefWidth="220.0" text="Last filter result">
                             <cellValueFactory>
-                                <PropertyValueFactory property="count" />
+                                <PropertyValueFactory property="filterResult" />
                             </cellValueFactory>
                         </TableColumn>
                         <TableColumn fx:id="lastAccessColumn" minWidth="250.0" prefWidth="250.0" sortType="DESCENDING" text="Last access">
@@ -68,9 +69,9 @@
                                 <PropertyValueFactory property="lastAccess" />
                             </cellValueFactory>
                         </TableColumn>
-                        <TableColumn minWidth="250.0" prefWidth="220.0" text="Last filter result">
+                        <TableColumn minWidth="100.0" prefWidth="100.0" sortType="DESCENDING" text="Count">
                             <cellValueFactory>
-                                <PropertyValueFactory property="filterResult" />
+                                <PropertyValueFactory property="count" />
                             </cellValueFactory>
                         </TableColumn>
                         <TableColumn minWidth="250.0" prefWidth="250.0" text="Last from IP">

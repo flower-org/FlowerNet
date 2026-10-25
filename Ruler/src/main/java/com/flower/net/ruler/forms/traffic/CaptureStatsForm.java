@@ -142,6 +142,15 @@ public class CaptureStatsForm extends AnchorPane implements CaptureForm {
         entriesByKey.clear();
     }
 
+    /** Removes the selected entry; it reappears (counting from 1) only if the host:port is accessed again */
+    public void removeSelectedEntry() {
+        CaptureStatsEntry entry = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
+        if (entry != null) {
+            capturedRequests.remove(entry);
+            entriesByKey.remove(new EntryKey(entry.getHost(), entry.getPort()));
+        }
+    }
+
     /** Thread-safe. Callers may check this before building a CapturedRequest. */
     @Override
     public boolean isCaptureEnabled() {

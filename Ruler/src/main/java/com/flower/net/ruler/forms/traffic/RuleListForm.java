@@ -69,6 +69,10 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
     protected AutoAddRulesMode autoAddRulesMode = AutoAddRulesMode.NONE;
 
     @Nullable @FXML ToggleButton activateToggleButton;
+    /** On/off state for UI thread consumers (bound to the toggle button); listen to react to changes */
+    final BooleanProperty active = new SimpleBooleanProperty(false);
+    /** Mirror of {@link #active} safe to read from connection-handling threads */
+    volatile boolean isActive = false;
 
     @Nullable DeniedHostsListener connectionMonitorForm;
 
@@ -143,8 +147,28 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
         trafficRules = FXCollections.observableArrayList();
         checkNotNull(trafficRulesTable).itemsProperty().set(trafficRules);
 
+        ToggleButton toggleButton = checkNotNull(activateToggleButton);
+        toggleButton.selectedProperty().bindBidirectional(active);
+        toggleButton.textProperty().bind(Bindings.when(active).then("On").otherwise("Off"));
+        active.addListener((obs, oldValue, newValue) -> isActive = newValue);
+
         markSaved();
         refreshContent();
+    }
+
+    /** Thread-safe: may be called from connection-handling threads. */
+    public boolean isActive() {
+        return isActive;
+    }
+
+    /** UI thread only. */
+    public void setActive(boolean active) {
+        this.active.set(active);
+    }
+
+    /** UI thread only; add a listener to react when the list is switched on/off. */
+    public BooleanProperty activeProperty() {
+        return active;
     }
 
     public @Nullable File getFile() {

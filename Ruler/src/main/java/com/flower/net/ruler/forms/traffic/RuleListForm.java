@@ -11,7 +11,6 @@ import com.flower.net.conntrack.allowdenylist.AllowDenyConnectionFilter;
 import com.flower.net.conntrack.allowdenylist.ImmutableAddressRecord;
 import com.flower.net.conntrack.allowdenylist.ImmutableHostRecord;
 import com.flower.net.conntrack.allowdenylist.ImmutablePortRecord;
-import com.flower.net.ruler.interfaces.DeniedHostsListener;
 import com.google.common.collect.Streams;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
@@ -70,7 +69,7 @@ public class RuleListForm extends AnchorPane implements Refreshable {
     /** Mirror of {@link #active} safe to read from connection-handling threads */
     volatile boolean isActive = false;
 
-    @Nullable DeniedHostsListener connectionMonitorForm;
+    @Nullable RulesChangedListener rulesChangedListener;
 
     final StringProperty listName;
     /** File this list was last saved to / loaded from; null if never */
@@ -122,7 +121,7 @@ public class RuleListForm extends AnchorPane implements Refreshable {
             void refreshAndRestoreCursor() { refreshAndRestoreTableCursor(); }
 
             @Override
-            void checkDeniedHosts() { checkNotNull(connectionMonitorForm).checkDeniedHosts(); }
+            void checkDeniedHosts() { /* parent re-checks denied hosts via RulesChangedListener */ }
 
             @Override
             @Nullable TrafficRule getSelectedTrafficRule() { return checkNotNull(trafficRulesTable).getSelectionModel().getSelectedItem(); }
@@ -188,9 +187,16 @@ public class RuleListForm extends AnchorPane implements Refreshable {
         return dirty.get();
     }
 
-    /** Re-evaluate dirty state after a change; this is the only place the comparison runs. */
+    /** Call after any change to rules: re-evaluates dirty state (the only place the comparison runs) and notifies the parent. */
     void rulesChanged() {
         dirty.set(!savedRulesSnapshot.equals(rulesSnapshot(mainRuleManager.filter)));
+        notifyRulesChanged();
+    }
+
+    void notifyRulesChanged() {
+        if (rulesChangedListener != null) {
+            rulesChangedListener.rulesChanged(this);
+        }
     }
 
     void markSaved() {
@@ -227,8 +233,9 @@ public class RuleListForm extends AnchorPane implements Refreshable {
         this.stage = stage;
     }
 
-    public void setConnectionMonitorForm(DeniedHostsListener connectionMonitorForm) {
-        this.connectionMonitorForm = connectionMonitorForm;
+    /** Parent is notified after any change to this list's rules (e.g. to re-check denied hosts, persist). */
+    public void setRulesChangedListener(@Nullable RulesChangedListener rulesChangedListener) {
+        this.rulesChangedListener = rulesChangedListener;
     }
 
     // ------------ Traffic rule list ------------
@@ -293,7 +300,7 @@ public class RuleListForm extends AnchorPane implements Refreshable {
                 .creationTimestamp(System.currentTimeMillis())
                 .isWildcard(false)
                 .build();
-        addRuleConfirmOverwrite(addressRecord, access,
+        addRuleConfirmOverwrite(addressRecord,
                 mainRuleManager.filter::addAddressRecord, AddressRecord::recordsEqual);
     }
 
@@ -304,7 +311,7 @@ public class RuleListForm extends AnchorPane implements Refreshable {
                 .creationTimestamp(System.currentTimeMillis())
                 .isWildcard(false)
                 .build();
-        addRuleConfirmOverwrite(hostRecord, access,
+        addRuleConfirmOverwrite(hostRecord,
                 mainRuleManager.filter::addHostRecord, HostRecord::recordsEqual);
     }
 
@@ -314,7 +321,7 @@ public class RuleListForm extends AnchorPane implements Refreshable {
                 .access(access)
                 .creationTimestamp(System.currentTimeMillis())
                 .build();
-        addRuleConfirmOverwrite(portRecord, access,
+        addRuleConfirmOverwrite(portRecord,
                 mainRuleManager.filter::addPortRecord, PortRecord::recordsEqual);
     }
 
@@ -323,7 +330,7 @@ public class RuleListForm extends AnchorPane implements Refreshable {
      * asks the user whether to overwrite it.
      * @param addRecord (record, overrideExisting) -> previously existing record, or null
      */
-    <R> void addRuleConfirmOverwrite(R record, Access access,
+    <R> void addRuleConfirmOverwrite(R record,
                                      BiFunction<R, Boolean, R> addRecord,
                                      BiPredicate<R, R> recordsEqual) {
         R existingRule = addRecord.apply(record, false);
@@ -334,9 +341,6 @@ public class RuleListForm extends AnchorPane implements Refreshable {
                 R unused = addRecord.apply(record, true);
                 rulesChanged();
             }
-        }
-        if (access == Access.DENY) {
-            checkNotNull(connectionMonitorForm).checkDeniedHosts();
         }
         refreshContent();
     }
@@ -498,7 +502,7 @@ public class RuleListForm extends AnchorPane implements Refreshable {
                 file = configFile;
                 setListName(configFile.getName());
                 markSaved();
-                checkNotNull(connectionMonitorForm).checkDeniedHosts();
+                notifyRulesChanged();
             }
             refreshContent();
         } catch (Exception e) {
@@ -558,7 +562,6 @@ public class RuleListForm extends AnchorPane implements Refreshable {
 
         mainRuleManager.filter.addList(appendList, overrideExisting);
         rulesChanged();
-        checkNotNull(connectionMonitorForm).checkDeniedHosts();
         refreshAndRestoreTableCursor();
         return true;
     }

@@ -214,7 +214,12 @@ public abstract class RuleManager {
     void onRulesChanged() {}
 
     abstract void refreshAndRestoreCursor();
-    /** "close on deny" existing connections for newly denied hosts */
+    /**
+     * "close on deny" existing connections for newly denied hosts.
+     * @deprecated Only called on remove/flip, missing other rule changes. Override {@link #onRulesChanged()} instead
+     * and let the parent re-check denied hosts; remove once TrafficControlForm migrates to RuleListForm.
+     */
+    @Deprecated
     abstract void checkDeniedHosts();
     @Nullable abstract TrafficRule getSelectedTrafficRule();
     @Nullable abstract Stage getStage();

@@ -56,8 +56,12 @@ public class RawCaptureForm extends AnchorPane {
                 change -> change.getControlNewText().matches("\\d*") ? change : null));
 
         CheckBox captureCheckBox = checkNotNull(captureRequestsCheckBox);
-        captureCheckBox.selectedProperty().addListener((obs, oldValue, newValue) -> captureEnabled = newValue);
         captureCheckBox.setSelected(Preferences.userRoot().getBoolean(CAPTURE_FLAG_PREF, false));
+        captureEnabled = captureCheckBox.isSelected();
+        captureCheckBox.selectedProperty().addListener((obs, oldValue, newValue) -> {
+            captureEnabled = newValue;
+            Preferences.userRoot().putBoolean(CAPTURE_FLAG_PREF, newValue);
+        });
 
         captureFilterChange();
     }
@@ -112,24 +116,22 @@ public class RawCaptureForm extends AnchorPane {
         checkNotNull(capturedRequestsTable).refresh();
     }
 
-    public void captureFlagChange() {
-        Preferences userPreferences = Preferences.userRoot();
-        userPreferences.put(CAPTURE_FLAG_PREF, Boolean.toString(checkNotNull(captureRequestsCheckBox).selectedProperty().get()));
-    }
-
     /** Thread-safe. Callers may check this before building a CapturedRequest. */
     public boolean isCaptureEnabled() {
         return captureEnabled;
     }
 
-    /** Thread-safe: may be called from connection threads. Shows the request if capture is on and the filter matches. */
+    /**
+     * Thread-safe: may be called from connection threads. Shows the request if capture is on and the filter matches.
+     * The caller decides what is worth capturing (e.g. skips re-checks of existing connections, where from == null).
+     */
     public void addCapture(CapturedRequest capturedRequest) {
         if (!captureEnabled) {
             return;
         }
         Platform.runLater(() -> {
             // Re-checked: capture may have been turned off while this was queued
-            if (checkNotNull(captureRequestsCheckBox).isSelected()
+            if (captureEnabled
                     && getCaptureFilter().matchCapturedRecord(capturedRequest.getAccess(), capturedRequest.isRuleMatched())) {
                 capturedRequests.add(capturedRequest);
                 trimToMaxRequests();

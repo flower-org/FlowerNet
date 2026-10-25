@@ -58,17 +58,22 @@
                                 <PropertyValueFactory property="port" />
                             </cellValueFactory>
                         </TableColumn>
-                        <TableColumn minWidth="250.0" prefWidth="220.0" text="Filter result">
+                        <TableColumn minWidth="100.0" prefWidth="100.0" sortType="DESCENDING" text="Count">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="count" />
+                            </cellValueFactory>
+                        </TableColumn>
+                        <TableColumn fx:id="lastAccessColumn" minWidth="250.0" prefWidth="250.0" sortType="DESCENDING" text="Last access">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="lastAccess" />
+                            </cellValueFactory>
+                        </TableColumn>
+                        <TableColumn minWidth="250.0" prefWidth="220.0" text="Last filter result">
                             <cellValueFactory>
                                 <PropertyValueFactory property="filterResult" />
                             </cellValueFactory>
                         </TableColumn>
-                        <TableColumn minWidth="250.0" prefWidth="250.0" text="Date">
-                            <cellValueFactory>
-                                <PropertyValueFactory property="date" />
-                            </cellValueFactory>
-                        </TableColumn>
-                        <TableColumn minWidth="250.0" prefWidth="250.0" text="From IP">
+                        <TableColumn minWidth="250.0" prefWidth="250.0" text="Last from IP">
                             <cellValueFactory>
                                 <PropertyValueFactory property="from" />
                             </cellValueFactory>

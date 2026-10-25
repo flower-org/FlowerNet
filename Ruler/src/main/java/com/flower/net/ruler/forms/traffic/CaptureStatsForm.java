@@ -2,13 +2,17 @@ package com.flower.net.ruler.forms.traffic;
 
 import com.flower.net.conntrack.ConnectionFilter;
 import javafx.application.Platform;
+import javafx.beans.Observable;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.MenuButton;
+import javafx.scene.control.TableCell;
+import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextFormatter;
@@ -16,19 +20,30 @@ import javafx.scene.layout.AnchorPane;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.prefs.Preferences;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+/** Like RawCaptureForm, but shows captured requests aggregated by destination host:port */
 public class CaptureStatsForm extends AnchorPane {
-    final static String CAPTURE_FLAG_PREF = "captureFlagPref";
+    final static String CAPTURE_FLAG_PREF = "captureStatsFlagPref";
     final static int DEFAULT_MAX_REQUESTS = 50;
 
+    record EntryKey(String host, int port) {}
+
+    /** Max number of host:port entries */
     @Nullable @FXML TextField maxRequests;
     @Nullable @FXML CheckBox captureRequestsCheckBox;
-    @Nullable @FXML TableView<CapturedRequest> capturedRequestsTable;
-    final ObservableList<CapturedRequest> capturedRequests;
+    @Nullable @FXML TableView<CaptureStatsEntry> capturedRequestsTable;
+    @Nullable @FXML TableColumn<CaptureStatsEntry, Number> lastAccessColumn;
+    /** Unsorted entries; the extractor makes a sorted table re-sort when counts or access times change */
+    final ObservableList<CaptureStatsEntry> capturedRequests =
+            FXCollections.observableArrayList(entry -> new Observable[] { entry.countProperty(), entry.lastAccessProperty() });
+    final Map<EntryKey, CaptureStatsEntry> entriesByKey = new HashMap<>();
     @Nullable @FXML MenuButton captureFilterMenuButton;
     @Nullable @FXML CheckMenuItem matchedAllowedMenuItem;
     @Nullable @FXML CheckMenuItem matchedProhibitedMenuItem;
@@ -49,8 +64,18 @@ public class CaptureStatsForm extends AnchorPane {
             throw new RuntimeException(exception);
         }
 
-        capturedRequests = FXCollections.observableArrayList();
-        checkNotNull(capturedRequestsTable).itemsProperty().set(capturedRequests);
+        TableView<CaptureStatsEntry> table = checkNotNull(capturedRequestsTable);
+        SortedList<CaptureStatsEntry> sortedEntries = new SortedList<>(capturedRequests);
+        sortedEntries.comparatorProperty().bind(table.comparatorProperty());
+        table.setItems(sortedEntries);
+
+        checkNotNull(lastAccessColumn).setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(@Nullable Number timestamp, boolean empty) {
+                super.updateItem(timestamp, empty);
+                setText(empty || timestamp == null ? null : CapturedRequest.formatTimestamp(timestamp.longValue()));
+            }
+        });
 
         checkNotNull(maxRequests).setTextFormatter(new TextFormatter<String>(
                 change -> change.getControlNewText().matches("\\d*") ? change : null));
@@ -70,8 +95,8 @@ public class CaptureStatsForm extends AnchorPane {
         this.connectionFilter = connectionFilter;
     }
 
-    void withSelectedCapture(BiConsumer<ConnectionFilter, CapturedRequest> action) {
-        CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
+    void withSelectedCapture(BiConsumer<ConnectionFilter, CaptureStatsEntry> action) {
+        CaptureStatsEntry capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
         if (capturedRequest != null) {
             action.accept(checkNotNull(connectionFilter, "CaptureStatsForm: setConnectionFilter() was not called"),
                     capturedRequest);
@@ -113,7 +138,7 @@ public class CaptureStatsForm extends AnchorPane {
 
     public void clearCapturedData() {
         capturedRequests.clear();
-        checkNotNull(capturedRequestsTable).refresh();
+        entriesByKey.clear();
     }
 
     /** Thread-safe. Callers may check this before building a CapturedRequest. */
@@ -122,7 +147,8 @@ public class CaptureStatsForm extends AnchorPane {
     }
 
     /**
-     * Thread-safe: may be called from connection threads. Shows the request if capture is on and the filter matches.
+     * Thread-safe: may be called from connection threads. Counts the request towards its host:port entry
+     * if capture is on and the filter matches.
      * The caller decides what is worth capturing (e.g. skips re-checks of existing connections, where from == null).
      */
     public void addCapture(CapturedRequest capturedRequest) {
@@ -133,9 +159,17 @@ public class CaptureStatsForm extends AnchorPane {
             // Re-checked: capture may have been turned off while this was queued
             if (captureEnabled
                     && getCaptureFilter().matchCapturedRecord(capturedRequest.getAccess(), capturedRequest.isRuleMatched())) {
-                capturedRequests.add(capturedRequest);
-                trimToMaxRequests();
-                checkNotNull(capturedRequestsTable).refresh();
+                EntryKey key = new EntryKey(capturedRequest.getHost(), capturedRequest.getPort());
+                CaptureStatsEntry entry = entriesByKey.get(key);
+                if (entry == null) {
+                    entry = new CaptureStatsEntry(key.host(), key.port());
+                    entry.record(capturedRequest);
+                    entriesByKey.put(key, entry);
+                    capturedRequests.add(entry);
+                    trimToMaxRequests();
+                } else {
+                    entry.record(capturedRequest);
+                }
             }
         });
     }
@@ -149,16 +183,15 @@ public class CaptureStatsForm extends AnchorPane {
         }
     }
 
-    /** Drops the oldest captures above the limit; if the selected row was dropped, the selection moves to the next row */
+    /** Drops the least recently accessed entries above the limit */
     void trimToMaxRequests() {
-        int excess = capturedRequests.size() - getMaxRequests();
-        if (excess > 0) {
-            TableView<CapturedRequest> table = checkNotNull(capturedRequestsTable);
-            CapturedRequest selectedItem = table.getSelectionModel().getSelectedItem();
-            capturedRequests.remove(0, excess);
-            if (selectedItem != null && capturedRequests.contains(selectedItem)) {
-                table.getSelectionModel().select(selectedItem);
-            }
+        int max = getMaxRequests();
+        while (capturedRequests.size() > max) {
+            CaptureStatsEntry oldest = capturedRequests.stream()
+                    .min(Comparator.comparingLong(CaptureStatsEntry::getLastAccess))
+                    .orElseThrow();
+            capturedRequests.remove(oldest);
+            entriesByKey.remove(new EntryKey(oldest.getHost(), oldest.getPort()));
         }
     }
 

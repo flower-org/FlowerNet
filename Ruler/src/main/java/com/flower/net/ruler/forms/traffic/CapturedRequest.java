@@ -63,7 +63,15 @@ public class CapturedRequest {
     }
 
     public String getDate() {
-        return String.format("%s", new Date(creationTimestamp));
+        return formatTimestamp(creationTimestamp);
+    }
+
+    public long getCreationTimestamp() {
+        return creationTimestamp;
+    }
+
+    static String formatTimestamp(long timestamp) {
+        return String.format("%s", new Date(timestamp));
     }
 
     public @Nullable String getFromHost() {

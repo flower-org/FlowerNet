@@ -35,6 +35,8 @@ public class RawCaptureForm extends AnchorPane {
     @Nullable @FXML CheckMenuItem unmatchedAllowedMenuItem;
     @Nullable @FXML CheckMenuItem unmatchedProhibitedMenuItem;
     @Nullable ConnectionFilter connectionFilter;
+    /** Mirrors the capture checkbox so connection threads can skip work without touching the UI */
+    volatile boolean captureEnabled;
 
     public RawCaptureForm() {
         FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("RawCaptureForm.fxml"));
@@ -53,8 +55,9 @@ public class RawCaptureForm extends AnchorPane {
         checkNotNull(maxRequests).setTextFormatter(new TextFormatter<String>(
                 change -> change.getControlNewText().matches("\\d*") ? change : null));
 
-        boolean captureFlag = Preferences.userRoot().getBoolean(CAPTURE_FLAG_PREF, false);
-        checkNotNull(captureRequestsCheckBox).selectedProperty().set(captureFlag);
+        CheckBox captureCheckBox = checkNotNull(captureRequestsCheckBox);
+        captureCheckBox.selectedProperty().addListener((obs, oldValue, newValue) -> captureEnabled = newValue);
+        captureCheckBox.setSelected(Preferences.userRoot().getBoolean(CAPTURE_FLAG_PREF, false));
 
         captureFilterChange();
     }
@@ -114,10 +117,19 @@ public class RawCaptureForm extends AnchorPane {
         userPreferences.put(CAPTURE_FLAG_PREF, Boolean.toString(checkNotNull(captureRequestsCheckBox).selectedProperty().get()));
     }
 
+    /** Thread-safe. Callers may check this before building a CapturedRequest. */
+    public boolean isCaptureEnabled() {
+        return captureEnabled;
+    }
+
     /** Thread-safe: may be called from connection threads. Shows the request if capture is on and the filter matches. */
     public void addCapture(CapturedRequest capturedRequest) {
+        if (!captureEnabled) {
+            return;
+        }
         Platform.runLater(() -> {
-            if (checkNotNull(captureRequestsCheckBox).selectedProperty().get()
+            // Re-checked: capture may have been turned off while this was queued
+            if (checkNotNull(captureRequestsCheckBox).isSelected()
                     && getCaptureFilter().matchCapturedRecord(capturedRequest.getAccess(), capturedRequest.isRuleMatched())) {
                 capturedRequests.add(capturedRequest);
                 trimToMaxRequests();

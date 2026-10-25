@@ -8,11 +8,20 @@ import com.flower.fxutils.Refreshable;
 import com.flower.net.config.access.Access;
 import com.flower.net.conntrack.AutoAddRulesMode;
 import com.flower.net.conntrack.ConnectionFilter;
-import com.flower.net.conntrack.allowdenylist.*;
-import com.flower.net.ruler.interfaces.ConnectionsTextSetter;
+import com.flower.net.conntrack.allowdenylist.AddressFilterList;
+import com.flower.net.conntrack.allowdenylist.AllowDenyConnectionFilter;
+import com.flower.net.conntrack.allowdenylist.ImmutableAddressRecord;
+import com.flower.net.conntrack.allowdenylist.ImmutableHostRecord;
+import com.flower.net.conntrack.allowdenylist.ImmutablePortRecord;
 import com.flower.net.ruler.interfaces.DeniedHostsListener;
 import com.google.common.collect.Streams;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.StringBinding;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
@@ -30,7 +39,9 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.net.SocketAddress;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.prefs.Preferences;
@@ -61,7 +72,31 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
 
     @Nullable DeniedHostsListener connectionMonitorForm;
 
-    public RuleListForm() {
+    final StringProperty listName;
+    /** True when the list content differs from what was last saved to / loaded from a file */
+    final BooleanProperty dirty = new SimpleBooleanProperty(false);
+    /** Rule content as of the last save/load, used to detect when changes were reverted */
+    Set<Object> savedRulesSnapshot = Set.of();
+    /** List name with "*" appended when there are unsaved changes */
+    final StringBinding title;
+
+    /** Create an empty list with the given name. */
+    public RuleListForm(String listName) {
+        this(listName, null);
+    }
+
+    /** Open a list from a ruleset file; the list is named after the file. */
+    public static RuleListForm fromFile(File file) throws IOException {
+        AddressFilterList addressFilterList = YAML_MAPPER.readValue(file, AddressFilterList.class);
+        return new RuleListForm(file.getName(), addressFilterList);
+    }
+
+    public RuleListForm(String listName, @Nullable AddressFilterList initialRules) {
+        this.listName = new SimpleStringProperty(listName);
+        this.title = Bindings.when(dirty)
+                .then(this.listName.concat("*"))
+                .otherwise(this.listName);
+
         FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("RuleListForm.fxml"));
         fxmlLoader.setRoot(this);
         fxmlLoader.setController(this);
@@ -74,13 +109,9 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
 
         AllowDenyConnectionFilter innerFilter = new AllowDenyConnectionFilter();
         innerFilter.clear();
-
-        Preferences userPreferences = Preferences.userRoot();
-        try {
-            String trafficRules = userPreferences.get(TRAFFIC_RULES_PREF, "");
-            AddressFilterList addressFilterList = YAML_MAPPER.readValue(trafficRules, AddressFilterList.class);
-            innerFilter.addList(addressFilterList, true);
-        } catch (Exception e) {}
+        if (initialRules != null) {
+            innerFilter.addList(initialRules, true);
+        }
 
         mainRuleManager = new RuleManager(innerFilter) {
             @Override
@@ -94,12 +125,74 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
 
             @Override
             @Nullable Stage getStage() { return stage; }
+
+            @Override
+            void onRulesChanged() { rulesChanged(); }
+
+            @Override protected String clearRulesMsg() { return "Delete all rules in \"" + getListName() + "\"?"; }
+
+            @Override protected String clearAllowRulesMsg() { return "Delete all Allow rules in \"" + getListName() + "\"?"; }
+
+            @Override protected String clearDenyRulesMsg() { return "Delete all Deny rules in \"" + getListName() + "\"?"; }
         };
 
         trafficRules = FXCollections.observableArrayList();
         checkNotNull(trafficRulesTable).itemsProperty().set(trafficRules);
 
+        markSaved();
         refreshContent();
+    }
+
+    public StringProperty listNameProperty() {
+        return listName;
+    }
+
+    /** Bind the containing Tab's text to this: list name, with "*" appended when there are unsaved changes. */
+    public StringBinding titleProperty() {
+        return title;
+    }
+
+    public BooleanProperty dirtyProperty() {
+        return dirty;
+    }
+
+    public boolean isDirty() {
+        return dirty.get();
+    }
+
+    /** Re-evaluate dirty state after a change; this is the only place the comparison runs. */
+    void rulesChanged() {
+        dirty.set(!savedRulesSnapshot.equals(rulesSnapshot(mainRuleManager.filter)));
+    }
+
+    void markSaved() {
+        savedRulesSnapshot = rulesSnapshot(mainRuleManager.filter);
+        dirty.set(false);
+    }
+
+    record AddressRuleKey(boolean isWildcard, String host, int port, Access access) {}
+    record HostRuleKey(boolean isWildcard, String host, Access access) {}
+    record PortRuleKey(int port, Access access) {}
+
+    /** Rule content ignoring creation timestamps and ordering */
+    static Set<Object> rulesSnapshot(AllowDenyConnectionFilter filter) {
+        Set<Object> snapshot = new HashSet<>();
+        filter.getPortRecords().values().forEach(
+                r -> snapshot.add(new PortRuleKey(r.dstPort(), r.access())));
+        Streams.concat(filter.getHostRecords().values().stream(), filter.getWildcardHostRecords().values().stream())
+                .forEach(r -> snapshot.add(new HostRuleKey(r.isWildcard(), r.dstHost(), r.access())));
+        Streams.concat(filter.getAddressRecords().values().stream(), filter.getWildcardAddressRecords().values().stream())
+                .flatMap(portMap -> portMap.values().stream())
+                .forEach(r -> snapshot.add(new AddressRuleKey(r.isWildcard(), r.dstHost(), r.dstPort(), r.access())));
+        return snapshot;
+    }
+
+    public String getListName() {
+        return listName.get();
+    }
+
+    public void setListName(String listName) {
+        this.listName.set(listName);
     }
 
     public void setStage(Stage stage) {
@@ -220,9 +313,12 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
                                      BiFunction<R, Boolean, R> addRecord,
                                      BiPredicate<R, R> recordsEqual) {
         R existingRule = addRecord.apply(record, false);
-        if (existingRule != null && !recordsEqual.test(existingRule, record)) {
+        if (existingRule == null) {
+            rulesChanged();
+        } else if (!recordsEqual.test(existingRule, record)) {
             if (JavaFxUtils.showYesNoDialog("Overwrite existing rule?") == JavaFxUtils.YesNo.YES) {
                 R unused = addRecord.apply(record, true);
+                rulesChanged();
             }
         }
         if (access == Access.DENY) {
@@ -272,7 +368,10 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
 
                 // We need this check, because even when list is inactive we still want to auto-add.
                 if (oldRule == null) {
-                    Platform.runLater(this::refreshContent);
+                    Platform.runLater(() -> {
+                        rulesChanged();
+                        refreshContent();
+                    });
                     return approveConnection(dstHost, dstPort, from);
                 }
             }
@@ -327,6 +426,7 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
 
     // --------------- Save and Load from file ---------------
 
+    /** "Save as": writes the list to a chosen file and renames the list after that file. */
     public void saveRules() {
         try {
             FileChooser fileChooser = new FileChooser();
@@ -341,6 +441,8 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
                 AddressFilterList addressFilterList = mainRuleManager.filter.getFullList();
 
                 YAML_MAPPER.writeValue(configFile, addressFilterList);
+                setListName(configFile.getName());
+                markSaved();
 
                 Alert alert = new Alert(Alert.AlertType.INFORMATION, "Traffic filter ruleset saved to : " + configFile.getPath(), ButtonType.OK);
                 LOGGER.info("Traffic filter ruleset saved to: {}", configFile.getPath());
@@ -367,6 +469,8 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
 
                 mainRuleManager.filter.clear();
                 mainRuleManager.filter.addList(addressFilterList, true);
+                setListName(configFile.getName());
+                markSaved();
                 checkNotNull(connectionMonitorForm).checkDeniedHosts();
             }
             refreshContent();

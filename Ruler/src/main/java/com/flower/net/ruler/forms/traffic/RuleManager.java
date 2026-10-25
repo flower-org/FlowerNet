@@ -104,6 +104,7 @@ public abstract class RuleManager {
         } else if (trafficRule.portRecord != null) {
             filter.addPortRecord(trafficRule.portRecord, true);
         }
+        onRulesChanged();
         refreshAndRestoreCursor();
     }
 
@@ -113,6 +114,7 @@ public abstract class RuleManager {
     public void clearRules() {
         if (JavaFxUtils.showYesNoDialog(clearRulesMsg()) == JavaFxUtils.YesNo.YES) {
             filter.clear();
+            onRulesChanged();
             refreshAndRestoreCursor();
         }
     }
@@ -123,6 +125,7 @@ public abstract class RuleManager {
     public void clearAllowRules() {
         if (JavaFxUtils.showYesNoDialog(clearAllowRulesMsg()) == JavaFxUtils.YesNo.YES) {
             filter.clearFilterType(Access.ALLOW);
+            onRulesChanged();
             refreshAndRestoreCursor();
         }
     }
@@ -135,6 +138,7 @@ public abstract class RuleManager {
     public void clearDenyRules() {
         if (JavaFxUtils.showYesNoDialog(clearDenyRulesMsg()) == JavaFxUtils.YesNo.YES) {
             filter.clearFilterType(Access.DENY);
+            onRulesChanged();
             refreshAndRestoreCursor();
         }
     }
@@ -150,6 +154,7 @@ public abstract class RuleManager {
             } else if (trafficRule.portRecord != null) {
                 filter.removePortRecord(trafficRule.portRecord);
             }
+            onRulesChanged();
             checkDeniedHosts();
         }
 
@@ -199,10 +204,14 @@ public abstract class RuleManager {
                                 .build(),
                         true);
             }
+            onRulesChanged();
             checkDeniedHosts();
         }
         refreshAndRestoreCursor();
     }
+
+    /** Called after the filter's rules were modified */
+    void onRulesChanged() {}
 
     abstract void refreshAndRestoreCursor();
     /** "close on deny" existing connections for newly denied hosts */

@@ -124,11 +124,14 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         autoAddCombo.valueProperty().addListener((obs, oldValue, newValue) -> autoAddRulesMode = toAutoAddRulesMode(newValue));
         autoAddRulesMode = toAutoAddRulesMode(autoAddCombo.getValue());
 
+        checkNotNull(filteringModeComboBox).valueProperty().addListener((obs, oldValue, newValue) -> filteringChanged());
+        checkNotNull(allowDirectIpAccessCheckBox).selectedProperty().addListener((obs, oldValue, newValue) -> filteringChanged());
+
         TabPane tabPane = checkNotNull(ruleListsTabPane);
         tabPane.getTabs().addListener((ListChangeListener<Tab>) change -> {
             ruleLists = tabPane.getTabs().stream().map(tab -> (RuleListForm) tab.getContent()).toList();
             // e.g. closing an active Allow list may deny existing connections
-            checkDeniedHosts();
+            filteringChanged();
             schedulePersistRuleLists();
         });
         tabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) ->
@@ -229,7 +232,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         }
         ruleList.setRulesChangedListener(this::rulesChanged);
         ruleList.activeProperty().addListener((obs, oldValue, newValue) -> {
-            checkDeniedHosts();
+            filteringChanged();
             schedulePersistRuleLists();
         });
         ruleList.fileProperty().addListener((obs, oldValue, newValue) -> schedulePersistRuleLists());
@@ -251,8 +254,19 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     }
 
     void rulesChanged(RuleListForm ruleList) {
-        checkDeniedHosts();
+        filteringChanged();
         schedulePersistRuleLists();
+    }
+
+    /**
+     * Call on the UI thread after anything that can change filtering results: rules, list activation or order,
+     * filtering mode, direct IP access. Re-checks existing connections and re-evaluates capture views.
+     */
+    void filteringChanged() {
+        checkDeniedHosts();
+        for (CaptureForm captureForm : captureForms) {
+            captureForm.rulesChanged(this::getCheckResult);
+        }
     }
 
     void checkDeniedHosts() {
@@ -388,18 +402,6 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
             case DENY: return Access.DENY;
             case ALLOW:
             default: return Access.ALLOW;
-        }
-    }
-
-    static class CheckResult {
-        final Access checkResult;
-        final boolean isDirectIpBlock;
-        final boolean isRuleMatched;
-
-        CheckResult(Access checkResult, boolean isDirectIpBlock, boolean isRuleMatched) {
-            this.checkResult = checkResult;
-            this.isDirectIpBlock = isDirectIpBlock;
-            this.isRuleMatched = isRuleMatched;
         }
     }
 

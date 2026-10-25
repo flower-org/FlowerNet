@@ -54,9 +54,15 @@ public class CapturedRequest {
     public boolean isRuleMatched() { return isRuleMatched; }
 
     public String getFilterResult() {
+        return formatFilterResult(access, isRuleMatched, isDirectIpBlock);
+    }
+
+    static String formatFilterResult(Access access, boolean isRuleMatched, boolean isDirectIpBlock) {
         return (access == Access.ALLOW ? "Allowed" : "Denied")
                 + (isDirectIpBlock ? " (direct IP block)" : (isRuleMatched ? " (rule match)" : " (default)"));
     }
+
+    public boolean isDirectIpBlock() { return isDirectIpBlock; }
 
     public Protocol getProtocol() {
         return protocol;

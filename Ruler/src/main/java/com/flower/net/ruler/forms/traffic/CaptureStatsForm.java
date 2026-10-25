@@ -200,5 +200,26 @@ public class CaptureStatsForm extends AnchorPane implements CaptureForm {
 
     public void captureFilterChange() {
         checkNotNull(captureFilterMenuButton).textProperty().set(getCaptureFilter().toString());
+        removeFilteredOutEntries();
+    }
+
+    @Override
+    public void rulesChanged(RuleEvaluator evaluator) {
+        for (CaptureStatsEntry entry : capturedRequests) {
+            entry.reevaluate(evaluator.evaluate(entry.getHost(), entry.getPort()));
+        }
+        removeFilteredOutEntries();
+    }
+
+    /** Removes entries whose current result no longer passes the capture filter */
+    void removeFilteredOutEntries() {
+        CaptureFilter captureFilter = getCaptureFilter();
+        capturedRequests.removeIf(entry -> {
+            boolean filteredOut = !captureFilter.matchCapturedRecord(entry.getAccess(), entry.isRuleMatched());
+            if (filteredOut) {
+                entriesByKey.remove(new EntryKey(entry.getHost(), entry.getPort()));
+            }
+            return filteredOut;
+        });
     }
 }

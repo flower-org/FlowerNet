@@ -1,5 +1,6 @@
 package com.flower.net.ruler.forms.traffic;
 
+import com.flower.net.config.access.Access;
 import javafx.beans.property.ReadOnlyLongProperty;
 import javafx.beans.property.ReadOnlyLongWrapper;
 import javafx.beans.property.ReadOnlyStringProperty;
@@ -13,6 +14,9 @@ public class CaptureStatsEntry {
     private final ReadOnlyLongWrapper lastAccess = new ReadOnlyLongWrapper(Long.MIN_VALUE);
     private final ReadOnlyStringWrapper filterResult = new ReadOnlyStringWrapper("");
     private final ReadOnlyStringWrapper from = new ReadOnlyStringWrapper("");
+    /** Latest result, kept for re-applying the capture filter */
+    private Access access = Access.DENY;
+    private boolean isRuleMatched;
 
     public CaptureStatsEntry(String host, int port) {
         this.host = host;
@@ -25,10 +29,25 @@ public class CaptureStatsEntry {
         long timestamp = request.getCreationTimestamp();
         if (timestamp >= lastAccess.get()) {
             lastAccess.set(timestamp);
-            filterResult.set(request.getFilterResult());
+            setResult(request.getAccess(), request.isRuleMatched(), request.isDirectIpBlock());
             from.set(request.getFrom());
         }
     }
+
+    /** Replaces the result with what the current rules give; count, last access and source stay */
+    void reevaluate(CheckResult check) {
+        setResult(check.checkResult, check.isRuleMatched, check.isDirectIpBlock);
+    }
+
+    private void setResult(Access access, boolean isRuleMatched, boolean isDirectIpBlock) {
+        this.access = access;
+        this.isRuleMatched = isRuleMatched;
+        filterResult.set(CapturedRequest.formatFilterResult(access, isRuleMatched, isDirectIpBlock));
+    }
+
+    public Access getAccess() { return access; }
+
+    public boolean isRuleMatched() { return isRuleMatched; }
 
     public String getHost() { return host; }
 

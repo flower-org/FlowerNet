@@ -12,4 +12,16 @@ public interface CaptureForm {
 
     /** Thread-safe: may be called from connection threads */
     void addCapture(CapturedRequest capturedRequest);
+
+    /** Gives the result the current rules and filtering settings produce for a destination. UI thread only. */
+    @FunctionalInterface
+    interface RuleEvaluator {
+        CheckResult evaluate(String host, int port);
+    }
+
+    /**
+     * Called on the UI thread after rules or filtering settings change.
+     * Forms that show current state may re-evaluate their entries; logs of past events can ignore it.
+     */
+    default void rulesChanged(RuleEvaluator evaluator) {}
 }

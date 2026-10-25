@@ -62,6 +62,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     @Nullable @FXML MenuButton captureFilterMenuButton;
     @Nullable @FXML ComboBox<String> autoAddComboBox;
     @Nullable @FXML TabPane ruleListsTabPane;
+    @Nullable @FXML MenuButton appendMenuButton;
 
     final AtomicLong totalConnections;
     final AtomicLong allowedConnections;
@@ -139,6 +140,9 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
         captureFilterChange();
 
+        MenuButton appendMenu = checkNotNull(appendMenuButton);
+        appendMenu.setOnShowing(event -> rebuildAppendMenu());
+        rebuildAppendMenu();
         persistDelay.setOnFinished(event -> persistRuleLists());
         restoreRuleLists();
     }
@@ -315,6 +319,40 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         RuleListForm ruleList = getSelectedRuleListOrWarn();
         if (ruleList != null) {
             boolean unused = ruleList.saveRulesAs();
+        }
+    }
+
+    /** Rebuilds the Append menu each time it opens: from file, or from any other open list into the selected one. */
+    void rebuildAppendMenu() {
+        MenuButton menuButton = checkNotNull(appendMenuButton);
+        menuButton.getItems().clear();
+        RuleListForm target = selectedRuleList;
+        if (target == null) {
+            MenuItem noTarget = new MenuItem("Select a list to append to");
+            noTarget.setDisable(true);
+            menuButton.getItems().add(noTarget);
+            return;
+        }
+
+        MenuItem fromFile = new MenuItem("From file...");
+        fromFile.setOnAction(event -> target.appendRulesFromFile());
+        menuButton.getItems().add(fromFile);
+
+        boolean separatorAdded = false;
+        for (RuleListForm source : ruleLists) {
+            if (source == target) {
+                continue;
+            }
+            if (!separatorAdded) {
+                menuButton.getItems().add(new SeparatorMenuItem());
+                separatorAdded = true;
+            }
+            File sourceFile = source.getFile();
+            MenuItem fromList = new MenuItem("From \"" + source.titleProperty().get() + "\""
+                    + (sourceFile == null ? "" : "  (" + sourceFile.getPath() + ")"));
+            fromList.setMnemonicParsing(false);
+            fromList.setOnAction(event -> target.appendRulesFrom(source));
+            menuButton.getItems().add(fromList);
         }
     }
 

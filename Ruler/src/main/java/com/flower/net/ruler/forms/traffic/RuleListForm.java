@@ -610,10 +610,14 @@ public class RuleListForm extends AnchorPane implements Refreshable {
      */
     boolean appendRules(AddressFilterList appendList, String sourceName) {
         boolean overrideExisting = false;
-        if (mainRuleManager.filter.isListOverrideRequired(appendList)) {
+        int conflicts = mainRuleManager.filter.countListOverrides(appendList);
+        if (conflicts > 0) {
             Optional<Boolean> override = shouldWeOverrideDialog("Override existing rules?",
-                    "Some rules in \"" + sourceName + "\" conflict with existing rules in \""
-                            + getListName() + "\". Should we override existing rules?");
+                    conflicts + (conflicts == 1 ? " rule" : " rules") + " in \"" + sourceName
+                            + "\" conflict with existing rules in \"" + getListName() + "\" (same target, different access).\n\n"
+                            + BUTTON_TYPE_OVERRIDE.getText() + ": use the rules from \"" + sourceName + "\".\n"
+                            + BUTTON_TYPE_IGNORE.getText() + ": keep the existing rules in \"" + getListName() + "\".\n"
+                            + "Non-conflicting rules are appended either way.");
             if (override.isEmpty()) {
                 return false;
             }

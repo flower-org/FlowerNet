@@ -82,25 +82,30 @@ public class AllowDenyConnectionFilter {
     }
 
     public boolean isListOverrideRequired(AddressFilterList list) {
+        return countListOverrides(list) > 0;
+    }
+
+    /** Number of records in the list that conflict with existing records (same target, different access). */
+    public int countListOverrides(AddressFilterList list) {
         lock.readLock().lock();
         try {
+            int count = 0;
             for (AddressRecord addressRecord : list.addressRecords()) {
-                if (isAddressRecordOverrideRequired(addressRecord)) { return true; }
+                if (isAddressRecordOverrideRequired(addressRecord)) { count++; }
             }
             for (HostRecord hostRecord : list.hostRecords()) {
-                if (isHostRecordOverrideRequired(hostRecord)) { return true; }
+                if (isHostRecordOverrideRequired(hostRecord)) { count++; }
             }
             for (PortRecord portRecord : list.portRecords()) {
-                if (isPortRecordOverrideRequired(portRecord)) { return true; }
+                if (isPortRecordOverrideRequired(portRecord)) { count++; }
             }
             for (AddressRecord addressRecord : list.wildcardAddressRecords()) {
-                if (isAddressRecordOverrideRequired(addressRecord)) { return true; }
+                if (isAddressRecordOverrideRequired(addressRecord)) { count++; }
             }
             for (HostRecord hostRecord : list.wildcardHostRecords()) {
-                if (isHostRecordOverrideRequired(hostRecord)) { return true; }
+                if (isHostRecordOverrideRequired(hostRecord)) { count++; }
             }
-            return false;
-    
+            return count;
         } finally {
             lock.readLock().unlock();
         }

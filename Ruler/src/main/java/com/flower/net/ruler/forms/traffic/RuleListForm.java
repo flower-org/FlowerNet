@@ -456,6 +456,10 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
     }
 
     public void loadRules() {
+        if (isDirty() && JavaFxUtils.showYesNoDialog(
+                "\"" + getListName() + "\" has unsaved changes that will be lost. Continue?") != JavaFxUtils.YesNo.YES) {
+            return;
+        }
         try {
             FileChooser fileChooser = new FileChooser();
             fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Traffic filter ruleset (*.rls)", "*.rls"));

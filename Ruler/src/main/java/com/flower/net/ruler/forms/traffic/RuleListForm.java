@@ -25,6 +25,7 @@ import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.*;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
@@ -33,7 +34,6 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
-import java.io.StringWriter;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Map;
@@ -41,7 +41,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
-import java.util.prefs.Preferences;
 
 import static com.flower.net.conntrack.allowdenylist.AddressFilterList.AddressRecord;
 import static com.flower.net.conntrack.allowdenylist.AddressFilterList.PortRecord;
@@ -52,7 +51,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class RuleListForm extends AnchorPane implements Refreshable {
     final static Logger LOGGER = LoggerFactory.getLogger(RuleListForm.class);
 
-    final static String TRAFFIC_RULES_PREF = "trafficRulesPref";
 
     static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory())
             .registerModule(new GuavaModule());
@@ -63,11 +61,11 @@ public class RuleListForm extends AnchorPane implements Refreshable {
     final ObservableList<TrafficRule> trafficRules;
     RuleManager mainRuleManager;
 
-    @Nullable @FXML ToggleButton activateToggleButton;
-    /** On/off state for UI thread consumers (bound to the toggle button); listen to react to changes */
-    final BooleanProperty active = new SimpleBooleanProperty(false);
+    @Nullable @FXML CheckBox activeCheckBox;
+    /** On/off state for UI thread consumers (bound to the checkbox); listen to react to changes */
+    final BooleanProperty active = new SimpleBooleanProperty(true);
     /** Mirror of {@link #active} safe to read from connection-handling threads */
-    volatile boolean isActive = false;
+    volatile boolean isActive = true;
 
     @Nullable RulesChangedListener rulesChangedListener;
 
@@ -142,9 +140,10 @@ public class RuleListForm extends AnchorPane implements Refreshable {
         trafficRules = FXCollections.observableArrayList();
         checkNotNull(trafficRulesTable).itemsProperty().set(trafficRules);
 
-        ToggleButton toggleButton = checkNotNull(activateToggleButton);
-        toggleButton.selectedProperty().bindBidirectional(active);
-        toggleButton.textProperty().bind(Bindings.when(active).then("On").otherwise("Off"));
+        CheckBox checkBox = checkNotNull(activeCheckBox);
+        checkBox.selectedProperty().bindBidirectional(active);
+        checkBox.textProperty().bind(Bindings.when(active).then("On").otherwise("Off"));
+        checkBox.textFillProperty().bind(Bindings.when(active).then(Color.GREEN).otherwise(Color.RED));
         active.addListener((obs, oldValue, newValue) -> isActive = newValue);
 
         markSaved();
@@ -350,19 +349,6 @@ public class RuleListForm extends AnchorPane implements Refreshable {
         trafficRules.clear();
         trafficRules.addAll(getRulesList(mainRuleManager));
         checkNotNull(trafficRulesTable).refresh();
-
-        Preferences userPreferences = Preferences.userRoot();
-        try {
-            // Save main rules
-            AddressFilterList addressFilterList = mainRuleManager.filter.getFullList();
-
-            StringWriter writer = new StringWriter();
-            YAML_MAPPER.writeValue(writer, addressFilterList);
-
-            String filterList = writer.getBuffer().toString();
-
-            userPreferences.put(TRAFFIC_RULES_PREF, filterList);
-        } catch (Exception e) {}
     }
 
     /**

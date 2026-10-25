@@ -4,6 +4,8 @@ import com.flower.net.config.access.Access;
 import com.flower.net.config.access.Protocol;
 
 import javax.annotation.Nullable;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.Date;
 
 public class CapturedRequest {
@@ -31,9 +33,25 @@ public class CapturedRequest {
         this.fromPort = fromPort;
     }
 
+    /** Builds a request from a raw source address: resolved address -> IP, unresolved -> original host string */
+    public static CapturedRequest of(String host, int port, Access access, boolean isRuleMatched, Protocol protocol,
+                                     boolean isDirectIpBlock, @Nullable SocketAddress from) {
+        String fromHost = null;
+        Integer fromPort = null;
+        if (from instanceof InetSocketAddress isa) {
+            fromHost = isa.getAddress() != null ? isa.getAddress().getHostAddress() : isa.getHostString();
+            fromPort = isa.getPort();
+        }
+        return new CapturedRequest(host, port, access, isRuleMatched, protocol, isDirectIpBlock, fromHost, fromPort);
+    }
+
     public String getHost() { return host; }
 
     public int getPort() { return port; }
+
+    public Access getAccess() { return access; }
+
+    public boolean isRuleMatched() { return isRuleMatched; }
 
     public String getFilterResult() {
         return (access == Access.ALLOW ? "Allowed" : "Denied")

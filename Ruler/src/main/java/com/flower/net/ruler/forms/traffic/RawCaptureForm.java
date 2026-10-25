@@ -1,7 +1,5 @@
 package com.flower.net.ruler.forms.traffic;
 
-import com.flower.net.config.access.Access;
-import com.flower.net.config.access.Protocol;
 import com.flower.net.conntrack.ConnectionFilter;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -18,8 +16,6 @@ import javafx.scene.layout.AnchorPane;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.util.function.BiConsumer;
 import java.util.prefs.Preferences;
 
@@ -70,7 +66,8 @@ public class RawCaptureForm extends AnchorPane {
     void withSelectedCapture(BiConsumer<ConnectionFilter, CapturedRequest> action) {
         CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
         if (capturedRequest != null) {
-            action.accept(checkNotNull(connectionFilter), capturedRequest);
+            action.accept(checkNotNull(connectionFilter, "RawCaptureForm: setConnectionFilter() was not called"),
+                    capturedRequest);
         }
     }
 
@@ -117,32 +114,16 @@ public class RawCaptureForm extends AnchorPane {
         userPreferences.put(CAPTURE_FLAG_PREF, Boolean.toString(checkNotNull(captureRequestsCheckBox).selectedProperty().get()));
     }
 
-    public void addCapture(String dstHost, int dstPort, @Nullable SocketAddress from,
-                           Access access, boolean isRuleMatched, boolean isDirectIpBlock) {
-        if (from != null) {
-            Platform.runLater(() -> {
-                if (checkNotNull(captureRequestsCheckBox).selectedProperty().get()) {
-                    CaptureFilter captureFilter = getCaptureFilter();
-                    if (captureFilter.matchCapturedRecord(access, isRuleMatched)) {
-                        String hostOrIpFrom = null;
-                        Integer port = null;
-                        if (from instanceof InetSocketAddress isa) {
-                            hostOrIpFrom = (isa.getAddress() != null)
-                                    ? isa.getAddress().getHostAddress() // resolved -> IP
-                                    : isa.getHostString();              // unresolved -> original host
-                            port = isa.getPort();
-                        }
-
-                        CapturedRequest capturedRequest = new CapturedRequest(dstHost, dstPort, access,
-                                isRuleMatched, Protocol.TCP, isDirectIpBlock, hostOrIpFrom, port);
-                        capturedRequests.add(capturedRequest);
-                        trimToMaxRequests();
-
-                        checkNotNull(capturedRequestsTable).refresh();
-                    }
-                }
-            });
-        }
+    /** Thread-safe: may be called from connection threads. Shows the request if capture is on and the filter matches. */
+    public void addCapture(CapturedRequest capturedRequest) {
+        Platform.runLater(() -> {
+            if (checkNotNull(captureRequestsCheckBox).selectedProperty().get()
+                    && getCaptureFilter().matchCapturedRecord(capturedRequest.getAccess(), capturedRequest.isRuleMatched())) {
+                capturedRequests.add(capturedRequest);
+                trimToMaxRequests();
+                checkNotNull(capturedRequestsTable).refresh();
+            }
+        });
     }
 
     /** Falls back to the default if the field is empty or out of int range (it only accepts digits) */

@@ -67,7 +67,8 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
     final ObservableList<TrafficRule> trafficRules;
     RuleManager mainRuleManager;
 
-    protected AutoAddRulesMode autoAddRulesMode = AutoAddRulesMode.NONE;
+    /** Set on the UI thread, read on connection-handling threads */
+    protected volatile AutoAddRulesMode autoAddRulesMode = AutoAddRulesMode.NONE;
 
     @Nullable @FXML ToggleButton activateToggleButton;
     /** On/off state for UI thread consumers (bound to the toggle button); listen to react to changes */
@@ -389,6 +390,7 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
         Access access = getAccess(dstHost, dstPort);
 
         if (access == null) {
+            AutoAddRulesMode autoAddRulesMode = this.autoAddRulesMode;
             if (autoAddRulesMode == AutoAddRulesMode.AUTO_DENY || autoAddRulesMode == AutoAddRulesMode.AUTO_ALLOW) {
                 AddressRecord addressRecord = ImmutableAddressRecord.builder()
                         .dstHost(dstHost)

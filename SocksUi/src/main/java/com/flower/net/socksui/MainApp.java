@@ -62,7 +62,7 @@ public class MainApp implements ConnectionsTextSetter {
     }
 
     public void showAboutDialog() {
-        Alert alert = new Alert(Alert.AlertType.NONE, "Socks UI v 1.4.1", ButtonType.OK);
+        Alert alert = new Alert(Alert.AlertType.NONE, "Socks UI v 1.4.2", ButtonType.OK);
         alert.showAndWait();
     }
 

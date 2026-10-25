@@ -11,9 +11,7 @@ import com.flower.net.ruler.interfaces.DeniedHostsListener;
 import com.flower.net.utils.IpAddressUtil;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
-import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
-import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.*;
@@ -21,19 +19,16 @@ import javafx.scene.layout.AnchorPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.prefs.Preferences;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -41,7 +36,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 public class TrafficControlForm extends AnchorPane implements Refreshable, ConnectionFilter {
     final static Logger LOGGER = LoggerFactory.getLogger(TrafficControlForm.class);
-    final static String CAPTURE_FLAG_PREF = "captureFlagPref";
 
     final static String ALLOW = "Allow";
     final static String DENY = "Deny";
@@ -54,15 +48,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
     @Nullable Stage stage;
     @Nullable @FXML ComboBox<String> filteringModeComboBox;
-    @Nullable @FXML CheckBox captureRequestsCheckBox;
-    @Nullable @FXML TableView<CapturedRequest> capturedRequestsTable;
-    final ObservableList<CapturedRequest> capturedRequests;
-    @Nullable @FXML TextField maxRequests;
     @Nullable @FXML CheckBox allowDirectIpAccessCheckBox;
-    @Nullable @FXML MenuButton captureFilterMenuButton;
     @Nullable @FXML ComboBox<String> autoAddComboBox;
     @Nullable @FXML TabPane ruleListsTabPane;
     @Nullable @FXML MenuButton appendMenuButton;
+    @Nullable @FXML RawCaptureForm rawCaptureForm;
 
     final AtomicLong totalConnections;
     final AtomicLong allowedConnections;
@@ -111,18 +101,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         prohibitedConnections = new AtomicLong(0);
         this.mainForm = mainForm;
 
-        capturedRequests = FXCollections.observableArrayList();
-        checkNotNull(capturedRequestsTable).itemsProperty().set(capturedRequests);
-
-        Preferences userPreferences = Preferences.userRoot();
-        String captureFlagStr = userPreferences.get(CAPTURE_FLAG_PREF, "");
-        boolean captureFlag = false;
-        if (!StringUtils.isBlank(captureFlagStr)) {
-            try {
-                captureFlag = Boolean.parseBoolean(captureFlagStr);
-            } catch (Exception e) { }
-        }
-        checkNotNull(captureRequestsCheckBox).selectedProperty().set(captureFlag);
+        checkNotNull(rawCaptureForm).setConnectionFilter(this);
 
         ComboBox<String> autoAddCombo = checkNotNull(autoAddComboBox);
         autoAddCombo.valueProperty().addListener((obs, oldValue, newValue) -> autoAddRulesMode = toAutoAddRulesMode(newValue));
@@ -137,8 +116,6 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         });
         tabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) ->
                 selectedRuleList = newTab == null ? null : (RuleListForm) newTab.getContent());
-
-        captureFilterChange();
 
         MenuButton appendMenu = checkNotNull(appendMenuButton);
         appendMenu.setOnShowing(event -> rebuildAppendMenu());
@@ -391,20 +368,6 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         }
     }
 
-    public void captureFilterChange() {
-        checkNotNull(captureFilterMenuButton).textProperty().set(getCaptureFilter().toString());
-    }
-
-    public CaptureFilter getCaptureFilter() {
-        MenuButton menuButton = checkNotNull(captureFilterMenuButton);
-        boolean matchedAllowed = ((CheckMenuItem)(menuButton).getItems().get(0)).selectedProperty().get();
-        boolean matchedProhibited = ((CheckMenuItem)menuButton.getItems().get(1)).selectedProperty().get();
-        boolean unmatchedAllowed = ((CheckMenuItem)menuButton.getItems().get(2)).selectedProperty().get();
-        boolean unmatchedProhibited = ((CheckMenuItem)menuButton.getItems().get(3)).selectedProperty().get();
-
-        return new CaptureFilter(matchedAllowed, matchedProhibited, unmatchedAllowed, unmatchedProhibited);
-    }
-
     static class CheckResult {
         final Access checkResult;
         final boolean isDirectIpBlock;
@@ -473,42 +436,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         final CheckResult finalCheck = check;
 
         if (from != null) {
-            Platform.runLater(() -> {
-                if (checkNotNull(captureRequestsCheckBox).selectedProperty().get()) {
-                    CaptureFilter captureFilter = getCaptureFilter();
-                    if (captureFilter.matchCapturedRecord(finalCheck.checkResult, finalCheck.isRuleMatched)) {
-                        String hostOrIpFrom = null;
-                        int port = -1;
-                        if (from instanceof InetSocketAddress isa) {
-                            hostOrIpFrom = (isa.getAddress() != null)
-                                    ? isa.getAddress().getHostAddress() // resolved -> IP
-                                    : isa.getHostString();              // unresolved -> original host
-                            port = isa.getPort();
-                        }
-
-                        CapturedRequest capturedRequest = new CapturedRequest(dstHost, dstPort, finalCheck.checkResult,
-                                finalCheck.isRuleMatched, Protocol.TCP, finalCheck.isDirectIpBlock, hostOrIpFrom, port);
-                        capturedRequests.add(capturedRequest);
-                        try {
-                            int max = Integer.parseInt(checkNotNull(maxRequests).textProperty().get());
-                            while (capturedRequests.size() > max) {
-                                CapturedRequest selectedItem = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
-                                capturedRequests.remove(0);
-                                if (selectedItem != null) {
-                                    try {
-                                        checkNotNull(capturedRequestsTable).getSelectionModel().select(selectedItem);
-                                    } catch (Exception e) {
-                                        // selectedItem may be out of bounds
-                                    }
-                                }
-                            }
-                        } catch (Exception e) {
-                        }
-
-                        checkNotNull(capturedRequestsTable).refresh();
-                    }
-                }
-            });
+            RawCaptureForm captureForm = checkNotNull(rawCaptureForm);
+            if (captureForm.isCaptureEnabled()) {
+                captureForm.addCapture(CapturedRequest.of(dstHost, dstPort, finalCheck.checkResult,
+                        finalCheck.isRuleMatched, Protocol.TCP, finalCheck.isDirectIpBlock, from));
+            }
 
             totalConnections.incrementAndGet();
             if (finalCheck.checkResult == Access.ALLOW) {
@@ -530,30 +462,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         );
     }
 
-    public void clearCapturedData() {
-        capturedRequests.clear();
-        checkNotNull(capturedRequestsTable).refresh();
-    }
-
-    public void allowCapture() {
-        CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
-        if (capturedRequest != null) {
-            allow(capturedRequest.getHost(), capturedRequest.getPort());
-        }
-    }
-
     @Override
     public void allow(String host, int port) {
         RuleListForm ruleList = getSelectedRuleListOrWarn();
         if (ruleList != null) {
             ruleList.allow(host, port);
-        }
-    }
-
-    public void denyCapture() {
-        CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
-        if (capturedRequest != null) {
-            deny(capturedRequest.getHost(), capturedRequest.getPort());
         }
     }
 
@@ -565,25 +478,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         }
     }
 
-    public void allowCaptureHost() {
-        CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
-        if (capturedRequest != null) {
-            allowHost(capturedRequest.getHost());
-        }
-    }
-
     @Override
     public void allowHost(String host) {
         RuleListForm ruleList = getSelectedRuleListOrWarn();
         if (ruleList != null) {
             ruleList.allowHost(host);
-        }
-    }
-
-    public void denyCaptureHost() {
-        CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
-        if (capturedRequest != null) {
-            denyHost(capturedRequest.getHost());
         }
     }
 
@@ -595,25 +494,11 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         }
     }
 
-    public void allowCapturePort() {
-        CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
-        if (capturedRequest != null) {
-            allowPort(capturedRequest.getPort());
-        }
-    }
-
     @Override
     public void allowPort(int port) {
         RuleListForm ruleList = getSelectedRuleListOrWarn();
         if (ruleList != null) {
             ruleList.allowPort(port);
-        }
-    }
-
-    public void denyCapturePort() {
-        CapturedRequest capturedRequest = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
-        if (capturedRequest != null) {
-            denyPort(capturedRequest.getPort());
         }
     }
 
@@ -630,10 +515,5 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         for (RuleListForm ruleList : ruleLists) {
             ruleList.refreshContent();
         }
-    }
-
-    public void captureFlagChange() {
-        Preferences userPreferences = Preferences.userRoot();
-        userPreferences.put(CAPTURE_FLAG_PREF, Boolean.toString(checkNotNull(captureRequestsCheckBox).selectedProperty().get()));
     }
 }

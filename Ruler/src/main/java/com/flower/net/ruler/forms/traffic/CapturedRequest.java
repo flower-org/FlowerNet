@@ -80,6 +80,6 @@ public class CapturedRequest {
             return "";
         }
         String host = fromHost.indexOf(':') >= 0 ? "[" + fromHost + "]" : fromHost;
-        return (fromPort == null || fromPort < 0) ? host : host + ":" + fromPort;
+        return fromPort == null ? host : host + ":" + fromPort;
     }
 }

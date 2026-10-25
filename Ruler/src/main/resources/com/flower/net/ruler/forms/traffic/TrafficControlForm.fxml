@@ -4,20 +4,16 @@
 <?import javafx.collections.FXCollections?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.CheckBox?>
-<?import javafx.scene.control.CheckMenuItem?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.MenuButton?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TabPane?>
-<?import javafx.scene.control.TableColumn?>
-<?import javafx.scene.control.TableView?>
-<?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.TitledPane?>
 <?import javafx.scene.control.ToolBar?>
-<?import javafx.scene.control.cell.PropertyValueFactory?>
 <?import javafx.scene.layout.AnchorPane?>
+<?import com.flower.net.ruler.forms.traffic.RawCaptureForm?>
 
 <fx:root prefHeight="844.0" prefWidth="1151.0" type="AnchorPane" xmlns="http://javafx.com/javafx/23.0.1" xmlns:fx="http://javafx.com/fxml/1">
     <SplitPane dividerPositions="0.3, 0.6" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
@@ -63,72 +59,7 @@
         <AnchorPane>
          <TitledPane animated="false" text="Capture" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
            <content>
-             <AnchorPane>
-                  <children>
-                        <SplitPane dividerPositions="0.5" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                        <AnchorPane maxHeight="50.0" minHeight="50.0" prefHeight="50.0">
-                            <children>
-                                <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                                    <items>
-                                        <CheckBox fx:id="captureRequestsCheckBox" mnemonicParsing="false" onAction="#captureFlagChange" text="Capture:" />
-                                        <TextField fx:id="maxRequests" prefHeight="26.0" prefWidth="60.0" text="50" />
-                                        <Button mnemonicParsing="false" onAction="#clearCapturedData" text="Clear" />
-                                        <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                        <Button mnemonicParsing="false" onAction="#allowCapture" text="Allow" />
-                                        <Button mnemonicParsing="false" onAction="#denyCapture" text="Deny" />
-                                        <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                        <Button mnemonicParsing="false" onAction="#allowCaptureHost" text="Allow host" />
-                                        <Button mnemonicParsing="false" onAction="#denyCaptureHost" text="Deny host" />
-                                        <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                        <Button mnemonicParsing="false" onAction="#allowCapturePort" text="Allow port" />
-                                        <Button mnemonicParsing="false" onAction="#denyCapturePort" text="Deny port" />
-                                    <Separator orientation="VERTICAL" prefHeight="200.0" />
-                                    <MenuButton fx:id="captureFilterMenuButton" mnemonicParsing="false" text="Filter">
-                                      <items>
-                                        <CheckMenuItem mnemonicParsing="false" onAction="#captureFilterChange" selected="true" text="Matched/Allowed" />
-                                        <CheckMenuItem mnemonicParsing="false" onAction="#captureFilterChange" selected="true" text="Matched/Prohibited" />
-                                        <CheckMenuItem mnemonicParsing="false" onAction="#captureFilterChange" selected="true" text="Unmatched/Allowed" />
-                                        <CheckMenuItem mnemonicParsing="false" onAction="#captureFilterChange" selected="true" text="Unmatched/Prohibited" />
-                                      </items>
-                                    </MenuButton>
-                                    </items>
-                                </ToolBar>
-                            </children>
-                        </AnchorPane>
-                        <AnchorPane>
-                            <TableView fx:id="capturedRequestsTable" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
-                                <columns>
-                                    <TableColumn minWidth="500.0" prefWidth="500.0" text="Host">
-                                        <cellValueFactory>
-                                            <PropertyValueFactory property="host" />
-                                        </cellValueFactory>
-                                    </TableColumn>
-                                    <TableColumn minWidth="200.0" prefWidth="200.0" text="Port">
-                                        <cellValueFactory>
-                                            <PropertyValueFactory property="port" />
-                                        </cellValueFactory>
-                                    </TableColumn>
-                                    <TableColumn minWidth="250.0" prefWidth="220.0" text="Filter result">
-                                        <cellValueFactory>
-                                            <PropertyValueFactory property="filterResult" />
-                                        </cellValueFactory>
-                                    </TableColumn>
-                                    <TableColumn minWidth="250.0" prefWidth="250.0" text="Date">
-                                        <cellValueFactory>
-                                            <PropertyValueFactory property="date" />
-                                        </cellValueFactory>
-                                    </TableColumn>
-                                    <TableColumn minWidth="250.0" prefWidth="250.0" text="From IP">
-                                        <cellValueFactory>
-                                            <PropertyValueFactory property="from" />
-                                        </cellValueFactory>
-                                    </TableColumn>
-                                </columns>
-                            </TableView>
-                        </AnchorPane>
-                        </SplitPane>
-                  </children>
-               </AnchorPane>
+             <RawCaptureForm fx:id="rawCaptureForm" />
            </content>
          </TitledPane>
         </AnchorPane>

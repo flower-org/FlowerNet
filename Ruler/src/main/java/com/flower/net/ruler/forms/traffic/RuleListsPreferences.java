@@ -1,0 +1,176 @@
+package com.flower.net.ruler.forms.traffic;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.flower.net.conntrack.allowdenylist.AddressFilterList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.prefs.Preferences;
+
+import static com.flower.net.ruler.forms.traffic.RuleListForm.YAML_MAPPER;
+
+/**
+ * Persists rule list tabs across restarts in a dedicated preferences node:
+ * <ul>
+ *   <li>{@value #INDEX_KEY} - all lists in tab order: file reference for file-based lists, key reference for untitled ones;</li>
+ *   <li>{@value #UNTITLED_KEY_PREFIX}N - rules of the N-th untitled list (one value each, as values are limited to
+ *   {@link Preferences#MAX_VALUE_LENGTH} chars).</li>
+ * </ul>
+ * File-based lists are re-read from their files on restore. Every save rewrites the node and removes all keys
+ * not referenced by the new index, so nothing is left dangling.
+ */
+class RuleListsPreferences {
+    final static Logger LOGGER = LoggerFactory.getLogger(RuleListsPreferences.class);
+
+    static final String NODE_PATH = "com/flower/net/ruler/trafficControl/ruleLists";
+    static final String INDEX_KEY = "index";
+    static final String UNTITLED_KEY_PREFIX = "untitled.";
+
+    enum EntryType { FILE, UNTITLED }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    record Entry(EntryType type, @Nullable String file, @Nullable String key, @Nullable String name, boolean active) {}
+
+    record Index(List<Entry> lists) {}
+
+    static Preferences node() {
+        return Preferences.userRoot().node(NODE_PATH);
+    }
+
+    /** Restore lists in saved order. Never fails: unreadable files become placeholders, unreadable untitled lists - empty. */
+    static List<RuleListForm> load() {
+        return load(node());
+    }
+
+    static List<RuleListForm> load(Preferences node) {
+        String indexYaml = node.get(INDEX_KEY, null);
+        if (indexYaml == null) {
+            return List.of();
+        }
+
+        Index index;
+        try {
+            index = YAML_MAPPER.readValue(indexYaml, Index.class);
+        } catch (Exception e) {
+            LOGGER.error("Can't read rule lists index from preferences", e);
+            return List.of();
+        }
+
+        List<RuleListForm> ruleLists = new ArrayList<>();
+        for (Entry entry : index.lists()) {
+            switch (entry.type()) {
+                case FILE -> {
+                    if (entry.file() == null) {
+                        LOGGER.warn("Skipping file-based rule list entry without a file");
+                        continue;
+                    }
+                    File file = new File(entry.file());
+                    RuleListForm ruleList;
+                    try {
+                        ruleList = RuleListForm.fromFile(file);
+                        ruleList.setActive(entry.active());
+                    } catch (Exception e) {
+                        LOGGER.warn("Can't load rule list from {}, restoring a placeholder", file.getPath(), e);
+                        ruleList = RuleListForm.fileNotFound(file);
+                    }
+                    ruleLists.add(ruleList);
+                }
+                case UNTITLED -> {
+                    AddressFilterList rules = null;
+                    String rulesYaml = entry.key() == null ? null : node.get(entry.key(), null);
+                    if (rulesYaml == null) {
+                        LOGGER.warn("Rules for untitled list \"{}\" not found in preferences, restoring it empty", entry.name());
+                    } else {
+                        try {
+                            rules = YAML_MAPPER.readValue(rulesYaml, AddressFilterList.class);
+                        } catch (Exception e) {
+                            LOGGER.error("Can't read rules for untitled list \"{}\", restoring it empty", entry.name(), e);
+                        }
+                    }
+                    String name = entry.name() == null ? TrafficControlForm.UNTITLED_LIST_NAME.trim() : entry.name();
+                    RuleListForm ruleList = RuleListForm.restoreUntitled(name, rules);
+                    ruleList.setActive(entry.active());
+                    ruleLists.add(ruleList);
+                }
+            }
+        }
+        return ruleLists;
+    }
+
+    /**
+     * Save lists in the given (tab) order. Lists that don't fit into a preference value are left out.
+     * UI thread only.
+     * @return error messages for anything that couldn't be saved; empty on success
+     */
+    static List<String> save(List<RuleListForm> ruleLists) {
+        return save(node(), ruleLists);
+    }
+
+    static List<String> save(Preferences node, List<RuleListForm> ruleLists) {
+        List<String> errors = new ArrayList<>();
+        List<Entry> entries = new ArrayList<>();
+        Map<String, String> values = new LinkedHashMap<>();
+
+        // Prepare and validate everything before writing, so a failure never leaves the index and lists inconsistent
+        for (RuleListForm ruleList : ruleLists) {
+            File file = ruleList.getFile();
+            if (file != null) {
+                entries.add(new Entry(EntryType.FILE, file.getPath(), null, null, ruleList.activeProperty().get()));
+                continue;
+            }
+
+            String rulesYaml;
+            try {
+                rulesYaml = YAML_MAPPER.writeValueAsString(ruleList.getRules());
+            } catch (Exception e) {
+                LOGGER.error("Can't serialize rule list \"{}\"", ruleList.getListName(), e);
+                errors.add("\"" + ruleList.getListName() + "\": " + e);
+                continue;
+            }
+            if (rulesYaml.length() > Preferences.MAX_VALUE_LENGTH) {
+                LOGGER.error("Rule list \"{}\" is too large to be kept in preferences: {} > {} chars",
+                        ruleList.getListName(), rulesYaml.length(), Preferences.MAX_VALUE_LENGTH);
+                errors.add("\"" + ruleList.getListName() + "\" is too large (" + rulesYaml.length()
+                        + " of max " + Preferences.MAX_VALUE_LENGTH + " chars)");
+                continue;
+            }
+
+            String key = UNTITLED_KEY_PREFIX + values.size();
+            values.put(key, rulesYaml);
+            entries.add(new Entry(EntryType.UNTITLED, null, key, ruleList.getListName(), ruleList.activeProperty().get()));
+        }
+
+        try {
+            String indexYaml = YAML_MAPPER.writeValueAsString(new Index(entries));
+            if (indexYaml.length() > Preferences.MAX_VALUE_LENGTH) {
+                LOGGER.error("Rule lists index is too large to be kept in preferences: {} > {} chars",
+                        indexYaml.length(), Preferences.MAX_VALUE_LENGTH);
+                errors.add("List of open rule lists is too large (" + indexYaml.length()
+                        + " of max " + Preferences.MAX_VALUE_LENGTH + " chars), nothing saved");
+                return errors;
+            }
+
+            // Lists first, index next, cleanup last: an interruption may leave unused keys, but never a missing list
+            values.forEach(node::put);
+            node.put(INDEX_KEY, indexYaml);
+            for (String key : node.keys()) {
+                if (!key.equals(INDEX_KEY) && !values.containsKey(key)) {
+                    node.remove(key);
+                }
+            }
+            node.flush();
+        } catch (Exception e) {
+            LOGGER.error("Can't save rule lists to preferences", e);
+            errors.add("Can't save rule lists to preferences: " + e);
+        }
+        return errors;
+    }
+
+    private RuleListsPreferences() {}
+}

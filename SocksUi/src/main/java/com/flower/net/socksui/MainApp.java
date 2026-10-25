@@ -71,7 +71,17 @@ public class MainApp implements ConnectionsTextSetter {
         tabs.getSelectionModel().select(tab);
     }
 
-    public void quit() { checkNotNull(mainStage).close(); }
+    public void quit() {
+        // Stage.close() doesn't fire onCloseRequest, so confirm here as well
+        if (confirmClose()) {
+            checkNotNull(mainStage).close();
+        }
+    }
+
+    /** @return true if it's OK to close the application (e.g. user chose what to do with unsaved rule lists) */
+    public boolean confirmClose() {
+        return trafficControlForm == null || trafficControlForm.confirmClose();
+    }
 
     public void closeAllTabs() {
         checkNotNull(tabs).getTabs().clear();

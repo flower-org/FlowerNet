@@ -9,6 +9,7 @@ import com.flower.fxutils.JavaFxUtils;
 import com.flower.net.ruler.interfaces.ConnectionsTextSetter;
 import com.flower.net.ruler.interfaces.DeniedHostsListener;
 import com.flower.net.utils.IpAddressUtil;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
@@ -19,6 +20,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +33,8 @@ import java.net.SocketAddress;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.prefs.Preferences;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -73,6 +77,10 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
     /** Numbering for new lists; never reused within a session */
     int untitledListCounter = 0;
+
+    /** Debounces persisting rule lists to preferences; runs on the UI thread, no extra threads */
+    final PauseTransition persistDelay = new PauseTransition(Duration.seconds(1));
+    static final Pattern UNTITLED_NUMBER = Pattern.compile(Pattern.quote(UNTITLED_LIST_NAME) + "(\\d+)");
 
     public void setStage(Stage stage) {
         this.stage = stage;
@@ -123,11 +131,89 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
             ruleLists = tabPane.getTabs().stream().map(tab -> (RuleListForm) tab.getContent()).toList();
             // e.g. closing an active Allow list may deny existing connections
             checkDeniedHosts();
+            schedulePersistRuleLists();
         });
         tabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) ->
                 selectedRuleList = newTab == null ? null : (RuleListForm) newTab.getContent());
 
         captureFilterChange();
+
+        persistDelay.setOnFinished(event -> persistRuleLists());
+        restoreRuleLists();
+    }
+
+    // ------------ Persistence across restarts ------------
+
+    void restoreRuleLists() {
+        for (RuleListForm ruleList : RuleListsPreferences.load()) {
+            addRuleList(ruleList);
+            Matcher matcher = UNTITLED_NUMBER.matcher(ruleList.getListName());
+            if (ruleList.getFile() == null && matcher.matches()) {
+                try {
+                    untitledListCounter = Math.max(untitledListCounter, Integer.parseInt(matcher.group(1)));
+                } catch (NumberFormatException e) {
+                    LOGGER.warn("Unexpected untitled list name: {}", ruleList.getListName());
+                }
+            }
+        }
+        checkNotNull(ruleListsTabPane).getSelectionModel().selectFirst();
+    }
+
+    void schedulePersistRuleLists() {
+        persistDelay.playFromStart();
+    }
+
+    /** @return errors for anything that couldn't be persisted; also logged */
+    List<String> persistRuleLists() {
+        persistDelay.stop();
+        return RuleListsPreferences.save(ruleLists);
+    }
+
+    /**
+     * Call before the application closes (UI thread). Offers to save file-based lists with unsaved changes
+     * and persists all lists; untitled lists are kept in preferences without asking.
+     * @return true if it's OK to close, false if the user cancelled
+     */
+    public boolean confirmClose() {
+        persistDelay.stop();
+        TabPane tabPane = checkNotNull(ruleListsTabPane);
+        ButtonType save = new ButtonType("Save", ButtonBar.ButtonData.YES);
+        ButtonType dontSave = new ButtonType("Don't save", ButtonBar.ButtonData.NO);
+        for (Tab tab : List.copyOf(tabPane.getTabs())) {
+            RuleListForm ruleList = (RuleListForm) tab.getContent();
+            if (ruleList.getFile() != null && ruleList.isDirty()) {
+                tabPane.getSelectionModel().select(tab);
+                Alert alert = new Alert(Alert.AlertType.CONFIRMATION,
+                        "\"" + ruleList.getListName() + "\" has unsaved changes. Save them to " + ruleList.getFile().getPath() + "?",
+                        save, dontSave, ButtonType.CANCEL);
+                alert.setHeaderText("Unsaved changes");
+                ButtonType answer = alert.showAndWait().orElse(ButtonType.CANCEL);
+                if (answer == save) {
+                    if (!ruleList.saveToFile()) {
+                        schedulePersistRuleLists();
+                        return false;
+                    }
+                } else if (answer != dontSave) {
+                    schedulePersistRuleLists();
+                    return false;
+                }
+            }
+        }
+
+        List<String> errors = persistRuleLists();
+        if (!errors.isEmpty()) {
+            ButtonType closeAnyway = new ButtonType("Close anyway", ButtonBar.ButtonData.OK_DONE);
+            Alert alert = new Alert(Alert.AlertType.ERROR,
+                    "Some rule lists can't be kept until the next start and will be lost:\n\n"
+                            + String.join("\n", errors)
+                            + "\n\nSave them to files to keep them.",
+                    closeAnyway, ButtonType.CANCEL);
+            alert.setHeaderText("Rule lists will be lost");
+            if (alert.showAndWait().orElse(ButtonType.CANCEL) != closeAnyway) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // ------------ Rule list tabs ------------
@@ -137,7 +223,12 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
             ruleList.setStage(stage);
         }
         ruleList.setRulesChangedListener(this::rulesChanged);
-        ruleList.activeProperty().addListener((obs, oldValue, newValue) -> checkDeniedHosts());
+        ruleList.activeProperty().addListener((obs, oldValue, newValue) -> {
+            checkDeniedHosts();
+            schedulePersistRuleLists();
+        });
+        ruleList.fileProperty().addListener((obs, oldValue, newValue) -> schedulePersistRuleLists());
+        ruleList.listNameProperty().addListener((obs, oldValue, newValue) -> schedulePersistRuleLists());
 
         Tab tab = new Tab();
         tab.setContent(ruleList);
@@ -156,6 +247,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
     void rulesChanged(RuleListForm ruleList) {
         checkDeniedHosts();
+        schedulePersistRuleLists();
     }
 
     void checkDeniedHosts() {

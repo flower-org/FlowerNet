@@ -8,6 +8,7 @@ import com.flower.fxutils.Refreshable;
 import com.flower.net.config.access.Access;
 import com.flower.net.conntrack.allowdenylist.AddressFilterList;
 import com.flower.net.conntrack.allowdenylist.AllowDenyConnectionFilter;
+import com.flower.net.conntrack.allowdenylist.ImmutableAddressFilterList;
 import com.flower.net.conntrack.allowdenylist.ImmutableAddressRecord;
 import com.flower.net.conntrack.allowdenylist.ImmutableHostRecord;
 import com.flower.net.conntrack.allowdenylist.ImmutablePortRecord;
@@ -16,6 +17,8 @@ import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.StringBinding;
 import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
@@ -71,7 +74,7 @@ public class RuleListForm extends AnchorPane implements Refreshable {
 
     final StringProperty listName;
     /** File this list was last saved to / loaded from; null if never */
-    @Nullable File file;
+    final ObjectProperty<File> file = new SimpleObjectProperty<>(null);
     /** True when the list content differs from what was last saved to / loaded from a file */
     final BooleanProperty dirty = new SimpleBooleanProperty(false);
     /** Rule content as of the last save/load, used to detect when changes were reverted */
@@ -88,7 +91,38 @@ public class RuleListForm extends AnchorPane implements Refreshable {
     public static RuleListForm fromFile(File file) throws IOException {
         AddressFilterList addressFilterList = YAML_MAPPER.readValue(file, AddressFilterList.class);
         RuleListForm ruleListForm = new RuleListForm(file.getName(), addressFilterList);
-        ruleListForm.file = file;
+        ruleListForm.file.set(file);
+        return ruleListForm;
+    }
+
+    /** Restore a list that was never saved to a file: it is dirty unless empty, as its rules exist nowhere else. */
+    public static RuleListForm restoreUntitled(String listName, @Nullable AddressFilterList rules) {
+        RuleListForm ruleListForm = new RuleListForm(listName, rules);
+        ruleListForm.savedRulesSnapshot = Set.of();
+        ruleListForm.updateDirty();
+        return ruleListForm;
+    }
+
+    static final String FILE_NOT_FOUND_HOST = "file.not.found";
+    static final int FILE_NOT_FOUND_PORT = 404;
+
+    /**
+     * Placeholder for a list whose file couldn't be read: keeps the file reference, holds a single marker rule and is off.
+     * Not dirty, so closing the app won't offer to overwrite the file with the placeholder.
+     */
+    public static RuleListForm fileNotFound(File file) {
+        AddressFilterList placeholderRules = ImmutableAddressFilterList.builder()
+                .addAddressRecords(ImmutableAddressRecord.builder()
+                        .dstHost(FILE_NOT_FOUND_HOST)
+                        .dstPort(FILE_NOT_FOUND_PORT)
+                        .access(Access.DENY)
+                        .creationTimestamp(System.currentTimeMillis())
+                        .isWildcard(false)
+                        .build())
+                .build();
+        RuleListForm ruleListForm = new RuleListForm(file.getName(), placeholderRules);
+        ruleListForm.file.set(file);
+        ruleListForm.setActive(false);
         return ruleListForm;
     }
 
@@ -166,6 +200,11 @@ public class RuleListForm extends AnchorPane implements Refreshable {
     }
 
     public @Nullable File getFile() {
+        return file.get();
+    }
+
+    /** UI thread only; add a listener to react when the list gets associated with another file. */
+    public ObjectProperty<File> fileProperty() {
         return file;
     }
 
@@ -188,8 +227,12 @@ public class RuleListForm extends AnchorPane implements Refreshable {
 
     /** Call after any change to rules: re-evaluates dirty state (the only place the comparison runs) and notifies the parent. */
     void rulesChanged() {
-        dirty.set(!savedRulesSnapshot.equals(rulesSnapshot(mainRuleManager.filter)));
+        updateDirty();
         notifyRulesChanged();
+    }
+
+    void updateDirty() {
+        dirty.set(!savedRulesSnapshot.equals(rulesSnapshot(mainRuleManager.filter)));
     }
 
     void notifyRulesChanged() {
@@ -436,12 +479,13 @@ public class RuleListForm extends AnchorPane implements Refreshable {
             FileChooser fileChooser = new FileChooser();
             fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Traffic filter ruleset (*.rls)", "*.rls"));
             fileChooser.setTitle("Save Traffic filter ruleset");
-            if (file != null) {
-                File parentDir = file.getParentFile();
+            File currentFile = file.get();
+            if (currentFile != null) {
+                File parentDir = currentFile.getParentFile();
                 if (parentDir != null && parentDir.isDirectory()) {
                     fileChooser.setInitialDirectory(parentDir);
                 }
-                fileChooser.setInitialFileName(file.getName());
+                fileChooser.setInitialFileName(currentFile.getName());
             }
             File configFile = fileChooser.showSaveDialog(checkNotNull(stage));
 
@@ -449,12 +493,7 @@ public class RuleListForm extends AnchorPane implements Refreshable {
                 if (!configFile.getName().endsWith(".rls")) {
                     configFile = new File(configFile.getPath()  + ".rls");
                 }
-                AddressFilterList addressFilterList = mainRuleManager.filter.getFullList();
-
-                YAML_MAPPER.writeValue(configFile, addressFilterList);
-                file = configFile;
-                setListName(configFile.getName());
-                markSaved();
+                writeToFile(configFile);
 
                 Alert alert = new Alert(Alert.AlertType.INFORMATION, "Traffic filter ruleset saved to : " + configFile.getPath(), ButtonType.OK);
                 LOGGER.info("Traffic filter ruleset saved to: {}", configFile.getPath());
@@ -465,6 +504,35 @@ public class RuleListForm extends AnchorPane implements Refreshable {
             LOGGER.error("Error saving Traffic filter ruleset: ", e);
             alert.showAndWait();
         }
+    }
+
+    /**
+     * Save to the associated file without asking for a location; shows an error and returns false on failure.
+     * Lists without a file fall back to "Save as" and return false if that is cancelled.
+     */
+    public boolean saveToFile() {
+        File currentFile = file.get();
+        if (currentFile == null) {
+            saveRules();
+            return file.get() != null && !isDirty();
+        }
+        try {
+            writeToFile(currentFile);
+            LOGGER.info("Traffic filter ruleset saved to: {}", currentFile.getPath());
+            return true;
+        } catch (Exception e) {
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Error saving Traffic filter ruleset: " + e, ButtonType.OK);
+            LOGGER.error("Error saving Traffic filter ruleset: ", e);
+            alert.showAndWait();
+            return false;
+        }
+    }
+
+    void writeToFile(File configFile) throws IOException {
+        YAML_MAPPER.writeValue(configFile, mainRuleManager.filter.getFullList());
+        file.set(configFile);
+        setListName(configFile.getName());
+        markSaved();
     }
 
     public void loadRules() {
@@ -485,7 +553,7 @@ public class RuleListForm extends AnchorPane implements Refreshable {
 
                 mainRuleManager.filter.clear();
                 mainRuleManager.filter.addList(addressFilterList, true);
-                file = configFile;
+                file.set(configFile);
                 setListName(configFile.getName());
                 markSaved();
                 notifyRulesChanged();

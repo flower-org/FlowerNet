@@ -55,4 +55,13 @@ public class CapturedRequest {
     public @Nullable Integer getFromPort() {
         return fromPort;
     }
+
+    /** "host:port" (IPv6 in brackets); host only if port is unknown; empty if source is unknown */
+    public String getFrom() {
+        if (fromHost == null) {
+            return "";
+        }
+        String host = fromHost.indexOf(':') >= 0 ? "[" + fromHost + "]" : fromHost;
+        return (fromPort == null || fromPort < 0) ? host : host + ":" + fromPort;
+    }
 }

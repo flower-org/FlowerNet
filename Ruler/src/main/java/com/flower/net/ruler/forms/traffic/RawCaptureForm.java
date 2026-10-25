@@ -13,6 +13,7 @@ import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextFormatter;
 import javafx.scene.layout.AnchorPane;
 
 import javax.annotation.Nullable;
@@ -26,6 +27,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 public class RawCaptureForm extends AnchorPane {
     final static String CAPTURE_FLAG_PREF = "captureFlagPref";
+    final static int DEFAULT_MAX_REQUESTS = 50;
 
     @Nullable @FXML TextField maxRequests;
     @Nullable @FXML CheckBox captureRequestsCheckBox;
@@ -51,6 +53,9 @@ public class RawCaptureForm extends AnchorPane {
 
         capturedRequests = FXCollections.observableArrayList();
         checkNotNull(capturedRequestsTable).itemsProperty().set(capturedRequests);
+
+        checkNotNull(maxRequests).setTextFormatter(new TextFormatter<String>(
+                change -> change.getControlNewText().matches("\\d*") ? change : null));
 
         boolean captureFlag = Preferences.userRoot().getBoolean(CAPTURE_FLAG_PREF, false);
         checkNotNull(captureRequestsCheckBox).selectedProperty().set(captureFlag);
@@ -120,7 +125,7 @@ public class RawCaptureForm extends AnchorPane {
                     CaptureFilter captureFilter = getCaptureFilter();
                     if (captureFilter.matchCapturedRecord(access, isRuleMatched)) {
                         String hostOrIpFrom = null;
-                        int port = -1;
+                        Integer port = null;
                         if (from instanceof InetSocketAddress isa) {
                             hostOrIpFrom = (isa.getAddress() != null)
                                     ? isa.getAddress().getHostAddress() // resolved -> IP
@@ -131,26 +136,34 @@ public class RawCaptureForm extends AnchorPane {
                         CapturedRequest capturedRequest = new CapturedRequest(dstHost, dstPort, access,
                                 isRuleMatched, Protocol.TCP, isDirectIpBlock, hostOrIpFrom, port);
                         capturedRequests.add(capturedRequest);
-                        try {
-                            int max = Integer.parseInt(checkNotNull(maxRequests).textProperty().get());
-                            while (capturedRequests.size() > max) {
-                                CapturedRequest selectedItem = checkNotNull(capturedRequestsTable).getSelectionModel().getSelectedItem();
-                                capturedRequests.remove(0);
-                                if (selectedItem != null) {
-                                    try {
-                                        checkNotNull(capturedRequestsTable).getSelectionModel().select(selectedItem);
-                                    } catch (Exception e) {
-                                        // selectedItem may be out of bounds
-                                    }
-                                }
-                            }
-                        } catch (Exception e) {
-                        }
+                        trimToMaxRequests();
 
                         checkNotNull(capturedRequestsTable).refresh();
                     }
                 }
             });
+        }
+    }
+
+    /** Falls back to the default if the field is empty or out of int range (it only accepts digits) */
+    int getMaxRequests() {
+        try {
+            return Integer.parseInt(checkNotNull(maxRequests).getText());
+        } catch (NumberFormatException e) {
+            return DEFAULT_MAX_REQUESTS;
+        }
+    }
+
+    /** Drops the oldest captures above the limit; if the selected row was dropped, the selection moves to the next row */
+    void trimToMaxRequests() {
+        int excess = capturedRequests.size() - getMaxRequests();
+        if (excess > 0) {
+            TableView<CapturedRequest> table = checkNotNull(capturedRequestsTable);
+            CapturedRequest selectedItem = table.getSelectionModel().getSelectedItem();
+            capturedRequests.remove(0, excess);
+            if (selectedItem != null && capturedRequests.contains(selectedItem)) {
+                table.getSelectionModel().select(selectedItem);
+            }
         }
     }
 

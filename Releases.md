@@ -1,4 +1,20 @@
 ```
+Oct 24, 2026
+SocksUi-1.4.0-amd64-all.jar
+41978840
+SHA2-256(SocksUi/build/libs/SocksUi-1.4.0-amd64-all.jar)= 0e41c6807a2c8fa6d4be16cb5233e1fbcfa6acb82d47f66d134a7b655c8b3e5c
+SocksUi-1.4.0-portable-linux.zip
+72148879
+SHA2-256(SocksUi-1.4.0-portable-linux.zip)= 28b357b49944f7c1cfdb3e57586d5b7e7e6c51a87a946bf096c33c2473d32520
+SocksUi-1.4.0-portable-macos.zip
+67629923
+cee001acfe88cde6f109581fdec3d81b343fb2861cb74595778f05947dfeaa1a  SocksUi-1.4.0-portable-macos.zip
+SocksUi-1.4.0-portable-windows.zip
+68488687
+529C8C3E42B3E615DFC4D54F4DF59F575543927C36479F9536E283ABE470702D
+```
+
+```
 Jul 29, 2026
 SocksUi-1.3.5-amd64-all.jar
 41944078

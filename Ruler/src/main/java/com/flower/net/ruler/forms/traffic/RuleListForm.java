@@ -41,6 +41,7 @@ import java.net.SocketAddress;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
@@ -526,42 +527,72 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
         }
     }
 
-    // TODO: implement append rules:
-    /*
-    public void mergeTmpRules() {
-        if (JavaFxUtils.showYesNoDialog("Merge temporary filter rule list into main?") == JavaFxUtils.YesNo.YES) {
-            boolean overrideExisting = false;
-            AddressFilterList tmpRuleList = tmpRuleManager.filter.getFullList();
-            if (mainRuleManager.filter.isListOverrideRequired(tmpRuleList)) {
-                Optional<Boolean> override = shouldWeOverrideDialog("Override main?",
-                        "Some rules conflict with existing rules in the main rule list. Should we override main list rules?");
-                if (override.isEmpty()) {
-                    return;
-                }
-                overrideExisting = override.get();
+    /** Snapshot of all rules in this list. */
+    public AddressFilterList getRules() {
+        return mainRuleManager.filter.getFullList();
+    }
+
+    /** Merge rules from a chosen file into this list; the list keeps its name and file. */
+    public void appendRulesFromFile() {
+        try {
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Traffic filter ruleset (*.rls)", "*.rls"));
+            fileChooser.setTitle("Append Traffic filter ruleset");
+
+            File appendFile = fileChooser.showOpenDialog(checkNotNull(stage));
+            if (appendFile == null) {
+                return;
             }
 
-            mainRuleManager.filter.addList(tmpRuleList, overrideExisting);
-            tmpRuleManager.filter.clear();
-
-            checkNotNull(activateComboBox).getSelectionModel().select(0);
-            checkNotNull(autoAddComboBox).getSelectionModel().select(0);
-
-            refreshContent();
+            AddressFilterList appendList = YAML_MAPPER.readValue(appendFile, AddressFilterList.class);
+            appendRules(appendList, appendFile.getName());
+        } catch (Exception e) {
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Error appending rules from file: " + e, ButtonType.OK);
+            LOGGER.error("Error appending rules from file: ", e);
+            alert.showAndWait();
         }
+    }
+
+    /** Merge rules from another open list into this list; the source list is left unchanged. */
+    public void appendRulesFrom(RuleListForm source) {
+        appendRules(source.getRules(), source.getListName());
+    }
+
+    /**
+     * Merge rules into this list, asking whether to override conflicting rules.
+     * @param sourceName shown to the user in the conflict dialog
+     * @return false if the user cancelled
+     */
+    boolean appendRules(AddressFilterList appendList, String sourceName) {
+        boolean overrideExisting = false;
+        if (mainRuleManager.filter.isListOverrideRequired(appendList)) {
+            Optional<Boolean> override = shouldWeOverrideDialog("Override existing rules?",
+                    "Some rules in \"" + sourceName + "\" conflict with existing rules in \""
+                            + getListName() + "\". Should we override existing rules?");
+            if (override.isEmpty()) {
+                return false;
+            }
+            overrideExisting = override.get();
+        }
+
+        mainRuleManager.filter.addList(appendList, overrideExisting);
+        rulesChanged();
+        checkNotNull(connectionMonitorForm).checkDeniedHosts();
+        refreshAndRestoreTableCursor();
+        return true;
     }
 
     public final static ButtonType BUTTON_TYPE_OVERRIDE = new ButtonType("Override");
     public final static ButtonType BUTTON_TYPE_IGNORE = new ButtonType("Ignore conflicts");
     public final static ButtonType BUTTON_TYPE_CANCEL = new ButtonType("Cancel");
 
+    /** Asks whether to override conflicting rules: true - override, false - ignore conflicts (keep existing), empty - cancel. */
     public static Optional<Boolean> shouldWeOverrideDialog(String titleHeader, String content) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle(titleHeader);
         alert.setHeaderText(titleHeader);
         alert.setContentText(content);
 
-        // Customize the buttons (Yes/No)
         alert.getButtonTypes().setAll(BUTTON_TYPE_OVERRIDE, BUTTON_TYPE_IGNORE, BUTTON_TYPE_CANCEL);
         Optional<ButtonType> dialogResult = alert.showAndWait();
         if (dialogResult.isPresent()) {
@@ -573,5 +604,4 @@ public class RuleListForm extends AnchorPane implements Refreshable, ConnectionF
         }
         return Optional.empty();
     }
-    */
 }

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.TitledPane?>
+<?import javafx.scene.control.ToolBar?>
+<?import javafx.scene.layout.AnchorPane?>
+
+<fx:root prefHeight="712.0" prefWidth="919.0" type="AnchorPane" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1">
+    <SplitPane dividerPositions="1.0, 1.0" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" orientation="VERTICAL" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" xmlns="http://javafx.com/javafx/19" xmlns:fx="http://javafx.com/fxml/1">
+      <AnchorPane maxHeight="50.0" minHeight="50.0" prefHeight="50.0">
+         <children>
+            <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+               <items>
+                  <Label text="Port:" />
+                  <TextField fx:id="portTextField" prefHeight="26.0" prefWidth="72.0" promptText="port" text="1081" />
+                  <Button fx:id="startButton" mnemonicParsing="false" onAction="#startServer" text="Start server" />
+                  <Button fx:id="stopButton" disable="true" mnemonicParsing="false" onAction="#stopServer" text="Stop server" />
+                  <Separator orientation="VERTICAL" prefHeight="200.0" />
+                  <Separator orientation="VERTICAL" prefHeight="200.0" />
+                  <Button mnemonicParsing="false" onAction="#notImplemented" text="Generate ip/nftables and service" />
+               </items>
+            </ToolBar>
+         </children>
+      </AnchorPane>
+      <AnchorPane>
+         <children>
+            <TitledPane animated="false" text="Placeholder #1 (UNIX socket decider server)" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
+         </children>
+      </AnchorPane>
+        <AnchorPane>
+            <TitledPane animated="false" text="Placeholder #2 (DNS)" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
+        </AnchorPane>
+    </SplitPane>
+</fx:root>

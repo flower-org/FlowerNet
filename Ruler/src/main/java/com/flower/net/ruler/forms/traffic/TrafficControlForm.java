@@ -443,7 +443,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     }
 
     @Override
-    public Access approveConnection(String dstHost, int dstPort, @Nullable SocketAddress from) {
+    public Access approveConnection(String dstHost, int dstPort, Protocol protocol, @Nullable SocketAddress from) {
         CheckResult check = getCheckResult(dstHost, dstPort);
 
         // from == null is a re-check of an existing connection (see DeniedHostsListener) - never auto-add there
@@ -466,7 +466,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 if (captureForm.isCaptureEnabled()) {
                     if (capturedRequest == null) {
                         capturedRequest = CapturedRequest.of(dstHost, dstPort, finalCheck.checkResult,
-                                finalCheck.isRuleMatched, Protocol.TCP, finalCheck.isDirectIpBlock, from);
+                                finalCheck.isRuleMatched, protocol, finalCheck.isDirectIpBlock, from);
                     }
                     captureForm.addCapture(capturedRequest);
                 }

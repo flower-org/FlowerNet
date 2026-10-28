@@ -1,6 +1,7 @@
 package com.flower.net.socksui.forms;
 
 import com.flower.fxutils.Refreshable;
+import com.flower.net.config.access.Protocol;
 import com.flower.net.conntrack.ConnectionId;
 import com.flower.net.conntrack.ConnectionInfo;
 import com.flower.net.conntrack.ConnectionListener;
@@ -201,7 +202,7 @@ public class ConnectionMonitorForm extends AnchorPane implements Refreshable, Co
                 Destination dest = info.connectionInfo.destination;
 
                 if (dest != null) {
-                    if (trafficControlForm.approveConnection(dest.host, dest.port, null) == DENY) {
+                    if (trafficControlForm.approveConnection(dest.host, dest.port, Protocol.TCP, null) == DENY) {
                         info.connectionInfo.channel.close();
                     }
                 }

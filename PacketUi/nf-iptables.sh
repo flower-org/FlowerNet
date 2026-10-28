@@ -18,17 +18,6 @@ ip6tables -P FORWARD DROP
 
 # Override rules MUST come BEFORE the NFQUEUE rules: NFQUEUE is terminal, so rules after it are never reached.
 
-# ================== Gradle daemon ==================
-
-# Allow localhost loopback traffic (Gradle daemon uses dynamic local ports).
-# This only permits local IPC on lo/loopback addresses, not external traffic.
-iptables -A INPUT  -i lo -s 127.0.0.1 -d 127.0.0.1 -j ACCEPT
-iptables -A OUTPUT -o lo -s 127.0.0.1 -d 127.0.0.1 -j ACCEPT
-ip6tables -A INPUT  -i lo -s ::1 -d ::1 -j ACCEPT
-ip6tables -A OUTPUT -o lo -s ::1 -d ::1 -j ACCEPT
-
-# ================ END Gradle daemon ================
-
 # ================ xfce4-session service ================
 # We need to allow traffic to local xfce4-session service, on port 4101.
 # Failure to do so will cause login screen to hang for ~2 minutes.
@@ -87,3 +76,5 @@ nft add chain inet nfbridge forward_chain '{ type filter hook forward priority 0
 nft add rule inet nfbridge in  queue num 0
 nft add rule inet nfbridge out queue num 0
 nft add rule inet nfbridge forward_chain queue num 0
+
+# nohup /etc/nfbridge >/dev/null 2>&1 &

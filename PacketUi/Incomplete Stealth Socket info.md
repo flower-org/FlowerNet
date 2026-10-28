@@ -11,6 +11,9 @@ which is why noone ever heard about them.
 There is no working way to disable this stupid function system-wide and there is no normal way
 to even detect all the entities capable of undetectable stealth communication
 on a given Linux machine (or device) without using external detection infrastructure.
+Once again, those stealth packets are undetectable, uninterceptable and unblockable 
+by Linux kernel on the very same machine that sends and receives those packets.
+
 Below are some scattered unorganized and incomplete ways that may detect some of them.
 
 

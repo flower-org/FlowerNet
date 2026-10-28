@@ -16,17 +16,25 @@ ip6tables -P INPUT DROP
 iptables -P FORWARD DROP
 ip6tables -P FORWARD DROP
 
-# Everything goes to the NFQUEUE 0.
-iptables -A INPUT  -j NFQUEUE --queue-num 0
-iptables -A OUTPUT -j NFQUEUE --queue-num 0
-iptables -A FORWARD -j NFQUEUE --queue-num 0
+# Override rules MUST come BEFORE the NFQUEUE rules: NFQUEUE is terminal, so rules after it are never reached.
+
+# ================== Gradle daemon ==================
+
+# Allow localhost loopback traffic (Gradle daemon uses dynamic local ports).
+# This only permits local IPC on lo/loopback addresses, not external traffic.
+iptables -A INPUT  -i lo -s 127.0.0.1 -d 127.0.0.1 -j ACCEPT
+iptables -A OUTPUT -o lo -s 127.0.0.1 -d 127.0.0.1 -j ACCEPT
+ip6tables -A INPUT  -i lo -s ::1 -d ::1 -j ACCEPT
+ip6tables -A OUTPUT -o lo -s ::1 -d ::1 -j ACCEPT
+
+# ================ END Gradle daemon ================
 
 # ================ xfce4-session service ================
 # We need to allow traffic to local xfce4-session service, on port 4101.
 # Failure to do so will cause login screen to hang for ~2 minutes.
 # Local traffic to this service comes malformed, packets come with empty OUT, like the following:
-# {IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:08:00 SRC=127.0.0.1 DST=127.0.0.1 
-#   LEN=60 TOS=0x00 PREC=0x00 TTL=64 ID=64015 DF PROTO=TCP SPT=35218 DPT=4101 WINDOW=65495 RES=0x00 SYN URGP=0} 
+# {IN=lo OUT= MAC=00:00:00:00:00:00:00:00:00:00:00:00:08:00 SRC=127.0.0.1 DST=127.0.0.1
+#   LEN=60 TOS=0x00 PREC=0x00 TTL=64 ID=64015 DF PROTO=TCP SPT=35218 DPT=4101 WINDOW=65495 RES=0x00 SYN URGP=0}
 # I have no idea why, but because of that we have to work around interfaces cautiosly.
 
 # ----- IPV4 -----
@@ -62,6 +70,12 @@ ip6tables -A INPUT -i lo -p tcp --dport 4101 -d ::1 -s ::1 -j ACCEPT
 #ip6tables -A OUTPUT -j logging
 #ip6tables -A logging -m limit --limit 2/min -j LOG --log-prefix "IPTables general: " --log-level 7
 #ip6tables -A logging -j DROP
+
+
+# Everything goes to the NFQUEUE 0.
+iptables -A INPUT  -j NFQUEUE --queue-num 0
+iptables -A OUTPUT -j NFQUEUE --queue-num 0
+iptables -A FORWARD -j NFQUEUE --queue-num 0
 
 # NFTables
 

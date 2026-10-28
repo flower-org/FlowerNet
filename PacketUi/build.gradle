@@ -68,6 +68,7 @@ sourceSets {
 
 dependencies {
     implementation project(':JavaFxUtils')
+    implementation project(':NetConfig')
     implementation project(':NetCore')
     implementation project(':Ruler')
 

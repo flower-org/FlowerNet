@@ -4,6 +4,7 @@ import com.flower.fxutils.Refreshable;
 import com.flower.net.conntrack.ConnectionFilter;
 import com.flower.net.conntrack.ConnectionListener;
 import com.flower.net.packetui.MainApp;
+import com.flower.net.packetui.server.ConnectionFilterDecider;
 import com.flower.net.packetui.server.DeciderServer;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -25,6 +26,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class ServerForm extends AnchorPane implements Refreshable {
     final ReentrantLock startLock;
     final MainApp mainApp;
+    final ConnectionFilterDecider decider;
     final DeciderServer server;
     boolean isStarted;
 
@@ -53,15 +55,14 @@ public class ServerForm extends AnchorPane implements Refreshable {
             throw new RuntimeException(exception);
         }
 
-        // TODO: plug in TrafficControlForm policy; allow everything for now
-        server = new DeciderServer((packet, packetId, hwProto, hook, mark, indev, outdev) -> true);
+        decider = new ConnectionFilterDecider();
+        server = new DeciderServer(decider);
 
         refreshContent();
     }
 
     public void addConnectionFilter(ConnectionFilter connectionFilter) {
-        // TODO: implement
-        // server.addConnectionFilter(connectionFilter);
+        decider.addConnectionFilter(connectionFilter);
     }
 
     public void addConnectionListener(ConnectionListener connectionListener) {

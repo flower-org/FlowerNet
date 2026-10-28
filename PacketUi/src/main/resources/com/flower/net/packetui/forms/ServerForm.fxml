@@ -15,8 +15,8 @@
          <children>
             <ToolBar AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                <items>
-                  <Label text="Port:" />
-                  <TextField fx:id="portTextField" prefHeight="26.0" prefWidth="72.0" promptText="port" text="1081" />
+                  <Label text="UNIX socket:" />
+                  <TextField fx:id="socketPathTextField" prefHeight="26.0" prefWidth="260.0" promptText="socket path" text="/run/nfbridge/nfbridge.sock" />
                   <Button fx:id="startButton" mnemonicParsing="false" onAction="#startServer" text="Start server" />
                   <Button fx:id="stopButton" disable="true" mnemonicParsing="false" onAction="#stopServer" text="Stop server" />
                   <Separator orientation="VERTICAL" prefHeight="200.0" />

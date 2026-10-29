@@ -10,6 +10,7 @@ import io.netty.handler.codec.dns.DnsQuery;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 
+import java.net.SocketAddress;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -22,14 +23,25 @@ public class DnsTcpMessageHandler extends AbstractDnsQueryHandler<DnsQuery> {
     /** RFC 7766 6.2.3 suggests an idle timeout in the order of seconds. */
     public static final long IDLE_TIMEOUT_MILLIS = 10_000L;
 
-    public DnsTcpMessageHandler(DnsOverTlsClient client) {
-        super(client);
+    public DnsTcpMessageHandler(DnsOverTlsClient client, ClientAccess access) {
+        super(client, access);
     }
 
+    /** Uses the default {@link ClientAccess}, shared by all handlers added this way. */
     public static void addHandlers(ChannelPipeline pipeline, DnsOverTlsClient client) {
+        addHandlers(pipeline, client, ClientAccess.sharedDefault());
+    }
+
+    /** {@code access} must be shared by all connections, so rate limits apply per client rather than per connection. */
+    public static void addHandlers(ChannelPipeline pipeline, DnsOverTlsClient client, ClientAccess access) {
         pipeline.addLast(new IdleStateHandler(0, 0, IDLE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))
                 .addLast(new TcpDnsQueryFrameDecoder())
-                .addLast(new DnsTcpMessageHandler(client));
+                .addLast(new DnsTcpMessageHandler(client, access));
+    }
+
+    @Override
+    protected SocketAddress clientAddress(ChannelHandlerContext ctx, DnsQuery query) {
+        return ctx.channel().remoteAddress();
     }
 
     @Override

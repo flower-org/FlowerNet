@@ -7,7 +7,6 @@ import com.flower.crypt.PkiUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.bootstrap.ServerBootstrap;
@@ -89,17 +88,30 @@ public class DnsServer implements AutoCloseable {
         this.tcpChannel = tcpChannel;
     }
 
-    /** Starts a server on {@code port} (UDP and TCP) that forwards to 1.1.1.1 over TLS. Returns once it's listening. */
+    /** By default the server only listens on, and answers, the local machine. */
+    public static final String DEFAULT_BIND_ADDRESS = "127.0.0.1";
+
+    /**
+     * Starts a server on {@value #DEFAULT_BIND_ADDRESS}:{@code port} (UDP and TCP) that forwards to 1.1.1.1 over TLS,
+     * with {@link ClientAccess#defaults()}. Returns once it's listening.
+     */
     public static DnsServer start(int port, boolean useCache) throws SSLException, InterruptedException {
         return start(port, new DnsOverTlsClient(OTHER_DNS_TLS_SERVER_ADDRESS, OTHER_DNS_TLS_SERVER_PORT,
                 TRUST_MANAGER, useCache, null));
     }
 
-    /**
-     * Starts a server on {@code port} (UDP and TCP) that forwards through {@code client}. Returns once it's listening.
-     * The server takes ownership of the client and shuts it down on {@link #close()}.
-     */
+    /** Like {@link #start(String, int, DnsOverTlsClient, ClientAccess)} on {@value #DEFAULT_BIND_ADDRESS} with the default access. */
     public static DnsServer start(int port, DnsOverTlsClient client) throws InterruptedException {
+        return start(DEFAULT_BIND_ADDRESS, port, client, ClientAccess.defaults());
+    }
+
+    /**
+     * Starts a server on {@code bindAddress}:{@code port} (UDP and TCP) that forwards through {@code client}, answering
+     * only clients {@code access} allows. Use {@code "0.0.0.0"} or {@code "::"} to listen on all interfaces.
+     * Returns once it's listening. The server takes ownership of the client and shuts it down on {@link #close()}.
+     */
+    public static DnsServer start(String bindAddress, int port, DnsOverTlsClient client, ClientAccess access)
+            throws InterruptedException {
         NioEventLoopGroup group = new NioEventLoopGroup();
         try {
             Bootstrap bootstrap = new Bootstrap();
@@ -109,10 +121,9 @@ public class DnsServer implements AutoCloseable {
                         @Override
                         protected void initChannel(NioDatagramChannel nioDatagramChannel) {
                             nioDatagramChannel.pipeline().addLast(new LenientDnsQueryDecoder());
-                            nioDatagramChannel.pipeline().addLast(new DnsMessageHandler(client));
+                            nioDatagramChannel.pipeline().addLast(new DnsMessageHandler(client, access));
                         }
-                    })
-                    .option(ChannelOption.SO_BROADCAST, true);
+                    });
 
             // Clients retry over TCP when a UDP reply is truncated (RFC 7766)
             ServerBootstrap tcpBootstrap = new ServerBootstrap();
@@ -121,13 +132,13 @@ public class DnsServer implements AutoCloseable {
                     .childHandler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         protected void initChannel(SocketChannel socketChannel) {
-                            DnsTcpMessageHandler.addHandlers(socketChannel.pipeline(), client);
+                            DnsTcpMessageHandler.addHandlers(socketChannel.pipeline(), client, access);
                         }
                     });
 
-            Channel udpChannel = bootstrap.bind(port).sync().channel();
-            Channel tcpChannel = tcpBootstrap.bind(port).sync().channel();
-            LOGGER.info("DNS Server Started at port {} (UDP and TCP)", port);
+            Channel udpChannel = bootstrap.bind(bindAddress, port).sync().channel();
+            Channel tcpChannel = tcpBootstrap.bind(bindAddress, port).sync().channel();
+            LOGGER.info("DNS Server Started at {} port {} (UDP and TCP)", bindAddress, port);
             return new DnsServer(client, group, udpChannel, tcpChannel);
         } catch (Throwable e) {
             group.shutdownGracefully();

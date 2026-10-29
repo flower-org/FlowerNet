@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.net.SocketAddress;
 import java.util.function.Consumer;
 
 /** Validates queries, resolves them through the upstream client and replies; transports define how replies are sent. */
@@ -25,10 +26,15 @@ public abstract class AbstractDnsQueryHandler<Q extends DnsQuery> extends Simple
     final static Logger LOGGER = LoggerFactory.getLogger(AbstractDnsQueryHandler.class);
 
     public final DnsOverTlsClient client;
+    private final ClientAccess access;
 
-    protected AbstractDnsQueryHandler(DnsOverTlsClient client) {
+    protected AbstractDnsQueryHandler(DnsOverTlsClient client, ClientAccess access) {
         this.client = client;
+        this.access = access;
     }
+
+    /** The address the query came from, for access control. */
+    protected abstract SocketAddress clientAddress(ChannelHandlerContext ctx, Q query);
 
     /**
      * Returns what sends a response to this query's client. It's called after {@code query} has been released,
@@ -51,6 +57,13 @@ public abstract class AbstractDnsQueryHandler<Q extends DnsQuery> extends Simple
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Q query) {
+        SocketAddress clientAddress = clientAddress(ctx, query);
+        ClientAccess.Decision decision = access.check(clientAddress);
+        if (decision == ClientAccess.Decision.DROP) {
+            LOGGER.debug("{} | Rate limited {}", query.id(), clientAddress);
+            return;
+        }
+
         Consumer<DefaultDnsResponse> replier = replier(ctx, query);
         int id = query.id();
         Consumer<DefaultDnsResponse> owningReplier = response -> {
@@ -65,7 +78,7 @@ public abstract class AbstractDnsQueryHandler<Q extends DnsQuery> extends Simple
             }
         };
 
-        DnsResponseCode error = validate(query);
+        DnsResponseCode error = decision == ClientAccess.Decision.REFUSE ? DnsResponseCode.REFUSED : validate(query);
         if (error != null) {
             LOGGER.info("{} | rejected with {}: opcode {}, question count {}", id, error, query.opCode(),
                     query.count(DnsSection.QUESTION));

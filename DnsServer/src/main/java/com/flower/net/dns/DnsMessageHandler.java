@@ -9,12 +9,23 @@ import io.netty.handler.codec.dns.DefaultDnsResponse;
 
 import javax.annotation.Nullable;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.function.Consumer;
 
 /** Answers UDP queries; replies larger than the client can receive are truncated, so it retries over TCP. */
 public class DnsMessageHandler extends AbstractDnsQueryHandler<DatagramDnsQuery> {
+    /** Uses the default {@link ClientAccess}, shared by all handlers created this way. */
     public DnsMessageHandler(DnsOverTlsClient client) {
-        super(client);
+        this(client, ClientAccess.sharedDefault());
+    }
+
+    public DnsMessageHandler(DnsOverTlsClient client, ClientAccess access) {
+        super(client, access);
+    }
+
+    @Override
+    protected SocketAddress clientAddress(ChannelHandlerContext ctx, DatagramDnsQuery query) {
+        return query.sender();
     }
 
     @Override

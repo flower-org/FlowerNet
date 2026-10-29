@@ -198,6 +198,39 @@ public class DnsMessageHandlerTest {
     }
 
     @Test
+    void clientOutsideAllowedNetworksGetsRefused() throws Exception {
+        InetSocketAddress outsider = new InetSocketAddress("8.8.8.8", 40000);
+        client = new FakeClient(false);
+        EmbeddedChannel channel = new EmbeddedChannel(new DnsMessageHandler(client));
+        channel.writeInbound(new DatagramDnsQuery(outsider, SERVER, 1234).addRecord(DnsSection.QUESTION, QUESTION));
+        assertEquals(0, client.queries, "must not be forwarded");
+        DatagramPacket packet = channel.readOutbound();
+        try {
+            assertEquals(outsider, packet.recipient());
+            assertEquals(1234, packet.content().getUnsignedShort(0));
+            assertEquals(DnsResponseCode.REFUSED.intValue(), packet.content().getUnsignedByte(3) & 0x0f);
+        } finally {
+            packet.release();
+        }
+    }
+
+    @Test
+    void queriesOverTheRateLimitAreDropped() throws Exception {
+        client = new FakeClient(false);
+        ClientAccess access = new ClientAccess(ClientAccess.LOCAL_NETWORKS, 1, 2);
+        EmbeddedChannel channel = new EmbeddedChannel(new DnsMessageHandler(client, access));
+        for (int i = 0; i < 3; i++) {
+            channel.writeInbound(query());
+        }
+        assertEquals(2, client.queries);
+        for (int i = 0; i < 2; i++) {
+            DatagramPacket packet = channel.readOutbound();
+            packet.release();
+        }
+        assertNull(channel.readOutbound());
+    }
+
+    @Test
     void immediateAnswerIsRepliedWithoutLeaks() throws Exception {
         client = new FakeClient(false);
         EmbeddedChannel channel = new EmbeddedChannel(new DnsMessageHandler(client));

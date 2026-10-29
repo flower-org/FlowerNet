@@ -74,6 +74,7 @@ public class DnsOverTlsClient {
 
     private final ChannelPool channelPool;
     private final UpstreamQueryRegistry pendingQueries;
+    private final InFlightQueries inFlight = new InFlightQueries();
 
     @Nullable private final AnswerCache cache;
 
@@ -169,18 +170,29 @@ public class DnsOverTlsClient {
      * The response passed to the consumer carries the original query's ID.
      * The consumer is called exactly once: with the upstream response, or with SERVFAIL if none could be obtained.
      * The consumer owns the response it receives and must release it (writing it to a channel does that).
+     * Identical queries in flight at the same time are sent upstream once and share the answer.
      */
     public void query(DnsQuery query, Consumer<DefaultDnsResponse> dnsResponseConsumer) {
         DnsQuestion qQuestion = query.recordAt(DnsSection.QUESTION, 0);
         if (cache != null) {
-            AnswerCache answerCache = cache;
-            DefaultDnsResponse response = answerCache.getResponseIfPresent(query);
+            DefaultDnsResponse response = cache.getResponseIfPresent(query);
             if (response != null) {
                 LOGGER.info("{} | Cache hit!", query.id());
                 dnsResponseConsumer.accept(response);
                 return;
             }
+        }
+
+        Consumer<DefaultDnsResponse> leaderConsumer = inFlight.join(query, dnsResponseConsumer);
+        if (leaderConsumer == null) {
+            return;
+        }
+        dnsResponseConsumer = leaderConsumer;
+
+        if (cache != null) {
+            // Cached before the flight ends, so later identical queries find it rather than going upstream.
             // The key is taken now: the query may be released before the answer arrives
+            AnswerCache answerCache = cache;
             AnswerCache.Key key = AnswerCache.Key.of(query);
             Consumer<DefaultDnsResponse> consumer = dnsResponseConsumer;
             dnsResponseConsumer = upstreamResponse -> {
@@ -323,6 +335,10 @@ public class DnsOverTlsClient {
 
     public SslContext getSslCtx() {
         return sslCtx;
+    }
+
+    InFlightQueries inFlight() {
+        return inFlight;
     }
 
     UpstreamQueryRegistry pendingQueries() {

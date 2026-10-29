@@ -169,4 +169,51 @@ public class DnsOverTlsClientFailureTest {
         assertTrue(answerMillis < DnsOverTlsClient.QUERY_ATTEMPT_TIMEOUT_MILLIS, answerMillis + "ms");
         assertEquals(0, client.pendingQueries().inFlightCount());
     }
+
+    /** Sends {@code count} identical queries (in varying case) at once; returns them by ID. */
+    java.util.Map<Integer, CompletableFuture<Answer>> burst(DnsOverTlsClient client, int count) {
+        java.util.Map<Integer, CompletableFuture<Answer>> answers = new java.util.concurrent.ConcurrentHashMap<>();
+        for (int id = 1; id <= count; id++) {
+            DefaultDnsQuery query = new DefaultDnsQuery(id);
+            query.addRecord(DnsSection.QUESTION, new DefaultDnsQuestion(
+                    id % 2 == 0 ? "EXAMPLE.org." : "example.org.", DnsRecordType.A));
+            CompletableFuture<Answer> answer = new CompletableFuture<>();
+            answers.put(id, answer);
+            client.query(query, response -> {
+                answer.complete(new Answer(response.id(),
+                        response.<DnsQuestion>recordAt(DnsSection.QUESTION).name(), response.code()));
+                response.release();
+            });
+            query.release();
+        }
+        return answers;
+    }
+
+    @Test
+    void identicalQueriesInFlightAreSentOnce() throws Exception {
+        // The first attempt is ignored, so all queries arrive while it's in flight
+        queriesToIgnore = 1;
+        java.util.Map<Integer, CompletableFuture<Answer>> answers = burst(client(startUpstream()), 20);
+        for (var entry : answers.entrySet()) {
+            Answer answer = entry.getValue().get(10, TimeUnit.SECONDS);
+            assertEquals(entry.getKey(), answer.id());
+            assertEquals(DnsResponseCode.NOERROR, answer.code());
+            assertEquals(entry.getKey() % 2 == 0 ? "EXAMPLE.org." : "example.org.", answer.questionName());
+        }
+        assertEquals(2, queriesReceived.get(), "one query and its retry");
+        assertEquals(0, client.inFlight().size());
+    }
+
+    @Test
+    void identicalQueriesShareServFail() throws Exception {
+        queriesToIgnore = -1;
+        java.util.Map<Integer, CompletableFuture<Answer>> answers = burst(client(startUpstream()), 5);
+        for (var entry : answers.entrySet()) {
+            Answer answer = entry.getValue().get(10, TimeUnit.SECONDS);
+            assertEquals(entry.getKey(), answer.id());
+            assertEquals(DnsResponseCode.SERVFAIL, answer.code());
+        }
+        assertEquals(DnsOverTlsClient.MAX_QUERY_RETRY_COUNT + 1, queriesReceived.get());
+        assertEquals(0, client.inFlight().size());
+    }
 }

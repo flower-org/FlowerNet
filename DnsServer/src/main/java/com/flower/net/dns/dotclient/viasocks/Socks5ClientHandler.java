@@ -31,8 +31,9 @@ import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
 import io.netty.handler.codec.socksx.v5.Socks5CommandType;
 import io.netty.handler.codec.socksx.v5.Socks5InitialResponse;
 import io.netty.handler.codec.socksx.v5.Socks5InitialResponseDecoder;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
+import io.netty.util.concurrent.Promise;
+
+import java.io.IOException;
 
 /**
  * Handles a client-side channel.
@@ -42,14 +43,19 @@ public final class Socks5ClientHandler extends SimpleChannelInboundHandler<Socks
     private final String dstAddr;
     private final int dstPort;
     final DnsOverTlsClient dnsClient;
-    final GenericFutureListener<Future<? super Channel>> sslHandshakeListener;
+    /** Succeeds once the TLS handshake through the tunnel completes; failed with the reason if the tunnel fails. */
+    final Promise<Channel> tunnelReady;
 
-    public Socks5ClientHandler(String dstAddr, int dstPort, DnsOverTlsClient dnsClient,
-                               GenericFutureListener<Future<? super Channel>> sslHandshakeListener) {
+    public Socks5ClientHandler(String dstAddr, int dstPort, DnsOverTlsClient dnsClient, Promise<Channel> tunnelReady) {
         this.dstAddr = dstAddr;
         this.dstPort = dstPort;
         this.dnsClient = dnsClient;
-        this.sslHandshakeListener = sslHandshakeListener;
+        this.tunnelReady = tunnelReady;
+    }
+
+    private void fail(ChannelHandlerContext ctx, String reason) {
+        tunnelReady.tryFailure(new IOException("SOCKS5 tunnel to " + dstAddr + ":" + dstPort + " failed: " + reason));
+        ctx.close();
     }
 
     @Override
@@ -63,18 +69,18 @@ public final class Socks5ClientHandler extends SimpleChannelInboundHandler<Socks
                 } else if (socksResponse instanceof Socks5CommandResponse) {
                     final Socks5CommandResponse socks5CmdResponse = (Socks5CommandResponse)socksResponse;
                     if (socks5CmdResponse.status() == Socks5CommandStatus.SUCCESS) {
-                        ctx.pipeline().addLast(new Socks5ClientConnectHandler(dnsClient, sslHandshakeListener));
+                        ctx.pipeline().addLast(new Socks5ClientConnectHandler(dnsClient, tunnelReady));
                         ctx.pipeline().remove(this);
                         ctx.fireChannelRead(socksResponse);
                     } else {
-                        ctx.close();
+                        fail(ctx, "CONNECT rejected with status " + socks5CmdResponse.status());
                     }
                 } else {
-                    ctx.close();
+                    fail(ctx, "unexpected response " + socksResponse);
                 }
                 break;
             case UNKNOWN:
-                Preconditions.checkNotNull(ctx).close();
+                fail(Preconditions.checkNotNull(ctx), "unknown SOCKS version in response");
                 break;
         }
     }
@@ -86,7 +92,7 @@ public final class Socks5ClientHandler extends SimpleChannelInboundHandler<Socks
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable throwable) {
-        throwable.printStackTrace();
+        tunnelReady.tryFailure(throwable);
         ServerUtil.closeOnFlush(ctx.channel());
     }
 }

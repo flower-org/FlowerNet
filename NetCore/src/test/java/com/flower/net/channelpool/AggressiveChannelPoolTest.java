@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -74,16 +75,29 @@ public class AggressiveChannelPoolTest {
     /** Pool whose connections stay pending until the test completes their setup. */
     static class ManualSetupPool extends AggressiveChannelPool {
         final List<Promise<Void>> setups = new CopyOnWriteArrayList<>();
+        final List<Channel> setupChannels = new CopyOnWriteArrayList<>();
+        final long setupTimeoutMillis;
 
         ManualSetupPool(Bootstrap bootstrap, int port, int maxChannels) {
+            this(bootstrap, port, maxChannels, DEFAULT_CONNECTION_SETUP_TIMEOUT_MILLIS);
+        }
+
+        ManualSetupPool(Bootstrap bootstrap, int port, int maxChannels, long setupTimeoutMillis) {
             super(bootstrap, InetAddress.getLoopbackAddress(), port, maxChannels, null);
+            this.setupTimeoutMillis = setupTimeoutMillis;
         }
 
         @Override
         protected Future<?> onConnected(Channel channel) {
             Promise<Void> setup = channel.eventLoop().newPromise();
+            setupChannels.add(channel);
             setups.add(setup);
             return setup;
+        }
+
+        @Override
+        protected long connectionSetupTimeoutMillis() {
+            return setupTimeoutMillis;
         }
     }
 
@@ -210,6 +224,37 @@ public class AggressiveChannelPoolTest {
         assertTrue(second.await(5, TimeUnit.SECONDS));
         assertTrue(second.isSuccess());
         assertTrue(second.getNow().value().isActive());
+    }
+
+    @Test
+    void channelClosedDuringSetupFreesSlot() throws Exception {
+        ManualSetupPool pool = new ManualSetupPool(bootstrap, server.getLocalPort(), 1);
+        Future<EvictLinkedNode<Channel>> first = pool.getChannel();
+        waitFor(() -> pool.setups.size() == 1);
+        // Setup never completes, e.g. a proxy handler that closes the channel without failing its future
+        pool.setupChannels.get(0).close();
+        assertTrue(first.await(5, TimeUnit.SECONDS));
+        assertInstanceOf(IOException.class, first.cause());
+
+        Future<EvictLinkedNode<Channel>> second = pool.getChannel();
+        assertTrue(second != first);
+        waitFor(() -> pool.setups.size() == 2);
+    }
+
+    @Test
+    void setupTimeoutClosesChannelAndFreesSlot() throws Exception {
+        ManualSetupPool pool = new ManualSetupPool(bootstrap, server.getLocalPort(), 1, 100);
+        Future<EvictLinkedNode<Channel>> first = pool.getChannel();
+        assertTrue(first.await(5, TimeUnit.SECONDS));
+        assertInstanceOf(TimeoutException.class, first.cause());
+        assertTrue(pool.setupChannels.get(0).closeFuture().await(5, TimeUnit.SECONDS));
+
+        Future<EvictLinkedNode<Channel>> second = pool.getChannel();
+        assertTrue(second != first);
+        waitFor(() -> pool.setups.size() == 2);
+        pool.setups.get(1).setSuccess(null);
+        assertTrue(second.await(5, TimeUnit.SECONDS));
+        assertTrue(second.isSuccess());
     }
 
     @Test

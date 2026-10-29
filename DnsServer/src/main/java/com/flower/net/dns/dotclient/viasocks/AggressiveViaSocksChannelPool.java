@@ -6,7 +6,8 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.socksx.v5.*;
-import io.netty.util.concurrent.*;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.Promise;
 
 import javax.annotation.Nullable;
 import java.net.InetAddress;
@@ -36,14 +37,7 @@ public class AggressiveViaSocksChannelPool extends AggressiveChannelPool {
     @Override
     protected Future<?> onConnected(Channel channel) {
         Promise<Channel> tunnelReady = channel.eventLoop().newPromise();
-        tunnelConnection(channel, dotServerHost, dotServerPort, dnsClient,
-            sslHandshakeFuture -> {
-                if (sslHandshakeFuture.isSuccess()) {
-                    tunnelReady.trySuccess(channel);
-                } else {
-                    tunnelReady.tryFailure(sslHandshakeFuture.cause());
-                }
-            });
+        tunnelConnection(channel, dotServerHost, dotServerPort, dnsClient, tunnelReady);
         return tunnelReady;
     }
 
@@ -51,11 +45,11 @@ public class AggressiveViaSocksChannelPool extends AggressiveChannelPool {
                           String dstAddr,
                           int dstPort,
                           DnsOverTlsClient dnsClient,
-                          GenericFutureListener<Future<? super Channel>> sslHandshakeListener) {
+                          Promise<Channel> tunnelReady) {
         ChannelPipeline pipeline = channel.pipeline();
         pipeline.addLast(new Socks5InitialResponseDecoder());
         pipeline.addLast(Socks5ClientEncoder.DEFAULT);
-        pipeline.addLast(new Socks5ClientHandler(dstAddr, dstPort, dnsClient, sslHandshakeListener));
+        pipeline.addLast(new Socks5ClientHandler(dstAddr, dstPort, dnsClient, tunnelReady));
 
         channel.writeAndFlush(new DefaultSocks5InitialRequest(Socks5AuthMethod.NO_AUTH));
     }

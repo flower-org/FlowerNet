@@ -25,18 +25,18 @@ import io.netty.handler.codec.socksx.v5.Socks5CommandResponseDecoder;
 import io.netty.handler.codec.socksx.v5.Socks5CommandStatus;
 import io.netty.handler.codec.socksx.v5.Socks5InitialResponseDecoder;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
+import io.netty.util.concurrent.Promise;
+
+import java.io.IOException;
 
 @ChannelHandler.Sharable
 public final class Socks5ClientConnectHandler extends SimpleChannelInboundHandler<SocksMessage> {
     final DnsOverTlsClient dnsClient;
-    final GenericFutureListener<Future<? super Channel>> sslHandshakeListener;
+    final Promise<Channel> tunnelReady;
 
-    public Socks5ClientConnectHandler(DnsOverTlsClient dnsClient,
-                                      GenericFutureListener<Future<? super Channel>> sslHandshakeListener) {
+    public Socks5ClientConnectHandler(DnsOverTlsClient dnsClient, Promise<Channel> tunnelReady) {
         this.dnsClient = dnsClient;
-        this.sslHandshakeListener = sslHandshakeListener;
+        this.tunnelReady = tunnelReady;
     }
 
     @Override
@@ -57,20 +57,29 @@ public final class Socks5ClientConnectHandler extends SimpleChannelInboundHandle
 //                ctx.pipeline().addLast(new SecureChatClientHandler());
 
                 SslHandler sslHandler = dnsClient.getSslCtx().newHandler(ctx.channel().alloc());
-                sslHandler.handshakeFuture().addListener(sslHandshakeListener);
+                sslHandler.handshakeFuture().addListener(handshake -> {
+                    if (handshake.isSuccess()) {
+                        tunnelReady.trySuccess(ctx.channel());
+                    } else {
+                        tunnelReady.tryFailure(handshake.cause());
+                    }
+                });
 
                 ctx.pipeline().addLast(sslHandler);
                 dnsClient.addDnsHandlers(ctx.pipeline());
             } else {
+                tunnelReady.tryFailure(new IOException("SOCKS5 CONNECT rejected with status " + response.status()));
                 ctx.close();
             }
         } else {
+            tunnelReady.tryFailure(new IOException("Unexpected SOCKS message " + message));
             ctx.close();
         }
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        tunnelReady.tryFailure(cause);
         ServerUtil.closeOnFlush(ctx.channel());
     }
 }

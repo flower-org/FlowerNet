@@ -11,12 +11,16 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
+import io.netty.util.concurrent.ScheduledFuture;
 
 import javax.annotation.Nullable;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Aggressively creates as many channels as it can until reaches `maxChannels`.
@@ -25,6 +29,8 @@ import java.util.List;
  * instead of busy-waiting.
  */
 public class AggressiveChannelPool implements ChannelPool {
+    public static final long DEFAULT_CONNECTION_SETUP_TIMEOUT_MILLIS = 10_000;
+
     protected final int maxChannels;
     protected final EvictLinkedList<Channel> channels;
     protected final EvictListElementPicker<Channel> picker;
@@ -117,20 +123,50 @@ public class AggressiveChannelPool implements ChannelPool {
                 failConnection(connectionPromise, e);
                 return;
             }
-            ready.addListener(readyFuture -> {
-                if (readyFuture.isSuccess()) {
+            awaitSetup(channel, ready).addListener(setupFuture -> {
+                if (setupFuture.isSuccess()) {
                     completeConnection(connectionPromise, channel);
                 } else {
                     channel.close();
-                    failConnection(connectionPromise, readyFuture.cause());
+                    failConnection(connectionPromise, setupFuture.cause());
                 }
             });
         });
     }
 
     /**
+     * Completes when `ready` does, but fails early if the channel closes or setup takes too long,
+     * so that a setup that never completes can't hold a pending slot forever.
+     */
+    private Future<Void> awaitSetup(Channel channel, Future<?> ready) {
+        Promise<Void> setup = channel.eventLoop().newPromise();
+        ready.addListener(readyFuture -> {
+            if (readyFuture.isSuccess()) {
+                setup.trySuccess(null);
+            } else {
+                setup.tryFailure(readyFuture.cause());
+            }
+        });
+        channel.closeFuture().addListener(closed -> setup.tryFailure(
+                new IOException("Channel to " + connectAddress + ":" + connectPort + " closed during connection setup")));
+        long timeoutMillis = connectionSetupTimeoutMillis();
+        ScheduledFuture<?> timeout = channel.eventLoop().schedule(() -> {
+                setup.tryFailure(new TimeoutException("Connection setup to " + connectAddress + ":" + connectPort
+                        + " timed out after " + timeoutMillis + "ms"));
+            }, timeoutMillis, TimeUnit.MILLISECONDS);
+        setup.addListener(done -> timeout.cancel(false));
+        return setup;
+    }
+
+    /** Max time between TCP connect and the future returned by {@link #onConnected} completing. */
+    protected long connectionSetupTimeoutMillis() {
+        return DEFAULT_CONNECTION_SETUP_TIMEOUT_MILLIS;
+    }
+
+    /**
      * Called once the TCP connection is established. Subclasses can perform additional setup, e.g. a proxy handshake;
-     * the channel is added to the pool when the returned future succeeds, and closed if it fails.
+     * the channel is added to the pool when the returned future succeeds, and closed if it fails, if the channel
+     * closes first, or if it doesn't complete within {@link #connectionSetupTimeoutMillis()}.
      */
     protected Future<?> onConnected(Channel channel) {
         return channel.newSucceededFuture();

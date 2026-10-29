@@ -11,7 +11,8 @@ import io.netty.handler.codec.dns.DefaultDnsQuestion;
 import io.netty.handler.codec.dns.DefaultDnsRawRecord;
 import io.netty.handler.codec.dns.DefaultDnsResponse;
 import io.netty.channel.socket.DatagramPacket;
-import io.netty.handler.codec.dns.DatagramDnsResponseEncoder;
+import io.netty.handler.codec.dns.DatagramDnsResponseDecoder;
+import io.netty.handler.codec.dns.DnsRecord;
 import io.netty.handler.codec.dns.DnsOpCode;
 import io.netty.handler.codec.dns.DnsQuery;
 import io.netty.handler.codec.dns.DnsResponseCode;
@@ -46,11 +47,17 @@ public class DnsMessageHandlerTest {
         final boolean deferred;
         final List<Runnable> pending = new ArrayList<>();
         final List<ByteBuf> buffers = new ArrayList<>();
+        final int answers;
         int queries;
 
         FakeClient(boolean deferred) throws Exception {
+            this(deferred, 1);
+        }
+
+        FakeClient(boolean deferred, int answers) throws Exception {
             super("1.1.1.1", 853, InsecureTrustManagerFactory.INSTANCE, false, null);
             this.deferred = deferred;
+            this.answers = answers;
         }
 
         @Override
@@ -58,8 +65,6 @@ public class DnsMessageHandlerTest {
             queries++;
             int id = query.id();
             Runnable answer = () -> {
-                ByteBuf content = PooledByteBufAllocator.DEFAULT.directBuffer().writeBytes(ADDRESS);
-                buffers.add(content);
                 DefaultDnsResponse response = new DefaultDnsResponse(id, DnsOpCode.QUERY, DnsResponseCode.NXDOMAIN);
                 response.setAuthoritativeAnswer(true)
                         .setTruncated(true)
@@ -67,8 +72,12 @@ public class DnsMessageHandlerTest {
                         .setRecursionAvailable(true)
                         .setZ(AD_AND_CD);
                 response.addRecord(DnsSection.QUESTION, QUESTION);
-                response.addRecord(DnsSection.ANSWER,
-                        new DefaultDnsRawRecord(QUESTION.name(), DnsRecordType.A, 60, content));
+                for (int i = 0; i < answers; i++) {
+                    ByteBuf content = PooledByteBufAllocator.DEFAULT.directBuffer().writeBytes(ADDRESS);
+                    buffers.add(content);
+                    response.addRecord(DnsSection.ANSWER,
+                            new DefaultDnsRawRecord(QUESTION.name(), DnsRecordType.A, 60, content));
+                }
                 consumer.accept(response);
             };
             if (deferred) {
@@ -94,23 +103,33 @@ public class DnsMessageHandlerTest {
         client.shutdown();
     }
 
+    /** Decodes the next outbound packet, checking it's addressed back to the client. */
+    static DatagramDnsResponse readReply(EmbeddedChannel channel) {
+        DatagramPacket packet = channel.readOutbound();
+        assertEquals(SERVER, packet.sender());
+        assertEquals(CLIENT, packet.recipient());
+        EmbeddedChannel decoder = new EmbeddedChannel(new DatagramDnsResponseDecoder());
+        decoder.writeInbound(new DatagramPacket(packet.content(), SERVER, CLIENT));
+        return decoder.readInbound();
+    }
+
     void check(EmbeddedChannel channel) {
-        DatagramDnsResponse response = channel.readOutbound();
-        assertEquals(1234, response.id());
-        assertEquals(DnsOpCode.QUERY, response.opCode());
-        assertEquals(DnsResponseCode.NXDOMAIN, response.code());
-        assertTrue(response.isAuthoritativeAnswer());
-        assertTrue(response.isTruncated());
-        assertTrue(response.isRecursionDesired());
-        assertTrue(response.isRecursionAvailable());
-        assertEquals(AD_AND_CD, response.z());
-        assertEquals(SERVER, response.sender());
-        assertEquals(CLIENT, response.recipient());
-        assertEquals(QUESTION.name(), response.recordAt(DnsSection.QUESTION, 0).name());
-        assertArrayEquals(ADDRESS,
-                ByteBufUtil.getBytes(response.<DnsRawRecord>recordAt(DnsSection.ANSWER, 0).content()));
-        // Stands in for the encoder, which releases what it writes
-        response.release();
+        DatagramDnsResponse response = readReply(channel);
+        try {
+            assertEquals(1234, response.id());
+            assertEquals(DnsOpCode.QUERY, response.opCode());
+            assertEquals(DnsResponseCode.NXDOMAIN, response.code());
+            assertTrue(response.isAuthoritativeAnswer());
+            assertTrue(response.isTruncated());
+            assertTrue(response.isRecursionDesired());
+            assertTrue(response.isRecursionAvailable());
+            assertEquals(AD_AND_CD, response.z());
+            assertEquals(QUESTION.name(), response.recordAt(DnsSection.QUESTION, 0).name());
+            assertArrayEquals(ADDRESS,
+                    ByteBufUtil.getBytes(response.<DnsRawRecord>recordAt(DnsSection.ANSWER, 0).content()));
+        } finally {
+            response.release();
+        }
         assertNull(channel.readOutbound());
     }
 
@@ -121,7 +140,7 @@ public class DnsMessageHandlerTest {
     @Test
     void headerFlagsReachTheWire() throws Exception {
         client = new FakeClient(false);
-        EmbeddedChannel channel = new EmbeddedChannel(new DatagramDnsResponseEncoder(), new DnsMessageHandler(client));
+        EmbeddedChannel channel = new EmbeddedChannel(new DnsMessageHandler(client));
         channel.writeInbound(query());
         DatagramPacket packet = channel.readOutbound();
         try {
@@ -139,14 +158,13 @@ public class DnsMessageHandlerTest {
         client = new FakeClient(false);
         EmbeddedChannel channel = new EmbeddedChannel(new DnsMessageHandler(client));
         channel.writeInbound(query);
-        DatagramDnsResponse response = channel.readOutbound();
+        DatagramDnsResponse response = readReply(channel);
         assertEquals(0, client.queries, "must not be forwarded");
         assertEquals(1234, response.id());
         assertEquals(expectedCode, response.code());
         assertEquals(query.opCode(), response.opCode());
         assertTrue(response.isRecursionDesired());
         assertTrue(response.isRecursionAvailable());
-        assertEquals(CLIENT, response.recipient());
         assertEquals(0, response.count(DnsSection.ANSWER));
         response.release();
         return response;
@@ -196,5 +214,47 @@ public class DnsMessageHandlerTest {
         assertEquals(0, query.refCnt());
         client.answerPending();
         check(channel);
+    }
+
+    DatagramDnsQuery bigQuery(int ednsPayloadSize) {
+        DatagramDnsQuery query = query();
+        if (ednsPayloadSize > 0) {
+            query.addRecord(DnsSection.ADDITIONAL, new DefaultDnsRawRecord("", DnsRecordType.OPT, ednsPayloadSize, 0,
+                    io.netty.buffer.Unpooled.EMPTY_BUFFER));
+        }
+        return query;
+    }
+
+    @Test
+    void answerTooLargeForUdpIsTruncated() throws Exception {
+        // Each answer is 16 bytes compressed: 40 of them don't fit in 512 bytes
+        client = new FakeClient(false, 40);
+        EmbeddedChannel channel = new EmbeddedChannel(new DnsMessageHandler(client));
+        channel.writeInbound(bigQuery(0));
+        DatagramDnsResponse response = readReply(channel);
+        try {
+            assertTrue(response.isTruncated());
+            assertEquals(1, response.count(DnsSection.QUESTION));
+            assertEquals(0, response.count(DnsSection.ANSWER));
+            assertEquals(0, response.count(DnsSection.ADDITIONAL), "no OPT for a non-EDNS client");
+        } finally {
+            response.release();
+        }
+    }
+
+    @Test
+    void ednsClientGetsLargerUdpAnswers() throws Exception {
+        client = new FakeClient(false, 40);
+        EmbeddedChannel channel = new EmbeddedChannel(new DnsMessageHandler(client));
+        channel.writeInbound(bigQuery(4096));
+        DatagramDnsResponse response = readReply(channel);
+        try {
+            assertEquals(40, response.count(DnsSection.ANSWER));
+            DnsRecord opt = response.recordAt(DnsSection.ADDITIONAL, 0);
+            assertEquals(DnsRecordType.OPT, opt.type());
+            assertEquals(DnsWireEncoder.EDNS_UDP_PAYLOAD_SIZE, opt.dnsClass());
+        } finally {
+            response.release();
+        }
     }
 }

@@ -5,7 +5,6 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.handler.codec.dns.DatagramDnsQuery;
-import io.netty.handler.codec.dns.DatagramDnsResponseEncoder;
 import io.netty.handler.codec.dns.DnsSection;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +17,7 @@ public class LenientDnsQueryDecoderTest {
     static final InetSocketAddress SERVER = new InetSocketAddress("127.0.0.1", 53);
     static final InetSocketAddress CLIENT = new InetSocketAddress("127.0.0.1", 40000);
 
-    final EmbeddedChannel channel = new EmbeddedChannel(new DatagramDnsResponseEncoder(), new LenientDnsQueryDecoder());
+    final EmbeddedChannel channel = new EmbeddedChannel(new LenientDnsQueryDecoder());
 
     void receive(int... bytes) {
         ByteBuf buf = Unpooled.buffer();
@@ -47,6 +46,7 @@ public class LenientDnsQueryDecoderTest {
         DatagramPacket reply = channel.readOutbound();
         ByteBuf wire = reply.content();
         assertEquals(CLIENT, reply.recipient());
+        assertEquals(SERVER, reply.sender());
         assertEquals(0x1234, wire.getUnsignedShort(0));
         // QR=1 OPCODE=0 AA=0 TC=0 RD=1 | RA=1 Z=0 RCODE=1 (FORMERR)
         assertEquals(0b1000_0001, wire.getUnsignedByte(2));

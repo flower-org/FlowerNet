@@ -8,7 +8,9 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioDatagramChannel;
-import io.netty.handler.codec.dns.DatagramDnsResponseEncoder;
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,16 +70,28 @@ public class DnsServer {
                         @Override
                         protected void initChannel(NioDatagramChannel nioDatagramChannel) {
                             nioDatagramChannel.pipeline().addLast(new LenientDnsQueryDecoder());
-                            nioDatagramChannel.pipeline().addLast(new DatagramDnsResponseEncoder());
                             nioDatagramChannel.pipeline().addLast(new DnsMessageHandler(client));
                         }
                     })
                     .option(ChannelOption.SO_BROADCAST, true);
 
+            // Clients retry over TCP when a UDP reply is truncated (RFC 7766)
+            ServerBootstrap tcpBootstrap = new ServerBootstrap();
+            tcpBootstrap.group(group)
+                    .channel(NioServerSocketChannel.class)
+                    .childHandler(new ChannelInitializer<SocketChannel>() {
+                        @Override
+                        protected void initChannel(SocketChannel socketChannel) {
+                            DnsTcpMessageHandler.addHandlers(socketChannel.pipeline(), client);
+                        }
+                    });
+
             ChannelFuture future = bootstrap.bind(port).sync();
-            LOGGER.info("DNS Server Started at port {}", port);
+            ChannelFuture tcpFuture = tcpBootstrap.bind(port).sync();
+            LOGGER.info("DNS Server Started at port {} (UDP and TCP)", port);
 
             future.channel().closeFuture().sync();
+            tcpFuture.channel().close().sync();
         } finally {
             group.shutdownGracefully();
         }

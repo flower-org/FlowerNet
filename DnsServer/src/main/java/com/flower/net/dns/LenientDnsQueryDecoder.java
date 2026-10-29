@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.handler.codec.dns.DatagramDnsQueryDecoder;
+import io.netty.handler.codec.dns.DefaultDnsResponse;
 import io.netty.handler.codec.dns.DnsOpCode;
 import io.netty.handler.codec.dns.DnsResponseCode;
 import org.slf4j.Logger;
@@ -37,9 +38,13 @@ public class LenientDnsQueryDecoder extends DatagramDnsQueryDecoder {
                 return;
             }
             LOGGER.info("{} | Malformed query from {}: {}", id, packet.sender(), e.toString());
-            // Write from the channel, not ctx: the response encoder sits after this handler in the pipeline
-            ctx.channel().writeAndFlush(DnsMessageHandler.errorReply(packet.recipient(), packet.sender(), id,
-                    DnsOpCode.valueOf((flags >> 11) & 0xF), (flags & 0x0100) != 0, DnsResponseCode.FORMERR));
+            DefaultDnsResponse reply = AbstractDnsQueryHandler.errorReply(id, DnsOpCode.valueOf((flags >> 11) & 0xF),
+                    (flags & 0x0100) != 0, DnsResponseCode.FORMERR);
+            try {
+                DnsMessageHandler.sendUdp(ctx, reply, null, packet.recipient(), packet.sender());
+            } finally {
+                reply.release();
+            }
         }
     }
 }

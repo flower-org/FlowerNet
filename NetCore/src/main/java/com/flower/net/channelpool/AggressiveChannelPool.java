@@ -9,22 +9,23 @@ import com.flower.net.utils.evictlist.MutableEvictNode;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.util.concurrent.DefaultPromise;
+import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 
 import javax.annotation.Nullable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Aggressively creates as many channels as it can until reaches `maxChannels`.
  * Never close the channels, evicting when they are closed by the peer.
+ * When all `maxChannels` slots are taken by connections still being established, callers wait for one of them
+ * instead of busy-waiting.
  */
 public class AggressiveChannelPool implements ChannelPool {
     protected final int maxChannels;
-    protected final AtomicInteger promiseCount = new AtomicInteger();
     protected final EvictLinkedList<Channel> channels;
     protected final EvictListElementPicker<Channel> picker;
 
@@ -32,6 +33,11 @@ public class AggressiveChannelPool implements ChannelPool {
     protected final InetAddress connectAddress;
     protected final int connectPort;
     @Nullable protected final String bindClientToIp;
+
+    /** Guards slot accounting: non-evicted channels + pending connections must not exceed maxChannels. */
+    private final Object slotLock = new Object();
+    private final List<Promise<EvictLinkedNode<Channel>>> pendingConnections = new ArrayList<>();
+    private int nextPendingConnection;
 
     public AggressiveChannelPool(Bootstrap bootstrap, InetAddress connectAddress, int connectPort, int maxChannels, @Nullable String bindClientToIp) {
         this.maxChannels = maxChannels;
@@ -60,61 +66,91 @@ public class AggressiveChannelPool implements ChannelPool {
 
     @Override
     public Promise<EvictLinkedNode<Channel>> getChannel() {
-        while (true) {
-            if (giveChannelPromise()) {
-                // 1. Aggressive approach - if we can create more channels, create more
-                Promise<EvictLinkedNode<Channel>> channelPromise = new DefaultPromise<>(bootstrap.config().group().next());
-                ChannelFuture connectFuture;
-                if (bindClientToIp == null) {
-                    connectFuture = bootstrap.connect(connectAddress, connectPort);
-                } else {
-                    connectFuture = bootstrap.connect(new InetSocketAddress(connectAddress, connectPort),
-                            new InetSocketAddress(bindClientToIp, 0));
-                }
-                connectFuture.addListener(
-                    (ChannelFutureListener) channelFuture -> {
-                        if (channelFuture.isSuccess()) {
-                            channelPromise.setSuccess(addChannel(channelFuture.channel()));
-                        } else {
-                            failOnChannelPromise();
-                            channelPromise.setFailure(channelPromise.cause() == null ?
-                                    new Exception("Unknown Exception " + channelFuture) : channelPromise.cause());
-                        }
-                    }
-                );
-                return channelPromise;
-            } else {
-                // 2. If max channels was reached, reuse
+        Promise<EvictLinkedNode<Channel>> newConnection;
+        synchronized (slotLock) {
+            if (channels.nonEvictedCount() + pendingConnections.size() >= maxChannels) {
+                // 1. Max channels reached - reuse an established channel
                 EvictLinkedNode<Channel> nonEvictedNode = picker.getNonEvictedNode();
                 if (nonEvictedNode != null) {
-                    Promise<EvictLinkedNode<Channel>> channelPromise = new DefaultPromise<>(bootstrap.config().group().next());
+                    Promise<EvictLinkedNode<Channel>> channelPromise = newPromise();
                     channelPromise.setSuccess(nonEvictedNode);
                     return channelPromise;
                 }
-            }
-        }
-    }
-
-    protected boolean giveChannelPromise() {
-        while (true) {
-            int currentPromises = promiseCount.get();
-            if (channels.nonEvictedCount() + promiseCount.get() < maxChannels) {
-                if (promiseCount.compareAndSet(currentPromises, currentPromises + 1)) {
-                    return true;
+                // 2. All slots are connections still being established - wait for one of them
+                if (!pendingConnections.isEmpty()) {
+                    nextPendingConnection = (nextPendingConnection + 1) % pendingConnections.size();
+                    return pendingConnections.get(nextPendingConnection);
                 }
-            } else {
-                return false;
+                // Channels became inactive since they were counted, so slots are free
             }
+            // 3. Aggressive approach - if we can create more channels, create more
+            newConnection = newPromise();
+            pendingConnections.add(newConnection);
         }
+        connect(newConnection);
+        return newConnection;
     }
 
-    protected void failOnChannelPromise() {
-        promiseCount.decrementAndGet();
+    protected Promise<EvictLinkedNode<Channel>> newPromise() {
+        return bootstrap.config().group().next().newPromise();
     }
 
-    protected EvictLinkedNode<Channel> addChannel(Channel channel) {
-        promiseCount.decrementAndGet();
-        return channels.addElement(channel);
+    protected void connect(Promise<EvictLinkedNode<Channel>> connectionPromise) {
+        ChannelFuture connectFuture;
+        if (bindClientToIp == null) {
+            connectFuture = bootstrap.connect(connectAddress, connectPort);
+        } else {
+            connectFuture = bootstrap.connect(new InetSocketAddress(connectAddress, connectPort),
+                    new InetSocketAddress(bindClientToIp, 0));
+        }
+        connectFuture.addListener(connected -> {
+            if (!connected.isSuccess()) {
+                failConnection(connectionPromise, connected.cause());
+                return;
+            }
+            Channel channel = connectFuture.channel();
+            Future<?> ready;
+            try {
+                ready = onConnected(channel);
+            } catch (Exception e) {
+                channel.close();
+                failConnection(connectionPromise, e);
+                return;
+            }
+            ready.addListener(readyFuture -> {
+                if (readyFuture.isSuccess()) {
+                    completeConnection(connectionPromise, channel);
+                } else {
+                    channel.close();
+                    failConnection(connectionPromise, readyFuture.cause());
+                }
+            });
+        });
+    }
+
+    /**
+     * Called once the TCP connection is established. Subclasses can perform additional setup, e.g. a proxy handshake;
+     * the channel is added to the pool when the returned future succeeds, and closed if it fails.
+     */
+    protected Future<?> onConnected(Channel channel) {
+        return channel.newSucceededFuture();
+    }
+
+    private void completeConnection(Promise<EvictLinkedNode<Channel>> connectionPromise, Channel channel) {
+        EvictLinkedNode<Channel> node;
+        synchronized (slotLock) {
+            // Add the channel before releasing the pending slot, so the slot count never dips below the actual count
+            node = channels.addElement(channel);
+            pendingConnections.remove(connectionPromise);
+        }
+        connectionPromise.setSuccess(node);
+    }
+
+    private void failConnection(Promise<EvictLinkedNode<Channel>> connectionPromise, @Nullable Throwable cause) {
+        synchronized (slotLock) {
+            pendingConnections.remove(connectionPromise);
+        }
+        connectionPromise.setFailure(cause != null ? cause : new Exception("Connection to " + connectAddress + ":" + connectPort + " failed"));
     }
 
     @Override

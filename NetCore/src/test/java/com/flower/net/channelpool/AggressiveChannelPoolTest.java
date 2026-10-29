@@ -1,0 +1,230 @@
+package com.flower.net.channelpool;
+
+import com.flower.net.utils.evictlist.EvictLinkedNode;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.Promise;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+import java.io.IOException;
+import java.net.ConnectException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@Timeout(20)
+public class AggressiveChannelPoolTest {
+    NioEventLoopGroup group;
+    Bootstrap bootstrap;
+    ServerSocket server;
+    final List<Socket> accepted = new CopyOnWriteArrayList<>();
+
+    @BeforeEach
+    void setUp() throws IOException {
+        group = new NioEventLoopGroup(2);
+        bootstrap = new Bootstrap().group(group).channel(NioSocketChannel.class)
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(Channel ch) {
+                    }
+                });
+        server = new ServerSocket(0, 100, InetAddress.getLoopbackAddress());
+        Thread acceptor = new Thread(() -> {
+            try {
+                while (true) {
+                    accepted.add(server.accept());
+                }
+            } catch (IOException e) {
+                // server closed
+            }
+        });
+        acceptor.setDaemon(true);
+        acceptor.start();
+    }
+
+    @AfterEach
+    void tearDown() throws IOException {
+        server.close();
+        for (Socket socket : accepted) {
+            socket.close();
+        }
+        group.shutdownGracefully(0, 0, TimeUnit.MILLISECONDS);
+    }
+
+    /** Pool whose connections stay pending until the test completes their setup. */
+    static class ManualSetupPool extends AggressiveChannelPool {
+        final List<Promise<Void>> setups = new CopyOnWriteArrayList<>();
+
+        ManualSetupPool(Bootstrap bootstrap, int port, int maxChannels) {
+            super(bootstrap, InetAddress.getLoopbackAddress(), port, maxChannels, null);
+        }
+
+        @Override
+        protected Future<?> onConnected(Channel channel) {
+            Promise<Void> setup = channel.eventLoop().newPromise();
+            setups.add(setup);
+            return setup;
+        }
+    }
+
+    static void waitFor(java.util.function.BooleanSupplier condition) throws InterruptedException {
+        while (!condition.getAsBoolean()) {
+            Thread.sleep(5);
+        }
+    }
+
+    /** Accepts happen asynchronously: wait for the expected count, then make sure no extra connections show up. */
+    void assertAcceptedConnections(int expected) throws InterruptedException {
+        waitFor(() -> accepted.size() >= expected);
+        Thread.sleep(100);
+        assertEquals(expected, accepted.size());
+    }
+
+    @Test
+    void waitsForPendingConnectionsInsteadOfSpinning() throws Exception {
+        ManualSetupPool pool = new ManualSetupPool(bootstrap, server.getLocalPort(), 2);
+        Future<EvictLinkedNode<Channel>> first = pool.getChannel();
+        Future<EvictLinkedNode<Channel>> second = pool.getChannel();
+
+        // Both slots are pending: further calls return immediately, sharing the pending connections
+        List<Future<EvictLinkedNode<Channel>>> waiting = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            Future<EvictLinkedNode<Channel>> future = pool.getChannel();
+            assertTrue(future == first || future == second);
+            assertFalse(future.isDone());
+            waiting.add(future);
+        }
+
+        waitFor(() -> pool.setups.size() == 2);
+        for (Promise<Void> setup : pool.setups) {
+            setup.setSuccess(null);
+        }
+        for (Future<EvictLinkedNode<Channel>> future : waiting) {
+            assertTrue(future.await(5, TimeUnit.SECONDS));
+            assertTrue(future.isSuccess());
+        }
+        assertAcceptedConnections(2);
+
+        // Pool is full of established channels: they are reused
+        Set<Channel> reused = new HashSet<>();
+        for (int i = 0; i < 10; i++) {
+            Future<EvictLinkedNode<Channel>> future = pool.getChannel();
+            assertTrue(future.isSuccess());
+            reused.add(future.getNow().value());
+        }
+        assertEquals(Set.of(first.getNow().value(), second.getNow().value()), reused);
+        assertAcceptedConnections(2);
+    }
+
+    @Test
+    void neverExceedsMaxChannelsUnderConcurrency() throws Exception {
+        AggressiveChannelPool pool = new AggressiveChannelPool(
+                bootstrap, InetAddress.getLoopbackAddress(), server.getLocalPort(), 3, null);
+        int threads = 16;
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<EvictLinkedNode<Channel>>> futures = new CopyOnWriteArrayList<>();
+        List<Thread> workers = new ArrayList<>();
+        for (int t = 0; t < threads; t++) {
+            Thread worker = new Thread(() -> {
+                try {
+                    start.await();
+                    for (int i = 0; i < 200; i++) {
+                        futures.add(pool.getChannel());
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+            worker.start();
+            workers.add(worker);
+        }
+        start.countDown();
+        for (Thread worker : workers) {
+            worker.join();
+        }
+
+        Set<Channel> channels = new HashSet<>();
+        for (Future<EvictLinkedNode<Channel>> future : futures) {
+            assertTrue(future.await(5, TimeUnit.SECONDS));
+            assertTrue(future.isSuccess());
+            channels.add(future.getNow().value());
+        }
+        assertEquals(3, channels.size());
+        assertAcceptedConnections(3);
+    }
+
+    @Test
+    void failedConnectionReportsCauseAndFreesSlot() throws Exception {
+        int closedPort;
+        try (ServerSocket unused = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            closedPort = unused.getLocalPort();
+        }
+        AggressiveChannelPool pool = new AggressiveChannelPool(
+                bootstrap, InetAddress.getLoopbackAddress(), closedPort, 1, null);
+
+        Future<EvictLinkedNode<Channel>> first = pool.getChannel();
+        assertTrue(first.await(5, TimeUnit.SECONDS));
+        assertInstanceOf(ConnectException.class, first.cause());
+
+        // The slot was released, so a new attempt is made rather than reusing the failed one
+        Future<EvictLinkedNode<Channel>> second = pool.getChannel();
+        assertTrue(second != first);
+        assertTrue(second.await(5, TimeUnit.SECONDS));
+        assertFalse(second.isSuccess());
+    }
+
+    @Test
+    void failedSetupClosesChannelAndFreesSlot() throws Exception {
+        ManualSetupPool pool = new ManualSetupPool(bootstrap, server.getLocalPort(), 1);
+        Future<EvictLinkedNode<Channel>> first = pool.getChannel();
+        waitFor(() -> pool.setups.size() == 1);
+        RuntimeException cause = new RuntimeException("handshake failed");
+        pool.setups.get(0).setFailure(cause);
+        assertTrue(first.await(5, TimeUnit.SECONDS));
+        assertSame(cause, first.cause());
+
+        Future<EvictLinkedNode<Channel>> second = pool.getChannel();
+        assertTrue(second != first);
+        waitFor(() -> pool.setups.size() == 2);
+        pool.setups.get(1).setSuccess(null);
+        assertTrue(second.await(5, TimeUnit.SECONDS));
+        assertTrue(second.isSuccess());
+        assertTrue(second.getNow().value().isActive());
+    }
+
+    @Test
+    void closedChannelIsReplaced() throws Exception {
+        AggressiveChannelPool pool = new AggressiveChannelPool(
+                bootstrap, InetAddress.getLoopbackAddress(), server.getLocalPort(), 1, null);
+        Future<EvictLinkedNode<Channel>> first = pool.getChannel();
+        assertTrue(first.await(5, TimeUnit.SECONDS));
+        Channel firstChannel = first.getNow().value();
+        firstChannel.close().sync();
+
+        Future<EvictLinkedNode<Channel>> second = pool.getChannel();
+        assertTrue(second.await(5, TimeUnit.SECONDS));
+        assertTrue(second.isSuccess());
+        assertTrue(second.getNow().value() != firstChannel);
+        assertTrue(second.getNow().value().isActive());
+    }
+}

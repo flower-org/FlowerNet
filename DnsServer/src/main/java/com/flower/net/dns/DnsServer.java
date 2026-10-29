@@ -1,10 +1,11 @@
 package com.flower.net.dns;
 
 import com.flower.net.dns.dotclient.DnsOverTlsClient;
+import com.flower.net.dns.dotclient.ResolvedHosts;
 import com.flower.net.dns.dotclient.viasocks.Socks5Credentials;
 import com.flower.crypt.PkiUtil;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.ChannelFuture;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -18,7 +19,7 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
 
-public class DnsServer {
+public class DnsServer implements AutoCloseable {
     final static Logger LOGGER = LoggerFactory.getLogger(DnsServer.class);
 
     private static String SOCKS_SERVER_ADDRESS = "";
@@ -68,8 +69,38 @@ public class DnsServer {
                                           null);
         }
 
-        final NioEventLoopGroup group = new NioEventLoopGroup();
+        DnsServer server = start(port, client);
+        try {
+            server.udpChannel.closeFuture().sync();
+        } finally {
+            server.close();
+        }
+    }
 
+    private final DnsOverTlsClient client;
+    private final NioEventLoopGroup group;
+    private final Channel udpChannel;
+    private final Channel tcpChannel;
+
+    private DnsServer(DnsOverTlsClient client, NioEventLoopGroup group, Channel udpChannel, Channel tcpChannel) {
+        this.client = client;
+        this.group = group;
+        this.udpChannel = udpChannel;
+        this.tcpChannel = tcpChannel;
+    }
+
+    /** Starts a server on {@code port} (UDP and TCP) that forwards to 1.1.1.1 over TLS. Returns once it's listening. */
+    public static DnsServer start(int port, boolean useCache) throws SSLException, InterruptedException {
+        return start(port, new DnsOverTlsClient(OTHER_DNS_TLS_SERVER_ADDRESS, OTHER_DNS_TLS_SERVER_PORT,
+                TRUST_MANAGER, useCache, null));
+    }
+
+    /**
+     * Starts a server on {@code port} (UDP and TCP) that forwards through {@code client}. Returns once it's listening.
+     * The server takes ownership of the client and shuts it down on {@link #close()}.
+     */
+    public static DnsServer start(int port, DnsOverTlsClient client) throws InterruptedException {
+        NioEventLoopGroup group = new NioEventLoopGroup();
         try {
             Bootstrap bootstrap = new Bootstrap();
             bootstrap.group(group)
@@ -94,14 +125,28 @@ public class DnsServer {
                         }
                     });
 
-            ChannelFuture future = bootstrap.bind(port).sync();
-            ChannelFuture tcpFuture = tcpBootstrap.bind(port).sync();
+            Channel udpChannel = bootstrap.bind(port).sync().channel();
+            Channel tcpChannel = tcpBootstrap.bind(port).sync().channel();
             LOGGER.info("DNS Server Started at port {} (UDP and TCP)", port);
-
-            future.channel().closeFuture().sync();
-            tcpFuture.channel().close().sync();
-        } finally {
+            return new DnsServer(client, group, udpChannel, tcpChannel);
+        } catch (Throwable e) {
             group.shutdownGracefully();
+            client.shutdown();
+            throw e;
         }
+    }
+
+    /** The hosts this server has resolved for its clients, looked up by IP. */
+    public ResolvedHosts resolvedHosts() {
+        return client.resolvedHosts();
+    }
+
+    /** Stops listening and shuts down the upstream client. */
+    @Override
+    public void close() {
+        udpChannel.close().syncUninterruptibly();
+        tcpChannel.close().syncUninterruptibly();
+        group.shutdownGracefully().syncUninterruptibly();
+        client.shutdown();
     }
 }

@@ -44,4 +44,22 @@ reset on success); meanwhile queries use the remaining connections, or get SERVF
 Upstream via SOCKS5: `DnsServer <port> <useCache> <socksHost> <socksPort>`. If the proxy needs username/password
 authentication (RFC 1929), set the `SOCKS_USERNAME` and `SOCKS_PASSWORD` environment variables (kept off the command
 line so the password doesn't show in the process list). The TLS handshake through the proxy times out after 5s.
+Embedding in your app:
+
+```java
+DnsServer server = DnsServer.start(5300, true);   // port, useCache; returns once listening on UDP + TCP
+
+List<String> hosts = server.resolvedHosts().hostsFor(InetAddress.getByName("104.20.23.154"));
+// ["example.com"], most recent first; [] if this server never resolved that IP
+
+server.close();                                    // on app shutdown
+```
+
+For a SOCKS proxy, build a `DnsOverTlsClient` yourself and call `DnsServer.start(port, client)`; the server owns
+the client and shuts it down on `close()`.
+
+IP to host lookup (Java API only): `server.resolvedHosts().hostsFor(ip)` returns the host names this server resolved
+to that IP for its clients, most recent first. It never resolves anything itself. It keeps up to 100k (IP, host)
+pairs, evicted least-recently-used first and regardless of DNS TTL. Resolving a host bumps its IPs; a lookup bumps
+the hosts it returns. Hosts are the names clients asked for (lowercase, no trailing dot), even via CNAMEs.
 TODO: empty responses?

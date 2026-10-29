@@ -33,6 +33,7 @@ import org.junit.jupiter.api.Timeout;
 
 import java.net.InetAddress;
 import java.net.ServerSocket;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -137,6 +138,7 @@ public class DnsOverTlsClientFailureTest {
         assertEquals(DnsResponseCode.NOERROR, response.code());
         assertEquals(1, queriesReceived.get());
         assertEquals(0, client.pendingQueries().inFlightCount());
+        assertEquals(List.of("example.org"), client.resolvedHosts().hostsFor(InetAddress.getByName("1.2.3.4")));
     }
 
     @Test

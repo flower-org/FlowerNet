@@ -76,6 +76,7 @@ public class DnsOverTlsClient {
     private final ChannelPool channelPool;
     private final UpstreamQueryRegistry pendingQueries;
     private final InFlightQueries inFlight = new InFlightQueries();
+    private final ResolvedHosts resolvedHosts = new ResolvedHosts();
 
     @Nullable private final AnswerCache cache;
 
@@ -186,6 +187,13 @@ public class DnsOverTlsClient {
      */
     public void query(DnsQuery query, Consumer<DefaultDnsResponse> dnsResponseConsumer) {
         DnsQuestion qQuestion = query.recordAt(DnsSection.QUESTION, 0);
+        // The name is taken now: the query may be released before the answer arrives
+        String questionName = qQuestion.name();
+        Consumer<DefaultDnsResponse> clientConsumer = dnsResponseConsumer;
+        dnsResponseConsumer = response -> {
+            resolvedHosts.record(questionName, response);
+            clientConsumer.accept(response);
+        };
         if (cache != null) {
             DefaultDnsResponse response = cache.getResponseIfPresent(query);
             if (response != null) {
@@ -347,6 +355,11 @@ public class DnsOverTlsClient {
 
     public SslContext getSslCtx() {
         return sslCtx;
+    }
+
+    /** The hosts this client has resolved for its callers, looked up by IP. */
+    public ResolvedHosts resolvedHosts() {
+        return resolvedHosts;
     }
 
     InFlightQueries inFlight() {

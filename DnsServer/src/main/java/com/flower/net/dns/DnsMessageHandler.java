@@ -32,7 +32,7 @@ public class DnsMessageHandler extends AbstractDnsQueryHandler<DatagramDnsQuery>
         ByteBuf buf = ctx.alloc().ioBuffer();
         try {
             if (DnsWireEncoder.encode(response, edns, DnsWireEncoder.maxUdpSize(edns), buf)) {
-                LOGGER.info("{} | Truncated to fit {} bytes", response.id(), DnsWireEncoder.maxUdpSize(edns));
+                LOGGER.debug("{} | Truncated to fit {} bytes", response.id(), DnsWireEncoder.maxUdpSize(edns));
             }
         } catch (RuntimeException e) {
             buf.release();

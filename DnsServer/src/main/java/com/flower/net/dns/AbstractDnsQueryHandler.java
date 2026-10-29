@@ -79,7 +79,7 @@ public abstract class AbstractDnsQueryHandler<Q extends DnsQuery> extends Simple
         }
 
         DnsQuestion qQuestion = query.recordAt(DnsSection.QUESTION, 0);
-        LOGGER.info("{} | request: {}", id, qQuestion.name());
+        LOGGER.debug("{} | request: {}", id, qQuestion.name());
         client.query(query, owningReplier);
     }
 
@@ -95,7 +95,7 @@ public abstract class AbstractDnsQueryHandler<Q extends DnsQuery> extends Simple
         int questionCount = response.count(DnsSection.QUESTION);
         if (questionCount > 0) {
             DnsQuestion question = response.recordAt(DnsSection.QUESTION, 0);
-            LOGGER.info("{} | response to: {} | {} | q: {} ans: {} auth: {} add: {}",
+            LOGGER.debug("{} | response to: {} | {} | q: {} ans: {} auth: {} add: {}",
                     response.id(), question.name(), response.code(), questionCount,
                     response.count(DnsSection.ANSWER), response.count(DnsSection.AUTHORITY),
                     response.count(DnsSection.ADDITIONAL));
@@ -104,7 +104,7 @@ public abstract class AbstractDnsQueryHandler<Q extends DnsQuery> extends Simple
         for (int i = 0, count = response.count(DnsSection.ANSWER); i < count; i++) {
             DnsRecord record = response.recordAt(DnsSection.ANSWER, i);
             if (DnsRecordType.A.equals(record.type()) && record instanceof DnsRawRecord) {
-                LOGGER.info("{} | {}", response.id(),
+                LOGGER.debug("{} | {}", response.id(),
                         NetUtil.bytesToIpAddress(ByteBufUtil.getBytes(((DnsRawRecord) record).content())));
             }
         }

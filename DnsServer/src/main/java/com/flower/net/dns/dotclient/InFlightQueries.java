@@ -59,7 +59,7 @@ public class InFlightQueries {
             return existing;
         });
         if (flight != leader) {
-            LOGGER.info("{} | Waiting for an identical query in flight", query.id());
+            LOGGER.debug("{} | Waiting for an identical query in flight", query.id());
             return null;
         }
         return response -> {

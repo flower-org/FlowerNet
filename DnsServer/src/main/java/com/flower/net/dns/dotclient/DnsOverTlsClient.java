@@ -197,7 +197,7 @@ public class DnsOverTlsClient {
         if (cache != null) {
             DefaultDnsResponse response = cache.getResponseIfPresent(query);
             if (response != null) {
-                LOGGER.info("{} | Cache hit!", query.id());
+                LOGGER.debug("{} | Cache hit!", query.id());
                 dnsResponseConsumer.accept(response);
                 return;
             }

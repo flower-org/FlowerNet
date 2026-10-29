@@ -424,18 +424,16 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         boolean isDirectIpBlock = false;
         boolean isRuleMatched;
 
-        Access defaultAccessType = getDefaultAccessType();
-        boolean isDirectIpAccessAllowed = checkNotNull(allowDirectIpAccessCheckBox).selectedProperty().get();
-        if (!isDirectIpAccessAllowed && IpAddressUtil.isIPAddress(dstHost)) {
-            isDirectIpBlock = true;
-            isRuleMatched = false;
-            checkResult = Access.DENY;
-        } else {
+        if (checkResult != null) {
             isRuleMatched = true;
-            // If matching record not found, we fall back to defaultAccessType
-            if (checkResult == null) {
-                isRuleMatched = false;
-                checkResult = defaultAccessType;
+        } else {
+            isRuleMatched = false;
+            boolean isDirectIpAccessAllowed = checkNotNull(allowDirectIpAccessCheckBox).selectedProperty().get();
+            if (!isDirectIpAccessAllowed && IpAddressUtil.isIPAddress(dstHost)) {
+                isDirectIpBlock = true;
+                checkResult = Access.DENY;
+            } else {
+                checkResult = getDefaultAccessType();
             }
         }
 

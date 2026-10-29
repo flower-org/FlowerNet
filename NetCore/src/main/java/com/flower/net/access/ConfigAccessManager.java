@@ -117,10 +117,6 @@ public class ConfigAccessManager implements AccessManager {
 
     @Override
     public Access accessCheck(InetAddress address, int port) {
-        if (!directIpAccessAllowed) {
-            return Access.DENY;
-        }
-
         Collection<AccessManagerRule> ipRules = addressRules.get(address);
         Access ipAccess = secondaryMatch(ipRules, port);
         if (ipAccess != null) {
@@ -140,6 +136,10 @@ public class ConfigAccessManager implements AccessManager {
         Access portAccess = portRuleCheck(port);
         if (portAccess != null) {
             return portAccess;
+        }
+
+        if (!directIpAccessAllowed) {
+            return Access.DENY;
         }
 
         return defaultAccessRule;
@@ -172,6 +172,10 @@ public class ConfigAccessManager implements AccessManager {
     }
 
     protected @Nullable Access secondaryMatch(@Nullable Collection<AccessManagerRule> rules, int port) {
+        return secondaryMatch(rules, port, defaultAccessRule);
+    }
+
+    protected @Nullable Access secondaryMatch(@Nullable Collection<AccessManagerRule> rules, int port, Access fallback) {
         if (rules == null || rules.isEmpty()) {
             return null;
         }
@@ -211,11 +215,15 @@ public class ConfigAccessManager implements AccessManager {
             }
             return Access.ALLOW;
         } else {
-            return portRuleCheck(port);
+            return portRuleCheck(port, fallback);
         }
     }
 
     protected Access portRuleCheck(int port) {
+        return portRuleCheck(port, defaultAccessRule);
+    }
+
+    protected Access portRuleCheck(int port, Access fallback) {
         Collection<AccessManagerRule> matchedRules = portRules.get(port);
 
         if (matchedRules == null || matchedRules.isEmpty()) {
@@ -236,7 +244,7 @@ public class ConfigAccessManager implements AccessManager {
             }
             return Access.ALLOW;
         } else {
-            return defaultAccessRule;
+            return fallback;
         }
     }
 }

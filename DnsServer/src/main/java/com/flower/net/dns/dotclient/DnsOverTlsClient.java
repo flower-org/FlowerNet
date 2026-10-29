@@ -47,7 +47,6 @@ import java.util.function.Consumer;
 
 import static com.flower.net.socksserver.FlowerSslContextBuilder.TLS_CIPHERS;
 import static com.flower.net.socksserver.FlowerSslContextBuilder.TLS_PROTOCOLS;
-import static com.google.common.base.Preconditions.checkNotNull;
 
 public class DnsOverTlsClient {
     static final Logger LOGGER = LoggerFactory.getLogger(DnsOverTlsClient.class);
@@ -74,7 +73,6 @@ public class DnsOverTlsClient {
     private final ChannelPool channelPool;
     private final UpstreamQueryRegistry pendingQueries;
 
-    private final boolean useCache;
     @Nullable private final AnswerCache cache;
 
     private final SslContext sslCtx;
@@ -114,7 +112,6 @@ public class DnsOverTlsClient {
                 MAX_PARALLEL_CHANNELS,
                 bindClientToIp);
 
-        this.useCache = useCache;
         if (useCache) { cache = new AnswerCache(); }
                 else  { cache = null; }
     }
@@ -160,7 +157,6 @@ public class DnsOverTlsClient {
             });
         this.channelPool = new AggressiveChannelPool(bootstrap, dnsServerAddress, dnsServerPort, MAX_PARALLEL_CHANNELS, bindClientToIp);
 
-        this.useCache = useCache;
         if (useCache) { cache = new AnswerCache(); }
                 else  { cache = null; }
     }
@@ -174,13 +170,21 @@ public class DnsOverTlsClient {
      */
     public void query(DnsQuery query, Consumer<DefaultDnsResponse> dnsResponseConsumer) {
         DnsQuestion qQuestion = query.recordAt(DnsSection.QUESTION, 0);
-        if (useCache) {
-            DefaultDnsResponse response = checkNotNull(cache).getResponseIfPresent(qQuestion, query.id());
+        if (cache != null) {
+            AnswerCache answerCache = cache;
+            DefaultDnsResponse response = answerCache.getResponseIfPresent(query);
             if (response != null) {
                 LOGGER.info("{} | Cache hit!", query.id());
                 dnsResponseConsumer.accept(response);
                 return;
             }
+            // The key is taken now: the query may be released before the answer arrives
+            AnswerCache.Key key = AnswerCache.Key.of(query);
+            Consumer<DefaultDnsResponse> consumer = dnsResponseConsumer;
+            dnsResponseConsumer = upstreamResponse -> {
+                answerCache.putResponse(key, upstreamResponse);
+                consumer.accept(upstreamResponse);
+            };
         }
 
         UpstreamQueryRegistry.PendingQuery pendingQuery;
@@ -323,13 +327,10 @@ public class DnsOverTlsClient {
         return pendingQueries;
     }
 
-    /** Doesn't take ownership of {@code msg}: the consumer gets its own copy, and the cache a snapshot. */
+    /** Doesn't take ownership of {@code msg}: the consumer gets its own copy. */
     public void handleQueryResp(DefaultDnsResponse msg) {
         UpstreamQueryRegistry.PendingQuery pendingQuery = pendingQueries.complete(msg);
         if (pendingQuery != null) {
-            if (useCache) {
-                checkNotNull(cache).putResponse(pendingQuery.question(), msg);
-            }
             pendingQuery.callback().accept(DnsMessages.retainedCopy(msg, pendingQuery.originalId()));
         }
     }

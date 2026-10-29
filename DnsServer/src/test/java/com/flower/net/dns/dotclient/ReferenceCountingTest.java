@@ -4,9 +4,11 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.dns.DefaultDnsQuery;
 import io.netty.handler.codec.dns.DefaultDnsQuestion;
 import io.netty.handler.codec.dns.DefaultDnsRawRecord;
 import io.netty.handler.codec.dns.DefaultDnsResponse;
+import io.netty.handler.codec.dns.DnsQuery;
 import io.netty.handler.codec.dns.DnsQuestion;
 import io.netty.handler.codec.dns.DnsRawRecord;
 import io.netty.handler.codec.dns.DnsRecordType;
@@ -55,6 +57,10 @@ public class ReferenceCountingTest {
         return ByteBufUtil.getBytes(response.<DnsRawRecord>recordAt(DnsSection.ANSWER, 0).content());
     }
 
+    static DnsQuery query(int id) {
+        return new DefaultDnsQuery(id).addRecord(DnsSection.QUESTION, QUESTION);
+    }
+
     @AfterEach
     void noBufferLeaks() {
         for (ByteBuf buf : buffers) {
@@ -66,13 +72,13 @@ public class ReferenceCountingTest {
     void cacheDoesNotRetainTheResponseItStores() {
         AnswerCache cache = new AnswerCache();
         DefaultDnsResponse empty = upstreamResponse(0);
-        cache.putResponse(QUESTION, empty);
-        assertNull(cache.getResponseIfPresent(QUESTION, 1));
+        cache.putResponse(AnswerCache.Key.of(query(1)), empty);
+        assertNull(cache.getResponseIfPresent(query(1)));
         assertEquals(1, empty.refCnt());
         empty.release();
 
         DefaultDnsResponse withAnswer = upstreamResponse(1);
-        cache.putResponse(QUESTION, withAnswer);
+        cache.putResponse(AnswerCache.Key.of(query(1)), withAnswer);
         assertEquals(1, withAnswer.refCnt());
         assertEquals(1, buffers.get(0).refCnt());
         withAnswer.release();
@@ -82,11 +88,11 @@ public class ReferenceCountingTest {
     void cachedResponsesAreIndependentOfTheSourceEachOtherAndEviction() {
         AnswerCache cache = new AnswerCache();
         DefaultDnsResponse upstream = upstreamResponse(1);
-        cache.putResponse(QUESTION, upstream);
+        cache.putResponse(AnswerCache.Key.of(query(1)), upstream);
         upstream.release();
 
-        DefaultDnsResponse first = cache.getResponseIfPresent(QUESTION, 11);
-        DefaultDnsResponse second = cache.getResponseIfPresent(QUESTION, 22);
+        DefaultDnsResponse first = cache.getResponseIfPresent(query(11));
+        DefaultDnsResponse second = cache.getResponseIfPresent(query(22));
         assertNotNull(first);
         assertNotNull(second);
         assertEquals(11, first.id());

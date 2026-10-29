@@ -18,9 +18,6 @@ package com.flower.net.dns.dotclient.viasocks;
 import com.flower.net.dns.dotclient.DnsOverTlsClient;
 import com.flower.net.utils.ServerUtil;
 import io.netty.channel.*;
-import io.netty.handler.codec.dns.DefaultDnsResponse;
-import io.netty.handler.codec.dns.TcpDnsQueryEncoder;
-import io.netty.handler.codec.dns.TcpDnsResponseDecoder;
 import io.netty.handler.codec.socksx.SocksMessage;
 import io.netty.handler.codec.socksx.v5.Socks5ClientEncoder;
 import io.netty.handler.codec.socksx.v5.Socks5CommandResponse;
@@ -30,13 +27,9 @@ import io.netty.handler.codec.socksx.v5.Socks5InitialResponseDecoder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @ChannelHandler.Sharable
 public final class Socks5ClientConnectHandler extends SimpleChannelInboundHandler<SocksMessage> {
-    static final Logger LOGGER = LoggerFactory.getLogger(Socks5ClientConnectHandler.class);
-
     final DnsOverTlsClient dnsClient;
     final GenericFutureListener<Future<? super Channel>> sslHandshakeListener;
 
@@ -66,30 +59,8 @@ public final class Socks5ClientConnectHandler extends SimpleChannelInboundHandle
                 SslHandler sslHandler = dnsClient.getSslCtx().newHandler(ctx.channel().alloc());
                 sslHandler.handshakeFuture().addListener(sslHandshakeListener);
 
-                ctx.pipeline().addLast(sslHandler)
-                .addLast(new ChannelInboundHandlerAdapter() {
-                    @Override
-                    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-                        super.exceptionCaught(ctx, cause);
-                    }
-                })
-                .addLast(new TcpDnsQueryEncoder())
-                .addLast(new TcpDnsResponseDecoder())
-                .addLast(new SimpleChannelInboundHandler<DefaultDnsResponse>() {
-                    @Override
-                    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-                        LOGGER.error("DnsOverTlsClient.exceptionCaught", cause);
-                    }
-
-                    @Override
-                    protected void channelRead0(ChannelHandlerContext ctx, DefaultDnsResponse msg) {
-                        try {
-                            dnsClient.handleQueryResp(msg);
-                        } finally {
-                            ctx.close();
-                        }
-                    }
-                });
+                ctx.pipeline().addLast(sslHandler);
+                dnsClient.addDnsHandlers(ctx.pipeline());
             } else {
                 ctx.close();
             }

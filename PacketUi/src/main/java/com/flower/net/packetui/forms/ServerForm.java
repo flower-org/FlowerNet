@@ -3,6 +3,7 @@ package com.flower.net.packetui.forms;
 import com.flower.fxutils.Refreshable;
 import com.flower.net.conntrack.ConnectionFilter;
 import com.flower.net.conntrack.ConnectionListener;
+import com.flower.net.dns.DnsServer;
 import com.flower.net.packetui.MainApp;
 import com.flower.net.packetui.server.ConnectionFilterDecider;
 import com.flower.net.packetui.server.DeciderServer;
@@ -28,7 +29,11 @@ public class ServerForm extends AnchorPane implements Refreshable {
     final MainApp mainApp;
     final ConnectionFilterDecider decider;
     final DeciderServer server;
+    @Nullable DnsServer dnsServer;
     boolean isStarted;
+
+    // TODO: make configurable
+    static final int DNS_PORT = 5300;
 
     @Nullable @FXML Button startButton;
     @Nullable @FXML Button stopButton;
@@ -88,7 +93,18 @@ public class ServerForm extends AnchorPane implements Refreshable {
                             ButtonType.OK).showAndWait();
                     return;
                 }
-                mainApp.setStatusText("Server started on " + socketPath);
+                try {
+                    DnsServer dns = DnsServer.start(DNS_PORT, true);
+                    dnsServer = dns;
+                    decider.setResolvedHosts(dns.resolvedHosts());
+                } catch (Exception e) {
+                    server.stop();
+                    mainApp.setStatusText("Server failed to start");
+                    new Alert(Alert.AlertType.ERROR, "Failed to start DNS server on port " + DNS_PORT + ":\n" + e,
+                            ButtonType.OK).showAndWait();
+                    return;
+                }
+                mainApp.setStatusText("Server started on " + socketPath + ", DNS on 127.0.0.1:" + DNS_PORT);
                 isStarted = true;
             }
             checkNotNull(socketPathTextField).setDisable(true);
@@ -104,6 +120,12 @@ public class ServerForm extends AnchorPane implements Refreshable {
             startLock.lock();
             if (isStarted) {
                 server.stop();
+                decider.setResolvedHosts(null);
+                DnsServer dns = dnsServer;
+                dnsServer = null;
+                if (dns != null) {
+                    dns.close();
+                }
                 mainApp.setStatusText("Server not running");
                 isStarted = false;
             }

@@ -3,11 +3,16 @@ package com.flower.net.packetui.server;
 import com.flower.net.config.access.Access;
 import com.flower.net.config.access.Protocol;
 import com.flower.net.conntrack.ConnectionFilter;
+import com.flower.net.dns.dotclient.ResolvedHosts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.Deque;
+import java.util.List;
 import java.util.concurrent.LinkedBlockingDeque;
 
 /**
@@ -23,6 +28,12 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
     static final int NF_INET_LOCAL_IN = 1;
 
     private final Deque<ConnectionFilter> connectionFilters = new LinkedBlockingDeque<>();
+    @Nullable private volatile ResolvedHosts resolvedHosts;
+
+    /** When set, remote IPs that our DNS server resolved are checked as their host name instead. */
+    public void setResolvedHosts(@Nullable ResolvedHosts resolvedHosts) {
+        this.resolvedHosts = resolvedHosts;
+    }
 
     public void addConnectionFilter(ConnectionFilter filter) {
         connectionFilters.add(filter);
@@ -42,7 +53,7 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
         }
 
         boolean inbound = isInbound(hook);
-        String remoteHost = inbound ? info.srcHost() : info.dstHost();
+        String remoteHost = hostFor(inbound ? info.srcHost() : info.dstHost());
         int remotePort = inbound ? info.srcPort() : info.dstPort();
         InetSocketAddress local = inbound
                 ? InetSocketAddress.createUnresolved(info.dstHost(), info.dstPort())
@@ -56,6 +67,21 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
             }
         }
         return allow;
+    }
+
+    /** The most recently resolved host name for {@code ip}, or {@code ip} itself if there's none. */
+    String hostFor(String ip) {
+        ResolvedHosts hosts = resolvedHosts;
+        if (hosts == null) {
+            return ip;
+        }
+        try {
+            // An IP literal: parsed, never looked up
+            List<String> names = hosts.hostsFor(InetAddress.getByName(ip));
+            return names.isEmpty() ? ip : names.get(0);
+        } catch (UnknownHostException e) {
+            return ip;
+        }
     }
 
     static boolean isInbound(int hook) {

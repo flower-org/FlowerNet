@@ -3,9 +3,11 @@ package com.flower.net.packetui.server;
 import com.flower.net.config.access.Access;
 import com.flower.net.config.access.Protocol;
 import com.flower.net.conntrack.ConnectionFilter;
+import com.flower.net.dns.dotclient.ResolvedHosts;
 import org.junit.jupiter.api.Test;
 
 import javax.annotation.Nullable;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
@@ -101,6 +103,21 @@ public class ConnectionFilterDeciderTest {
         assertNull(PacketInfo.parse(new byte[0]));
         assertNull(PacketInfo.parse(new byte[]{0x45, 0, 0}));
         assertNull(PacketInfo.parse(new byte[20])); // version 0
+    }
+
+    @Test
+    public void resolvedIpIsCheckedAsItsHost() throws Exception {
+        ConnectionFilterDecider decider = new ConnectionFilterDecider();
+        RecordingFilter filter = new RecordingFilter(Access.ALLOW);
+        decider.addConnectionFilter(filter);
+        ResolvedHosts hosts = new ResolvedHosts();
+        hosts.record("example.com.", List.of(InetAddress.getByName("93.184.216.34")));
+        decider.setResolvedHosts(hosts);
+
+        decider.decide(ipv4(6, new int[]{10, 0, 0, 2}, new int[]{93, 184, 216, 34}, 40000, 443, 0), 1, 0x0800, LOCAL_OUT, 0, 0, 0);
+        decider.decide(ipv4(6, new int[]{10, 0, 0, 2}, new int[]{5, 6, 7, 8}, 40000, 443, 0), 2, 0x0800, LOCAL_OUT, 0, 0, 0);
+        assertEquals("example.com", filter.calls.get(0).host());
+        assertEquals("5.6.7.8", filter.calls.get(1).host());
     }
 
     @Test

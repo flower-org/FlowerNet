@@ -20,11 +20,14 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.channel.SimpleChannelInboundHandler;
 
 import io.netty.handler.codec.dns.DefaultDnsQuery;
+import io.netty.handler.codec.dns.DefaultDnsQuestion;
 import io.netty.handler.codec.dns.DefaultDnsResponse;
+import io.netty.handler.codec.dns.DnsOpCode;
 import io.netty.handler.codec.dns.DnsQuery;
 import io.netty.handler.codec.dns.DnsQuestion;
 import io.netty.handler.codec.dns.DnsRawRecord;
 import io.netty.handler.codec.dns.DnsRecord;
+import io.netty.handler.codec.dns.DnsResponseCode;
 import io.netty.handler.codec.dns.DnsSection;
 import io.netty.handler.codec.dns.TcpDnsQueryEncoder;
 import io.netty.handler.codec.dns.TcpDnsResponseDecoder;
@@ -51,7 +54,10 @@ public class DnsOverTlsClient {
     static final Logger LOGGER = LoggerFactory.getLogger(DnsOverTlsClient.class);
 
     static final Long SSL_HANDSHAKE_TIMEOUT_MILLIS = 1000L;
-    static final Long CALLBACK_EXPIRATION_TIMEOUT = 2500L;
+    /** Deadline for an answer from upstream, after which the client gets SERVFAIL. */
+    static final Long CALLBACK_EXPIRATION_TIMEOUT = 4000L;
+    /** If no response arrives within this time, the query is sent again. */
+    static final long QUERY_ATTEMPT_TIMEOUT_MILLIS = 1200L;
     static final int MAX_PARALLEL_CHANNELS = 3;
     static final int MAX_QUERY_RETRY_COUNT = 2;
     /** Close idle connections before the server does (1.1.1.1 closes after 10s), so we don't write to a closing one. */
@@ -94,7 +100,7 @@ public class DnsOverTlsClient {
                 .build();
 
         group = new NioEventLoopGroup();
-        this.pendingQueries = new UpstreamQueryRegistry(group, CALLBACK_EXPIRATION_TIMEOUT);
+        this.pendingQueries = new UpstreamQueryRegistry(group, CALLBACK_EXPIRATION_TIMEOUT, this::answerServFail);
         bootstrap = new Bootstrap();
 
         bootstrap.group(group)
@@ -131,7 +137,7 @@ public class DnsOverTlsClient {
                 .build();
 
         group = new NioEventLoopGroup();
-        this.pendingQueries = new UpstreamQueryRegistry(group, CALLBACK_EXPIRATION_TIMEOUT);
+        this.pendingQueries = new UpstreamQueryRegistry(group, CALLBACK_EXPIRATION_TIMEOUT, this::answerServFail);
         bootstrap = new Bootstrap();
         bootstrap.group(group)
             .channel(NioSocketChannel.class)
@@ -164,6 +170,7 @@ public class DnsOverTlsClient {
      * Sends the query upstream and calls the consumer with the response.
      * The caller keeps ownership of {@code query}; it's not retained or released here.
      * The response passed to the consumer carries the original query's ID.
+     * The consumer is called exactly once: with the upstream response, or with SERVFAIL if none could be obtained.
      */
     public void query(DnsQuery query, Consumer<DefaultDnsResponse> dnsResponseConsumer) {
         DnsQuestion qQuestion = query.recordAt(DnsSection.QUESTION, 0);
@@ -181,10 +188,24 @@ public class DnsOverTlsClient {
             pendingQuery = pendingQueries.register(query.id(), qQuestion, dnsResponseConsumer);
         } catch (IllegalStateException e) {
             LOGGER.warn("{} | Can't send query upstream: {}", query.id(), e.getMessage());
+            dnsResponseConsumer.accept(servFail(query.id(), qQuestion));
             return;
         }
         LOGGER.debug("{} | Sending upstream as {}", query.id(), pendingQuery.upstreamId());
-        sendUpstream(copyWithId(query, pendingQuery.upstreamId()), pendingQuery, 0);
+        pendingQuery.attachUpstreamQuery(copyWithId(query, pendingQuery.upstreamId()));
+        sendUpstream(pendingQuery, 0);
+    }
+
+    public static DefaultDnsResponse servFail(int id, DnsQuestion question) {
+        DefaultDnsResponse response = new DefaultDnsResponse(id, DnsOpCode.QUERY, DnsResponseCode.SERVFAIL);
+        response.setRecursionDesired(true);
+        response.setRecursionAvailable(true);
+        response.addRecord(DnsSection.QUESTION, new DefaultDnsQuestion(question.name(), question.type(), question.dnsClass()));
+        return response;
+    }
+
+    private void answerServFail(UpstreamQueryRegistry.PendingQuery pendingQuery) {
+        pendingQuery.callback().accept(servFail(pendingQuery.originalId(), pendingQuery.question()));
     }
 
     /**
@@ -206,40 +227,57 @@ public class DnsOverTlsClient {
         return copy;
     }
 
-    /** Takes ownership of {@code upstreamQuery} and releases it once sent or abandoned. */
-    protected void sendUpstream(DnsQuery upstreamQuery, UpstreamQueryRegistry.PendingQuery pendingQuery, int retry) {
-        if (retry > MAX_QUERY_RETRY_COUNT) {
-            LOGGER.info("{} | DoT Server request failed after retry# {}", pendingQuery.originalId(), retry);
-            pendingQueries.cancel(pendingQuery);
-            upstreamQuery.release();
+    /**
+     * Sends attempt number {@code attempt} of the query. The query is sent again if the attempt fails or no response
+     * arrives in time; once retries are exhausted the query is dropped and the client gets SERVFAIL.
+     */
+    protected void sendUpstream(UpstreamQueryRegistry.PendingQuery pendingQuery, int attempt) {
+        if (attempt > MAX_QUERY_RETRY_COUNT) {
+            LOGGER.info("{} | DoT Server request failed after {} attempts", pendingQuery.originalId(), attempt);
+            if (pendingQueries.cancel(pendingQuery)) {
+                answerServFail(pendingQuery);
+            }
             return;
         }
+        pendingQueries.scheduleRetry(pendingQuery, QUERY_ATTEMPT_TIMEOUT_MILLIS, () -> {
+            LOGGER.info("{} | No response to attempt# {}", pendingQuery.originalId(), attempt);
+            retry(pendingQuery, attempt);
+        });
 
         channelPool.getChannel().addListener(channelFuture -> {
-            if (channelFuture.isSuccess()) {
-                @SuppressWarnings("unchecked")
-                EvictLinkedNode<Channel> channelRecord = (EvictLinkedNode<Channel>)channelFuture.get();
-                final Channel ch = channelRecord.value();
-                // The encoder releases the message it writes; keep our own reference for retries.
-                upstreamQuery.retain();
-                ch.writeAndFlush(upstreamQuery)
-                    .addListener(
-                        writeFuture -> {
-                            if (!writeFuture.isSuccess()) {
-                                channelPool.returnFailedChannel(channelRecord);
-                                sendUpstream(upstreamQuery, pendingQuery, retry + 1);
-                            } else {
-                                channelPool.returnChannel(channelRecord);
-                                upstreamQuery.release();
-                            }
-                        }
-                    );
-            } else {
-                LOGGER.info("{} | DoT Server request failed to get channel", pendingQuery.originalId());
-                pendingQueries.cancel(pendingQuery);
-                upstreamQuery.release();
+            if (!channelFuture.isSuccess()) {
+                LOGGER.info("{} | DoT Server request failed to get channel: {}", pendingQuery.originalId(),
+                        String.valueOf(channelFuture.cause()));
+                retry(pendingQuery, attempt);
+                return;
             }
+            @SuppressWarnings("unchecked")
+            EvictLinkedNode<Channel> channelRecord = (EvictLinkedNode<Channel>)channelFuture.get();
+            // The encoder releases the message it writes
+            DnsQuery upstreamQuery = pendingQuery.retainUpstreamQuery();
+            if (upstreamQuery == null) {
+                // Already answered or abandoned
+                return;
+            }
+            channelRecord.value().writeAndFlush(upstreamQuery)
+                .addListener(
+                    writeFuture -> {
+                        if (!writeFuture.isSuccess()) {
+                            channelPool.returnFailedChannel(channelRecord);
+                            retry(pendingQuery, attempt);
+                        } else {
+                            channelPool.returnChannel(channelRecord);
+                        }
+                    }
+                );
         });
+    }
+
+    /** Starts the next attempt, unless another failure or timeout of the same attempt already did. */
+    private void retry(UpstreamQueryRegistry.PendingQuery pendingQuery, int failedAttempt) {
+        if (pendingQuery.advanceAttempt(failedAttempt)) {
+            sendUpstream(pendingQuery, failedAttempt + 1);
+        }
     }
 
     /**

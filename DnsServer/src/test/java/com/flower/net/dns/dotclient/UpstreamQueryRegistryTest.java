@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class UpstreamQueryRegistryTest {
@@ -103,12 +104,14 @@ public class UpstreamQueryRegistryTest {
 
     @Test
     void pendingQueryTimesOut() throws InterruptedException {
-        UpstreamQueryRegistry registry = new UpstreamQueryRegistry(scheduler, 50);
+        List<UpstreamQueryRegistry.PendingQuery> expired = new java.util.concurrent.CopyOnWriteArrayList<>();
+        UpstreamQueryRegistry registry = new UpstreamQueryRegistry(scheduler, 50, expired::add);
         DnsQuestion q = question("a.com.", DnsRecordType.A);
         UpstreamQueryRegistry.PendingQuery p = registry.register(1, q, r -> {});
-        for (int i = 0; i < 100 && registry.inFlightCount() > 0; i++) {
+        for (int i = 0; i < 100 && expired.isEmpty(); i++) {
             Thread.sleep(20);
         }
+        assertEquals(List.of(p), expired);
         assertEquals(0, registry.inFlightCount());
         assertNull(registry.complete(response(p.upstreamId(), q)));
     }
@@ -118,7 +121,8 @@ public class UpstreamQueryRegistryTest {
         UpstreamQueryRegistry registry = new UpstreamQueryRegistry(scheduler, 10_000);
         DnsQuestion q = question("a.com.", DnsRecordType.A);
         UpstreamQueryRegistry.PendingQuery p = registry.register(1, q, r -> {});
-        registry.cancel(p);
+        assertTrue(registry.cancel(p));
+        assertFalse(registry.cancel(p));
         assertEquals(0, registry.inFlightCount());
         assertNull(registry.complete(response(p.upstreamId(), q)));
     }

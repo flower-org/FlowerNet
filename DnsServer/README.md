@@ -37,5 +37,8 @@ DNS via HTTPS (FYI only, unused)
 
 ---
 
-TODO: reuse connections and batch requests?
+Upstream connections: queries share long-lived DoT connections (up to 3) and are pipelined (RFC 7766):
+each gets a unique ID and responses are matched to it in any order. Idle connections close after 7s and are
+reopened on demand. After a failed connection, new attempts back off exponentially (250ms doubling up to 30s,
+reset on success); meanwhile queries use the remaining connections, or get SERVFAIL if there are none.
 TODO: empty responses?

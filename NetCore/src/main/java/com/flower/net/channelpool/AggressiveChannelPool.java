@@ -15,6 +15,7 @@ import io.netty.util.concurrent.ScheduledFuture;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -27,9 +28,14 @@ import java.util.concurrent.TimeoutException;
  * Never close the channels, evicting when they are closed by the peer.
  * When all `maxChannels` slots are taken by connections still being established, callers wait for one of them
  * instead of busy-waiting.
+ * After a failed connection, new ones aren't attempted for a backoff period that doubles with each consecutive
+ * failure, up to a maximum, and resets once a connection succeeds. During it, established channels are still used;
+ * if there are none, callers fail right away instead of starting a connection storm against an unreachable peer.
  */
 public class AggressiveChannelPool implements ChannelPool {
     public static final long DEFAULT_CONNECTION_SETUP_TIMEOUT_MILLIS = 10_000;
+    public static final long DEFAULT_INITIAL_RECONNECT_BACKOFF_MILLIS = 250;
+    public static final long DEFAULT_MAX_RECONNECT_BACKOFF_MILLIS = 30_000;
 
     protected final int maxChannels;
     protected final EvictLinkedList<Channel> channels;
@@ -44,6 +50,9 @@ public class AggressiveChannelPool implements ChannelPool {
     private final Object slotLock = new Object();
     private final List<Promise<EvictLinkedNode<Channel>>> pendingConnections = new ArrayList<>();
     private int nextPendingConnection;
+    private int consecutiveFailures;
+    /** System.nanoTime() before which no new connection is attempted; meaningful only if consecutiveFailures > 0. */
+    private long backoffUntilNanos;
 
     public AggressiveChannelPool(Bootstrap bootstrap, InetAddress connectAddress, int connectPort, int maxChannels, @Nullable String bindClientToIp) {
         this.maxChannels = maxChannels;
@@ -74,8 +83,10 @@ public class AggressiveChannelPool implements ChannelPool {
     public Promise<EvictLinkedNode<Channel>> getChannel() {
         Promise<EvictLinkedNode<Channel>> newConnection;
         synchronized (slotLock) {
-            if (channels.nonEvictedCount() + pendingConnections.size() >= maxChannels) {
-                // 1. Max channels reached - reuse an established channel
+            long backoffRemainingNanos = backoffRemainingNanos();
+            if (backoffRemainingNanos > 0
+                    || channels.nonEvictedCount() + pendingConnections.size() >= maxChannels) {
+                // 1. Max channels reached, or backing off - reuse an established channel
                 EvictLinkedNode<Channel> nonEvictedNode = picker.getNonEvictedNode();
                 if (nonEvictedNode != null) {
                     Promise<EvictLinkedNode<Channel>> channelPromise = newPromise();
@@ -87,14 +98,44 @@ public class AggressiveChannelPool implements ChannelPool {
                     nextPendingConnection = (nextPendingConnection + 1) % pendingConnections.size();
                     return pendingConnections.get(nextPendingConnection);
                 }
+                // 3. Backing off after failures, and nothing to use: fail right away
+                if (backoffRemainingNanos > 0) {
+                    Promise<EvictLinkedNode<Channel>> failed = newPromise();
+                    failed.setFailure(new ConnectException("Not connecting to " + connectAddress + ":" + connectPort
+                            + " for " + TimeUnit.NANOSECONDS.toMillis(backoffRemainingNanos) + "ms after "
+                            + consecutiveFailures + " failed attempt(s)"));
+                    return failed;
+                }
                 // Channels became inactive since they were counted, so slots are free
             }
-            // 3. Aggressive approach - if we can create more channels, create more
+            // 4. Aggressive approach - if we can create more channels, create more
             newConnection = newPromise();
             pendingConnections.add(newConnection);
         }
         connect(newConnection);
         return newConnection;
+    }
+
+    /** Must be called under slotLock. */
+    private long backoffRemainingNanos() {
+        return consecutiveFailures == 0 ? 0 : Math.max(0, backoffUntilNanos - System.nanoTime());
+    }
+
+    /** Backoff after the first failed connection; 0 disables backoff. */
+    protected long initialReconnectBackoffMillis() {
+        return DEFAULT_INITIAL_RECONNECT_BACKOFF_MILLIS;
+    }
+
+    protected long maxReconnectBackoffMillis() {
+        return DEFAULT_MAX_RECONNECT_BACKOFF_MILLIS;
+    }
+
+    /** Backoff after {@code failures} consecutive failed connections (at least 1). */
+    long reconnectBackoffMillis(int failures) {
+        long initial = initialReconnectBackoffMillis();
+        long max = maxReconnectBackoffMillis();
+        int doublings = Math.min(failures - 1, 30);
+        return Math.min(max, initial << doublings);
     }
 
     protected Promise<EvictLinkedNode<Channel>> newPromise() {
@@ -178,6 +219,7 @@ public class AggressiveChannelPool implements ChannelPool {
             // Add the channel before releasing the pending slot, so the slot count never dips below the actual count
             node = channels.addElement(channel);
             pendingConnections.remove(connectionPromise);
+            consecutiveFailures = 0;
         }
         connectionPromise.setSuccess(node);
     }
@@ -185,6 +227,9 @@ public class AggressiveChannelPool implements ChannelPool {
     private void failConnection(Promise<EvictLinkedNode<Channel>> connectionPromise, @Nullable Throwable cause) {
         synchronized (slotLock) {
             pendingConnections.remove(connectionPromise);
+            consecutiveFailures++;
+            backoffUntilNanos = System.nanoTime()
+                    + TimeUnit.MILLISECONDS.toNanos(reconnectBackoffMillis(consecutiveFailures));
         }
         connectionPromise.setFailure(cause != null ? cause : new Exception("Connection to " + connectAddress + ":" + connectPort + " failed"));
     }

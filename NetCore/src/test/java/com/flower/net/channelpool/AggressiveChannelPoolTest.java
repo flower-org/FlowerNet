@@ -99,6 +99,40 @@ public class AggressiveChannelPoolTest {
         protected long connectionSetupTimeoutMillis() {
             return setupTimeoutMillis;
         }
+
+        /** These tests check slot accounting, so failures are retried right away. */
+        @Override
+        protected long initialReconnectBackoffMillis() {
+            return 0;
+        }
+    }
+
+    /** Pool with a short, observable backoff. */
+    static class BackoffPool extends AggressiveChannelPool {
+        BackoffPool(Bootstrap bootstrap, int port, int maxChannels) {
+            super(bootstrap, InetAddress.getLoopbackAddress(), port, maxChannels, null);
+        }
+
+        @Override
+        protected long initialReconnectBackoffMillis() {
+            return 200;
+        }
+
+        @Override
+        protected long maxReconnectBackoffMillis() {
+            return 400;
+        }
+    }
+
+    static int closedPort() throws IOException {
+        try (ServerSocket unused = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            return unused.getLocalPort();
+        }
+    }
+
+    static boolean isBackoff(Future<?> future) {
+        return future.isDone() && future.cause() instanceof ConnectException
+                && future.cause().getMessage().startsWith("Not connecting");
     }
 
     static void waitFor(java.util.function.BooleanSupplier condition) throws InterruptedException {
@@ -188,23 +222,71 @@ public class AggressiveChannelPoolTest {
     }
 
     @Test
-    void failedConnectionReportsCauseAndFreesSlot() throws Exception {
-        int closedPort;
-        try (ServerSocket unused = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
-            closedPort = unused.getLocalPort();
-        }
-        AggressiveChannelPool pool = new AggressiveChannelPool(
-                bootstrap, InetAddress.getLoopbackAddress(), closedPort, 1, null);
+    void failedConnectionReportsCauseAndBacksOff() throws Exception {
+        BackoffPool pool = new BackoffPool(bootstrap, closedPort(), 1);
 
         Future<EvictLinkedNode<Channel>> first = pool.getChannel();
         assertTrue(first.await(5, TimeUnit.SECONDS));
         assertInstanceOf(ConnectException.class, first.cause());
+        assertFalse(isBackoff(first));
 
-        // The slot was released, so a new attempt is made rather than reusing the failed one
+        // Right after the failure, callers fail fast without a new connection attempt
         Future<EvictLinkedNode<Channel>> second = pool.getChannel();
-        assertTrue(second != first);
-        assertTrue(second.await(5, TimeUnit.SECONDS));
-        assertFalse(second.isSuccess());
+        assertTrue(isBackoff(second), String.valueOf(second.cause()));
+
+        // Once the backoff ends, the slot is free for a new attempt
+        Thread.sleep(250);
+        Future<EvictLinkedNode<Channel>> third = pool.getChannel();
+        assertTrue(third.await(5, TimeUnit.SECONDS));
+        assertFalse(isBackoff(third));
+
+        // The second failure doubles the backoff, up to the max
+        assertEquals(200, pool.reconnectBackoffMillis(1));
+        assertEquals(400, pool.reconnectBackoffMillis(2));
+        assertEquals(400, pool.reconnectBackoffMillis(40));
+        Thread.sleep(250);
+        assertTrue(isBackoff(pool.getChannel()));
+        Thread.sleep(200);
+        assertFalse(isBackoff(pool.getChannel()));
+    }
+
+    @Test
+    void establishedChannelsAreUsedDuringBackoffAndSuccessResetsIt() throws Exception {
+        ManualSetupPool pool = new ManualSetupPool(bootstrap, server.getLocalPort(), 2) {
+            @Override
+            protected long initialReconnectBackoffMillis() {
+                return 300;
+            }
+        };
+        Future<EvictLinkedNode<Channel>> first = pool.getChannel();
+        waitFor(() -> pool.setups.size() == 1);
+        pool.setups.get(0).setSuccess(null);
+        assertTrue(first.await(5, TimeUnit.SECONDS));
+
+        // A second connection fails: the pool has a free slot but doesn't try it while backing off
+        Future<EvictLinkedNode<Channel>> failing = pool.getChannel();
+        waitFor(() -> pool.setups.size() == 2);
+        pool.setups.get(1).setFailure(new RuntimeException("handshake failed"));
+        assertTrue(failing.await(5, TimeUnit.SECONDS));
+        for (int i = 0; i < 5; i++) {
+            Future<EvictLinkedNode<Channel>> reused = pool.getChannel();
+            assertTrue(reused.isSuccess());
+            assertSame(first.getNow().value(), reused.getNow().value());
+        }
+        assertEquals(2, pool.setups.size());
+
+        // After the backoff a new connection is made, and its success resets the backoff
+        Thread.sleep(350);
+        Future<EvictLinkedNode<Channel>> next = pool.getChannel();
+        waitFor(() -> pool.setups.size() == 3);
+        pool.setups.get(2).setSuccess(null);
+        assertTrue(next.await(5, TimeUnit.SECONDS));
+        assertTrue(next.isSuccess());
+        first.getNow().value().close().sync();
+        next.getNow().value().close().sync();
+        Future<EvictLinkedNode<Channel>> afterReset = pool.getChannel();
+        assertFalse(isBackoff(afterReset));
+        waitFor(() -> pool.setups.size() == 4);
     }
 
     @Test

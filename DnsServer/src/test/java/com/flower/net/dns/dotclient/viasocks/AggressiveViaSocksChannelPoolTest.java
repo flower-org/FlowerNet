@@ -133,6 +133,12 @@ public class AggressiveViaSocksChannelPoolTest {
             protected long connectionSetupTimeoutMillis() {
                 return setupTimeoutMillis;
             }
+
+            /** These tests check that failed slots are freed, so failures are retried right away. */
+            @Override
+            protected long initialReconnectBackoffMillis() {
+                return 0;
+            }
         };
     }
 

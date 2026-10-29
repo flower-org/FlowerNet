@@ -3,6 +3,7 @@ package com.flower.net.dns.dotclient;
 import com.flower.net.channelpool.AggressiveChannelPool;
 import com.flower.net.channelpool.ChannelPool;
 import com.flower.net.dns.dotclient.viasocks.AggressiveViaSocksChannelPool;
+import com.flower.net.dns.dotclient.viasocks.Socks5Credentials;
 import com.flower.net.utils.EmptyPipelineChannelInitializer;
 import com.flower.net.utils.ServerUtil;
 import com.flower.net.utils.evictlist.EvictLinkedNode;
@@ -83,6 +84,13 @@ public class DnsOverTlsClient {
     public DnsOverTlsClient(String socksServerHost, int socksServerPort,
                             String dnsServerHost, int dnsServerPort,
                             TrustManagerFactory trustManager, boolean useCache, @Nullable String bindClientToIp) throws SSLException {
+        this(socksServerHost, socksServerPort, null, dnsServerHost, dnsServerPort, trustManager, useCache, bindClientToIp);
+    }
+
+    /** Connects to the DoT server through a SOCKS5 proxy, authenticating with {@code socksCredentials} if given. */
+    public DnsOverTlsClient(String socksServerHost, int socksServerPort, @Nullable Socks5Credentials socksCredentials,
+                            String dnsServerHost, int dnsServerPort,
+                            TrustManagerFactory trustManager, boolean useCache, @Nullable String bindClientToIp) throws SSLException {
         this.socksServerAddress = ServerUtil.getByName(socksServerHost);
         this.socksServerPort = socksServerPort;
 
@@ -110,6 +118,7 @@ public class DnsOverTlsClient {
                 .handler(new EmptyPipelineChannelInitializer());
 
         this.channelPool = new AggressiveViaSocksChannelPool(bootstrap, socksServerAddress, socksServerPort,
+                socksCredentials,
                 dnsServerHost, dnsServerPort,
                 this,
                 MAX_PARALLEL_CHANNELS,
@@ -144,16 +153,7 @@ public class DnsOverTlsClient {
                 @Override
                 protected void initChannel(SocketChannel ch) {
                     ChannelPipeline p = ch.pipeline();
-                    SslHandler sslHandler = sslCtx.newHandler(ch.alloc());
-                    sslHandler.setHandshakeTimeoutMillis(SSL_HANDSHAKE_TIMEOUT_MILLIS);
-                    sslHandler.handshakeFuture().addListener(
-                        future -> {
-                            if (!future.isSuccess()) {
-                                LOGGER.error("DnsOverTlsClient - TLS Handshake Failed", future.cause());
-                            }
-                        }
-                    );
-
+                    SslHandler sslHandler = newSslHandler(ch, SSL_HANDSHAKE_TIMEOUT_MILLIS);
                     p.addLast(sslHandler);
                     addDnsHandlers(p);
                 }
@@ -162,6 +162,18 @@ public class DnsOverTlsClient {
 
         if (useCache) { cache = new AnswerCache(); }
                 else  { cache = null; }
+    }
+
+    /** Creates a TLS handler for a connection to the DoT server, with a handshake timeout; failures are logged. */
+    public SslHandler newSslHandler(Channel channel, long handshakeTimeoutMillis) {
+        SslHandler sslHandler = sslCtx.newHandler(channel.alloc());
+        sslHandler.setHandshakeTimeoutMillis(handshakeTimeoutMillis);
+        sslHandler.handshakeFuture().addListener(future -> {
+            if (!future.isSuccess()) {
+                LOGGER.error("DnsOverTlsClient - TLS Handshake Failed", future.cause());
+            }
+        });
+        return sslHandler;
     }
 
     /**

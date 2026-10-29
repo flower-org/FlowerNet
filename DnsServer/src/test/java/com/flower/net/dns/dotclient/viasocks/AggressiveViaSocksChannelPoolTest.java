@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import javax.annotation.Nullable;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,6 +22,7 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -31,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** A failed SOCKS tunnel must fail the caller and free its pool slot, rather than stay pending forever. */
@@ -39,7 +42,11 @@ public class AggressiveViaSocksChannelPoolTest {
     static final int MAX_CHANNELS = 3;
     static final int ATTEMPTS = MAX_CHANNELS + 2;
 
-    enum ProxyBehavior { REJECT_CONNECT, CLOSE_AFTER_GREETING, SILENT }
+    enum ProxyBehavior { REJECT_CONNECT, CLOSE_AFTER_GREETING, SILENT, NO_ACCEPTABLE_METHOD, REQUIRE_PASSWORD, CONNECT_THEN_NOT_TLS }
+
+    static final String USERNAME = "user";
+    static final String PASSWORD = "secret";
+    static final Socks5Credentials GOOD_CREDENTIALS = new Socks5Credentials(USERNAME, PASSWORD);
 
     NioEventLoopGroup group;
     Bootstrap bootstrap;
@@ -47,6 +54,10 @@ public class AggressiveViaSocksChannelPoolTest {
     ServerSocket proxy;
     final List<Socket> accepted = new CopyOnWriteArrayList<>();
     final AtomicInteger closedByClient = new AtomicInteger();
+    /** Auth methods offered by the client in its last greeting. */
+    volatile List<Integer> offeredMethods = List.of();
+    /** First byte the client sent through an established tunnel; 0x16 is a TLS handshake record. */
+    final List<Integer> firstTunnelBytes = new CopyOnWriteArrayList<>();
 
     @BeforeEach
     void setUp() throws Exception {
@@ -100,18 +111,60 @@ public class AggressiveViaSocksChannelPoolTest {
             }
             // Greeting: VER, NMETHODS, METHODS
             in.readByte();
-            in.readFully(new byte[in.readUnsignedByte()]);
+            byte[] methods = new byte[in.readUnsignedByte()];
+            in.readFully(methods);
+            List<Integer> offered = new ArrayList<>();
+            for (byte method : methods) {
+                offered.add(method & 0xFF);
+            }
+            offeredMethods = offered;
             if (behavior == ProxyBehavior.CLOSE_AFTER_GREETING) {
                 socket.close();
                 return;
             }
-            out.write(new byte[] {5, 0});
-            out.flush();
+            if (behavior == ProxyBehavior.NO_ACCEPTABLE_METHOD) {
+                out.write(new byte[] {5, (byte) 0xFF});
+                out.flush();
+                drainUntilClientCloses(in);
+                return;
+            }
+            if (behavior == ProxyBehavior.REQUIRE_PASSWORD) {
+                out.write(new byte[] {5, 2});
+                out.flush();
+                // RFC 1929: VER=1, ULEN, UNAME, PLEN, PASSWD
+                assertEquals(1, in.readUnsignedByte());
+                byte[] username = new byte[in.readUnsignedByte()];
+                in.readFully(username);
+                byte[] password = new byte[in.readUnsignedByte()];
+                in.readFully(password);
+                boolean ok = USERNAME.equals(new String(username, StandardCharsets.US_ASCII))
+                        && PASSWORD.equals(new String(password, StandardCharsets.US_ASCII));
+                out.write(new byte[] {1, (byte) (ok ? 0 : 1)});
+                out.flush();
+                if (!ok) {
+                    drainUntilClientCloses(in);
+                    return;
+                }
+            } else {
+                out.write(new byte[] {5, 0});
+                out.flush();
+            }
             // CONNECT: VER, CMD, RSV, ATYP=DOMAIN, LEN, HOST, PORT
-            in.readFully(new byte[4]);
+            in.readFully(new byte[3]);
+            assertEquals(3, in.readUnsignedByte());
             in.readFully(new byte[in.readUnsignedByte() + 2]);
-            // Reply "connection refused" (0x05) and keep the socket open: the client must give up on its own
-            out.write(new byte[] {5, 5, 0, 1, 0, 0, 0, 0, 0, 0});
+            if (behavior == ProxyBehavior.REJECT_CONNECT) {
+                // Reply "connection refused" (0x05) and keep the socket open: the client must give up on its own
+                out.write(new byte[] {5, 5, 0, 1, 0, 0, 0, 0, 0, 0});
+                out.flush();
+                drainUntilClientCloses(in);
+                return;
+            }
+            out.write(new byte[] {5, 0, 0, 1, 0, 0, 0, 0, 0, 0});
+            out.flush();
+            // The tunnel is up: the client should now start TLS. Answer with something that isn't TLS.
+            firstTunnelBytes.add(in.readUnsignedByte());
+            out.write("HTTP/1.1 400 Bad Request\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
             out.flush();
             drainUntilClientCloses(in);
         } catch (IOException e) {
@@ -127,8 +180,12 @@ public class AggressiveViaSocksChannelPoolTest {
     }
 
     AggressiveViaSocksChannelPool pool(long setupTimeoutMillis) {
+        return pool(setupTimeoutMillis, null);
+    }
+
+    AggressiveViaSocksChannelPool pool(long setupTimeoutMillis, @Nullable Socks5Credentials credentials) {
         return new AggressiveViaSocksChannelPool(bootstrap, InetAddress.getLoopbackAddress(), proxy.getLocalPort(),
-                "one.one.one.one", 853, dnsClient, MAX_CHANNELS, null) {
+                credentials, "one.one.one.one", 853, dnsClient, MAX_CHANNELS, null) {
             @Override
             protected long connectionSetupTimeoutMillis() {
                 return setupTimeoutMillis;
@@ -188,5 +245,75 @@ public class AggressiveViaSocksChannelPoolTest {
         }
         // Timed-out channels are closed by the pool
         waitFor(() -> closedByClient.get() == ATTEMPTS);
+    }
+
+    static void assertMessageContains(Throwable cause, String text) {
+        assertInstanceOf(IOException.class, cause);
+        assertTrue(String.valueOf(cause.getMessage()).contains(text), String.valueOf(cause));
+    }
+
+    @Test
+    void withoutCredentialsOnlyNoAuthIsOffered() throws Exception {
+        startProxy(ProxyBehavior.REJECT_CONNECT);
+        assertEveryAttemptFails(pool(10_000));
+        assertEquals(List.of(0), offeredMethods);
+    }
+
+    @Test
+    void noAcceptableMethodFailsAndFreesSlot() throws Exception {
+        startProxy(ProxyBehavior.NO_ACCEPTABLE_METHOD);
+        for (Throwable cause : assertEveryAttemptFails(pool(10_000, GOOD_CREDENTIALS))) {
+            assertMessageContains(cause, "none of the offered authentication methods");
+        }
+        assertEquals(List.of(0, 2), offeredMethods);
+        waitFor(() -> closedByClient.get() == ATTEMPTS);
+    }
+
+    @Test
+    void passwordRequiredWithoutCredentialsFails() throws Exception {
+        startProxy(ProxyBehavior.REQUIRE_PASSWORD);
+        for (Throwable cause : assertEveryAttemptFails(pool(10_000))) {
+            assertMessageContains(cause, "requires a username/password");
+        }
+    }
+
+    @Test
+    void wrongPasswordFailsAndFreesSlot() throws Exception {
+        startProxy(ProxyBehavior.REQUIRE_PASSWORD);
+        for (Throwable cause : assertEveryAttemptFails(pool(10_000, new Socks5Credentials(USERNAME, "wrong")))) {
+            assertMessageContains(cause, "rejected the username/password");
+        }
+        waitFor(() -> closedByClient.get() == ATTEMPTS);
+    }
+
+    @Test
+    void passwordAuthReachesTlsThroughTunnel() throws Exception {
+        startProxy(ProxyBehavior.REQUIRE_PASSWORD);
+        // The fake server isn't TLS, so the handshake fails, but only after the client sent its ClientHello
+        for (Throwable cause : assertEveryAttemptFails(pool(10_000, GOOD_CREDENTIALS))) {
+            assertFalse(cause instanceof TimeoutException, String.valueOf(cause));
+            assertFalse(String.valueOf(cause.getMessage()).contains("SOCKS5"), String.valueOf(cause));
+        }
+        assertEquals(List.of(0, 2), offeredMethods);
+        waitFor(() -> firstTunnelBytes.size() == ATTEMPTS);
+        assertTrue(firstTunnelBytes.stream().allMatch(b -> b == 0x16), String.valueOf(firstTunnelBytes));
+    }
+
+    @Test
+    void noAuthReachesTlsThroughTunnel() throws Exception {
+        startProxy(ProxyBehavior.CONNECT_THEN_NOT_TLS);
+        for (Throwable cause : assertEveryAttemptFails(pool(10_000))) {
+            assertFalse(cause instanceof TimeoutException, String.valueOf(cause));
+        }
+        waitFor(() -> firstTunnelBytes.size() == ATTEMPTS);
+        assertTrue(firstTunnelBytes.stream().allMatch(b -> b == 0x16), String.valueOf(firstTunnelBytes));
+    }
+
+    @Test
+    void invalidCredentialsAreRejected() {
+        assertThrows(IllegalArgumentException.class, () -> new Socks5Credentials("", PASSWORD));
+        assertThrows(IllegalArgumentException.class, () -> new Socks5Credentials(USERNAME, "x".repeat(256)));
+        assertThrows(IllegalArgumentException.class, () -> new Socks5Credentials("us\u00e9r", PASSWORD));
+        assertFalse(GOOD_CREDENTIALS.toString().contains(PASSWORD));
     }
 }

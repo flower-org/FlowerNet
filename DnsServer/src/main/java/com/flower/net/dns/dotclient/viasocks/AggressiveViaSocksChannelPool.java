@@ -4,8 +4,6 @@ import com.flower.net.channelpool.AggressiveChannelPool;
 import com.flower.net.dns.dotclient.DnsOverTlsClient;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelPipeline;
-import io.netty.handler.codec.socksx.v5.*;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 
@@ -20,6 +18,7 @@ import java.net.InetAddress;
 public class AggressiveViaSocksChannelPool extends AggressiveChannelPool {
     final String dotServerHost;
     final int dotServerPort;
+    @Nullable final Socks5Credentials credentials;
     final DnsOverTlsClient dnsClient;
 
     public AggressiveViaSocksChannelPool(Bootstrap bootstrap,
@@ -28,29 +27,28 @@ public class AggressiveViaSocksChannelPool extends AggressiveChannelPool {
                                          DnsOverTlsClient dnsClient,
                                          int maxChannels,
                                          @Nullable String bindClientToIp) {
-        super(bootstrap, connectAddress, connectPort, maxChannels,bindClientToIp);
+        this(bootstrap, connectAddress, connectPort, null, dotServerHost, dotServerPort, dnsClient, maxChannels,
+                bindClientToIp);
+    }
+
+    public AggressiveViaSocksChannelPool(Bootstrap bootstrap,
+                                         InetAddress connectAddress, int connectPort,
+                                         @Nullable Socks5Credentials credentials,
+                                         String dotServerHost, int dotServerPort,
+                                         DnsOverTlsClient dnsClient,
+                                         int maxChannels,
+                                         @Nullable String bindClientToIp) {
+        super(bootstrap, connectAddress, connectPort, maxChannels, bindClientToIp);
         this.dotServerHost = dotServerHost;
         this.dotServerPort = dotServerPort;
+        this.credentials = credentials;
         this.dnsClient = dnsClient;
     }
 
     @Override
     protected Future<?> onConnected(Channel channel) {
         Promise<Channel> tunnelReady = channel.eventLoop().newPromise();
-        tunnelConnection(channel, dotServerHost, dotServerPort, dnsClient, tunnelReady);
+        Socks5TunnelHandler.install(channel, dotServerHost, dotServerPort, credentials, dnsClient, tunnelReady);
         return tunnelReady;
-    }
-
-    void tunnelConnection(Channel channel,
-                          String dstAddr,
-                          int dstPort,
-                          DnsOverTlsClient dnsClient,
-                          Promise<Channel> tunnelReady) {
-        ChannelPipeline pipeline = channel.pipeline();
-        pipeline.addLast(new Socks5InitialResponseDecoder());
-        pipeline.addLast(Socks5ClientEncoder.DEFAULT);
-        pipeline.addLast(new Socks5ClientHandler(dstAddr, dstPort, dnsClient, tunnelReady));
-
-        channel.writeAndFlush(new DefaultSocks5InitialRequest(Socks5AuthMethod.NO_AUTH));
     }
 }

@@ -1,6 +1,7 @@
 package com.flower.net.dns;
 
 import com.flower.net.dns.dotclient.DnsOverTlsClient;
+import com.flower.net.dns.dotclient.viasocks.Socks5Credentials;
 import com.flower.crypt.PkiUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
@@ -45,8 +46,15 @@ public class DnsServer {
             SOCKS_SERVER_ADDRESS = args[2];
             SOCKS_SERVER_PORT = Integer.parseInt(args[3]);
 
+            // Credentials come from the environment so the password doesn't show up in the process list
+            String socksUsername = System.getenv("SOCKS_USERNAME");
+            String socksPassword = System.getenv("SOCKS_PASSWORD");
+            Socks5Credentials socksCredentials = socksUsername == null || socksUsername.isEmpty() ? null
+                    : new Socks5Credentials(socksUsername, socksPassword == null ? "" : socksPassword);
+
             client = new DnsOverTlsClient(SOCKS_SERVER_ADDRESS,
                                           SOCKS_SERVER_PORT,
+                                          socksCredentials,
                                           OTHER_DNS_TLS_SERVER_ADDRESS,
                                           OTHER_DNS_TLS_SERVER_PORT,
                                           TRUST_MANAGER,

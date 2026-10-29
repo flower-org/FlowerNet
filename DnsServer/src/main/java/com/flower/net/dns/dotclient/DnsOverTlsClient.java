@@ -171,11 +171,12 @@ public class DnsOverTlsClient {
      * The caller keeps ownership of {@code query}; it's not retained or released here.
      * The response passed to the consumer carries the original query's ID.
      * The consumer is called exactly once: with the upstream response, or with SERVFAIL if none could be obtained.
+     * The consumer owns the response it receives and must release it (writing it to a channel does that).
      */
     public void query(DnsQuery query, Consumer<DefaultDnsResponse> dnsResponseConsumer) {
         DnsQuestion qQuestion = query.recordAt(DnsSection.QUESTION, 0);
         if (useCache) {
-            DefaultDnsResponse response = checkNotNull(cache).getResponseIfPresent(qQuestion);
+            DefaultDnsResponse response = checkNotNull(cache).getResponseIfPresent(qQuestion, query.id());
             if (response != null) {
                 LOGGER.info("{} | Cache hit!", query.id());
                 dnsResponseConsumer.accept(response);
@@ -219,9 +220,7 @@ public class DnsOverTlsClient {
         for (DnsSection section : DnsSection.values()) {
             for (int i = 0, count = query.count(section); i < count; i++) {
                 DnsRecord record = query.recordAt(section, i);
-                copy.addRecord(section, record instanceof DnsRawRecord
-                        ? ((DnsRawRecord) record).retainedDuplicate()
-                        : record);
+                copy.addRecord(section, DnsMessages.retainedDuplicate(record));
             }
         }
         return copy;
@@ -325,14 +324,14 @@ public class DnsOverTlsClient {
         return pendingQueries;
     }
 
+    /** Doesn't take ownership of {@code msg}: the consumer gets its own copy, and the cache a snapshot. */
     public void handleQueryResp(DefaultDnsResponse msg) {
         UpstreamQueryRegistry.PendingQuery pendingQuery = pendingQueries.complete(msg);
         if (pendingQuery != null) {
-            msg.setId(pendingQuery.originalId());
-            pendingQuery.callback().accept(msg);
             if (useCache) {
                 checkNotNull(cache).putResponse(pendingQuery.question(), msg);
             }
+            pendingQuery.callback().accept(DnsMessages.retainedCopy(msg, pendingQuery.originalId()));
         }
     }
 }

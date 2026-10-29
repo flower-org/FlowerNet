@@ -1,5 +1,6 @@
 package com.flower.net.dns;
 
+import com.flower.net.dns.dotclient.DnsMessages;
 import com.flower.net.dns.dotclient.DnsOverTlsClient;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
@@ -16,6 +17,8 @@ import io.netty.util.NetUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.InetSocketAddress;
+
 public class DnsMessageHandler extends SimpleChannelInboundHandler<DatagramDnsQuery> {
     final static Logger LOGGER = LoggerFactory.getLogger(DnsMessageHandler.class);
 
@@ -30,11 +33,19 @@ public class DnsMessageHandler extends SimpleChannelInboundHandler<DatagramDnsQu
         DnsQuestion qQuestion = query.recordAt(DnsSection.QUESTION, 0);
         LOGGER.info("{} | request: {} / question count {}", query.id(), qQuestion.name(), query.count(DnsSection.QUESTION));
 
+        // The query is released when this method returns, while the answer may arrive later: keep only its addresses
+        InetSocketAddress queryRecipient = query.recipient();
+        InetSocketAddress querySender = query.sender();
         client.query(query,
             tcpResponse -> {
-                logResponse(tcpResponse);
-
-                DatagramDnsResponse udpResponse = convertToUdpResponse(query, tcpResponse);
+                // We own tcpResponse; the UDP response gets its own references and is released by the encoder
+                DatagramDnsResponse udpResponse;
+                try {
+                    logResponse(tcpResponse);
+                    udpResponse = convertToUdpResponse(queryRecipient, querySender, tcpResponse);
+                } finally {
+                    tcpResponse.release();
+                }
                 ctx.writeAndFlush(udpResponse);
             }
         );
@@ -45,15 +56,19 @@ public class DnsMessageHandler extends SimpleChannelInboundHandler<DatagramDnsQu
         LOGGER.error("DnsMessageHandler.exceptionCaught", cause);
     }
 
-    protected DatagramDnsResponse convertToUdpResponse(DatagramDnsQuery query, DefaultDnsResponse tcpResponse) {
-        DatagramDnsResponse udpResponse = new DatagramDnsResponse(query.recipient(), query.sender(), query.id());
-        udpResponse.retain();
+    /** Doesn't take ownership of {@code tcpResponse}: the returned response holds its own references to the records. */
+    protected static DatagramDnsResponse convertToUdpResponse(InetSocketAddress queryRecipient,
+                                                              InetSocketAddress querySender,
+                                                              DefaultDnsResponse tcpResponse) {
+        // The reply goes back from where the query was received to whoever sent it
+        DatagramDnsResponse udpResponse = new DatagramDnsResponse(
+                /* sender= */ queryRecipient, /* recipient= */ querySender, tcpResponse.id());
         udpResponse.setCode(tcpResponse.code());
         for (DnsSection section : DnsSection.values()) {
             int count = tcpResponse.count(section);
             for (int i = 0; i < count; i++) {
                 DnsRecord record = tcpResponse.recordAt(section, i);
-                udpResponse.addRecord(section, record);
+                udpResponse.addRecord(section, DnsMessages.retainedDuplicate(record));
             }
         }
 

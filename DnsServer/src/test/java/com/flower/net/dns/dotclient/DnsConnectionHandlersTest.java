@@ -55,9 +55,9 @@ public class DnsConnectionHandlersTest {
         DnsQuestion qb = new DefaultDnsQuestion("b.com.", DnsRecordType.A);
         List<String> received = new ArrayList<>();
         UpstreamQueryRegistry.PendingQuery a = client.pendingQueries().register(1, qa,
-                r -> received.add(r.id() + ":" + r.recordAt(DnsSection.QUESTION, 0).name()));
+                r -> { received.add(r.id() + ":" + r.recordAt(DnsSection.QUESTION, 0).name()); r.release(); });
         UpstreamQueryRegistry.PendingQuery b = client.pendingQueries().register(2, qb,
-                r -> received.add(r.id() + ":" + r.recordAt(DnsSection.QUESTION, 0).name()));
+                r -> { received.add(r.id() + ":" + r.recordAt(DnsSection.QUESTION, 0).name()); r.release(); });
 
         // Responses may arrive out of order, both on the same connection
         channel.writeInbound(wireResponse(b.upstreamId(), qb));

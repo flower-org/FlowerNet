@@ -46,6 +46,7 @@ public class DnsMessageHandlerTest {
         final boolean deferred;
         final List<Runnable> pending = new ArrayList<>();
         final List<ByteBuf> buffers = new ArrayList<>();
+        int queries;
 
         FakeClient(boolean deferred) throws Exception {
             super("1.1.1.1", 853, InsecureTrustManagerFactory.INSTANCE, false, null);
@@ -54,6 +55,7 @@ public class DnsMessageHandlerTest {
 
         @Override
         public void query(DnsQuery query, Consumer<DefaultDnsResponse> consumer) {
+            queries++;
             int id = query.id();
             Runnable answer = () -> {
                 ByteBuf content = PooledByteBufAllocator.DEFAULT.directBuffer().writeBytes(ADDRESS);
@@ -130,6 +132,50 @@ public class DnsMessageHandlerTest {
             assertEquals(0b1011_0011, wire.getUnsignedByte(3));
         } finally {
             packet.release();
+        }
+    }
+
+    DatagramDnsResponse rejected(DatagramDnsQuery query, DnsResponseCode expectedCode) throws Exception {
+        client = new FakeClient(false);
+        EmbeddedChannel channel = new EmbeddedChannel(new DnsMessageHandler(client));
+        channel.writeInbound(query);
+        DatagramDnsResponse response = channel.readOutbound();
+        assertEquals(0, client.queries, "must not be forwarded");
+        assertEquals(1234, response.id());
+        assertEquals(expectedCode, response.code());
+        assertEquals(query.opCode(), response.opCode());
+        assertTrue(response.isRecursionDesired());
+        assertTrue(response.isRecursionAvailable());
+        assertEquals(CLIENT, response.recipient());
+        assertEquals(0, response.count(DnsSection.ANSWER));
+        response.release();
+        return response;
+    }
+
+    @Test
+    void queryWithoutQuestionGetsFormErr() throws Exception {
+        DatagramDnsQuery query = new DatagramDnsQuery(CLIENT, SERVER, 1234);
+        query.setRecursionDesired(true);
+        rejected(query, DnsResponseCode.FORMERR);
+    }
+
+    @Test
+    void queryWithTwoQuestionsGetsFormErr() throws Exception {
+        DatagramDnsQuery query = query();
+        query.setRecursionDesired(true);
+        query.addRecord(DnsSection.QUESTION, new DefaultDnsQuestion("other.org.", DnsRecordType.AAAA));
+        rejected(query, DnsResponseCode.FORMERR);
+    }
+
+    @Test
+    void nonQueryOpcodesGetNotImp() throws Exception {
+        for (DnsOpCode opCode : new DnsOpCode[] {DnsOpCode.IQUERY, DnsOpCode.STATUS, DnsOpCode.NOTIFY,
+                DnsOpCode.UPDATE}) {
+            DatagramDnsQuery query = new DatagramDnsQuery(CLIENT, SERVER, 1234, opCode);
+            query.setRecursionDesired(true);
+            query.addRecord(DnsSection.QUESTION, QUESTION);
+            rejected(query, DnsResponseCode.NOTIMP);
+            client.shutdown();
         }
     }
 

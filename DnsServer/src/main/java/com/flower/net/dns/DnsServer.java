@@ -8,7 +8,6 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioDatagramChannel;
-import io.netty.handler.codec.dns.DatagramDnsQueryDecoder;
 import io.netty.handler.codec.dns.DatagramDnsResponseEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,7 +67,7 @@ public class DnsServer {
                     .handler(new ChannelInitializer<NioDatagramChannel>() {
                         @Override
                         protected void initChannel(NioDatagramChannel nioDatagramChannel) {
-                            nioDatagramChannel.pipeline().addLast(new DatagramDnsQueryDecoder());
+                            nioDatagramChannel.pipeline().addLast(new LenientDnsQueryDecoder());
                             nioDatagramChannel.pipeline().addLast(new DatagramDnsResponseEncoder());
                             nioDatagramChannel.pipeline().addLast(new DnsMessageHandler(client));
                         }

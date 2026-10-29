@@ -8,15 +8,19 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.dns.DatagramDnsQuery;
 import io.netty.handler.codec.dns.DatagramDnsResponse;
 import io.netty.handler.codec.dns.DefaultDnsResponse;
+import io.netty.handler.codec.dns.DnsOpCode;
+import io.netty.handler.codec.dns.DnsQuery;
 import io.netty.handler.codec.dns.DnsQuestion;
 import io.netty.handler.codec.dns.DnsRawRecord;
 import io.netty.handler.codec.dns.DnsRecord;
 import io.netty.handler.codec.dns.DnsRecordType;
+import io.netty.handler.codec.dns.DnsResponseCode;
 import io.netty.handler.codec.dns.DnsSection;
 import io.netty.util.NetUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.net.InetSocketAddress;
 
 public class DnsMessageHandler extends SimpleChannelInboundHandler<DatagramDnsQuery> {
@@ -28,10 +32,37 @@ public class DnsMessageHandler extends SimpleChannelInboundHandler<DatagramDnsQu
         this.client = client;
     }
 
+    /** Returns the error to reply with if the query can't be forwarded, or null if it's valid. */
+    @Nullable
+    static DnsResponseCode validate(DnsQuery query) {
+        if (!DnsOpCode.QUERY.equals(query.opCode())) {
+            return DnsResponseCode.NOTIMP;
+        }
+        // Multiple questions are undefined in practice (RFC 9619), and no upstream supports them
+        if (query.count(DnsSection.QUESTION) != 1) {
+            return DnsResponseCode.FORMERR;
+        }
+        return null;
+    }
+
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, DatagramDnsQuery query) {
+        DnsResponseCode error = validate(query);
+        if (error != null) {
+            LOGGER.info("{} | rejected with {}: opcode {}, question count {}", query.id(), error, query.opCode(),
+                    query.count(DnsSection.QUESTION));
+            DatagramDnsResponse reply = errorReply(query.recipient(), query.sender(), query.id(), query.opCode(),
+                    query.isRecursionDesired(), error);
+            for (int i = 0, count = query.count(DnsSection.QUESTION); i < count; i++) {
+                DnsQuestion question = query.recordAt(DnsSection.QUESTION, i);
+                reply.addRecord(DnsSection.QUESTION, question);
+            }
+            ctx.writeAndFlush(reply);
+            return;
+        }
+
         DnsQuestion qQuestion = query.recordAt(DnsSection.QUESTION, 0);
-        LOGGER.info("{} | request: {} / question count {}", query.id(), qQuestion.name(), query.count(DnsSection.QUESTION));
+        LOGGER.info("{} | request: {}", query.id(), qQuestion.name());
 
         // The query is released when this method returns, while the answer may arrive later: keep only its addresses
         InetSocketAddress queryRecipient = query.recipient();
@@ -54,6 +85,16 @@ public class DnsMessageHandler extends SimpleChannelInboundHandler<DatagramDnsQu
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         LOGGER.error("DnsMessageHandler.exceptionCaught", cause);
+    }
+
+    /** An error reply with no records; the header echoes the query's ID, opcode and RD (RFC 1035 4.1.1). */
+    static DatagramDnsResponse errorReply(InetSocketAddress queryRecipient, InetSocketAddress querySender, int id,
+                                          DnsOpCode opCode, boolean recursionDesired, DnsResponseCode code) {
+        DatagramDnsResponse reply = new DatagramDnsResponse(
+                /* sender= */ queryRecipient, /* recipient= */ querySender, id, opCode, code);
+        reply.setRecursionDesired(recursionDesired);
+        reply.setRecursionAvailable(true);
+        return reply;
     }
 
     /** Doesn't take ownership of {@code tcpResponse}: the returned response holds its own references to the records. */

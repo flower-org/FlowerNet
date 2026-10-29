@@ -60,6 +60,8 @@ public class DnsOverTlsClient {
     static final int MAX_QUERY_RETRY_COUNT = 2;
     /** Close idle connections before the server does (1.1.1.1 closes after 10s), so we don't write to a closing one. */
     static final long CHANNEL_IDLE_TIMEOUT_MILLIS = 7000L;
+    /** The largest message the 2-byte TCP length prefix can describe (RFC 7766 8). */
+    static final int MAX_TCP_MESSAGE_LENGTH = 65_535;
 
     @Nullable private final InetAddress socksServerAddress;
     @Nullable private final Integer socksServerPort;
@@ -290,7 +292,7 @@ public class DnsOverTlsClient {
     public void addDnsHandlers(ChannelPipeline p) {
         p.addLast(new IdleStateHandler(0, 0, CHANNEL_IDLE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))
             .addLast(new TcpDnsQueryFullHeaderEncoder())
-            .addLast(new TcpDnsResponseDecoder())
+            .addLast(new TcpDnsResponseDecoder(new DecompressingDnsRecordDecoder(), MAX_TCP_MESSAGE_LENGTH))
             .addLast(new SimpleChannelInboundHandler<DefaultDnsResponse>() {
                 @Override
                 protected void channelRead0(ChannelHandlerContext ctx, DefaultDnsResponse msg) {

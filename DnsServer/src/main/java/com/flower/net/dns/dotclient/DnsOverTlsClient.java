@@ -5,8 +5,6 @@ import com.flower.net.channelpool.ChannelPool;
 import com.flower.net.dns.dotclient.viasocks.AggressiveViaSocksChannelPool;
 import com.flower.net.utils.EmptyPipelineChannelInitializer;
 import com.flower.net.utils.ServerUtil;
-import com.flower.net.utils.evictlist.ConcurrentEvictListWithFixedTimeout;
-import com.flower.net.utils.evictlist.EvictLinkedList;
 import com.flower.net.utils.evictlist.EvictLinkedNode;
 import io.netty.bootstrap.Bootstrap;
 
@@ -22,16 +20,18 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.channel.SimpleChannelInboundHandler;
 
+import io.netty.handler.codec.dns.DefaultDnsQuery;
 import io.netty.handler.codec.dns.DefaultDnsResponse;
 import io.netty.handler.codec.dns.DnsQuery;
 import io.netty.handler.codec.dns.DnsQuestion;
+import io.netty.handler.codec.dns.DnsRawRecord;
+import io.netty.handler.codec.dns.DnsRecord;
 import io.netty.handler.codec.dns.DnsSection;
 import io.netty.handler.codec.dns.TcpDnsQueryEncoder;
 import io.netty.handler.codec.dns.TcpDnsResponseDecoder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
-import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +39,6 @@ import javax.annotation.Nullable;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
 import java.net.InetAddress;
-import java.util.Iterator;
 import java.util.function.Consumer;
 
 import static com.flower.net.socksserver.FlowerSslContextBuilder.TLS_CIPHERS;
@@ -64,7 +63,7 @@ public class DnsOverTlsClient {
     private final Bootstrap bootstrap;
 
     private final ChannelPool channelPool;
-    private final EvictLinkedList<Pair<Integer, Pair<DnsQuestion, Consumer<DefaultDnsResponse>>>> callbacks;
+    private final UpstreamQueryRegistry pendingQueries;
 
     private final boolean useCache;
     @Nullable private final AnswerCache cache;
@@ -81,7 +80,6 @@ public class DnsOverTlsClient {
         this.dnsServerPort = dnsServerPort;
         this.bindClientToIp = bindClientToIp;
 
-        this.callbacks = new ConcurrentEvictListWithFixedTimeout<>(CALLBACK_EXPIRATION_TIMEOUT);
 
         // Configure SSL.
         this.sslCtx = SslContextBuilder
@@ -92,6 +90,7 @@ public class DnsOverTlsClient {
                 .build();
 
         group = new NioEventLoopGroup();
+        this.pendingQueries = new UpstreamQueryRegistry(group, CALLBACK_EXPIRATION_TIMEOUT);
         bootstrap = new Bootstrap();
 
         bootstrap.group(group)
@@ -118,7 +117,6 @@ public class DnsOverTlsClient {
         this.socksServerPort = null;
         this.dnsServerAddress = ServerUtil.getByName(dnsServerHost);
         this.dnsServerPort = dnsServerPort;
-        this.callbacks = new ConcurrentEvictListWithFixedTimeout<>(CALLBACK_EXPIRATION_TIMEOUT);
 
         // Configure SSL.
         this.sslCtx = SslContextBuilder
@@ -129,6 +127,7 @@ public class DnsOverTlsClient {
                 .build();
 
         group = new NioEventLoopGroup();
+        this.pendingQueries = new UpstreamQueryRegistry(group, CALLBACK_EXPIRATION_TIMEOUT);
         bootstrap = new Bootstrap();
         bootstrap.group(group)
             .channel(NioSocketChannel.class)
@@ -179,6 +178,11 @@ public class DnsOverTlsClient {
                 else  { cache = null; }
     }
 
+    /**
+     * Sends the query upstream and calls the consumer with the response.
+     * The caller keeps ownership of {@code query}; it's not retained or released here.
+     * The response passed to the consumer carries the original query's ID.
+     */
     public void query(DnsQuery query, Consumer<DefaultDnsResponse> dnsResponseConsumer) {
         DnsQuestion qQuestion = query.recordAt(DnsSection.QUESTION, 0);
         if (useCache) {
@@ -190,33 +194,68 @@ public class DnsOverTlsClient {
             }
         }
 
-        callbacks.addElement(Pair.of(query.id(), Pair.of(qQuestion, dnsResponseConsumer)));
-        query(query, 0);
+        UpstreamQueryRegistry.PendingQuery pendingQuery;
+        try {
+            pendingQuery = pendingQueries.register(query.id(), qQuestion, dnsResponseConsumer);
+        } catch (IllegalStateException e) {
+            LOGGER.warn("{} | Can't send query upstream: {}", query.id(), e.getMessage());
+            return;
+        }
+        LOGGER.debug("{} | Sending upstream as {}", query.id(), pendingQuery.upstreamId());
+        sendUpstream(copyWithId(query, pendingQuery.upstreamId()), pendingQuery, 0);
     }
 
-    protected void query(DnsQuery query, int retry) {
+    /**
+     * Copies the query's header and records under a new ID.
+     * Records are duplicated and retained, so the copy is independent of the original's reference count.
+     */
+    public static DnsQuery copyWithId(DnsQuery query, int id) {
+        DnsQuery copy = new DefaultDnsQuery(id, query.opCode())
+                .setRecursionDesired(query.isRecursionDesired())
+                .setZ(query.z());
+        for (DnsSection section : DnsSection.values()) {
+            for (int i = 0, count = query.count(section); i < count; i++) {
+                DnsRecord record = query.recordAt(section, i);
+                copy.addRecord(section, record instanceof DnsRawRecord
+                        ? ((DnsRawRecord) record).retainedDuplicate()
+                        : record);
+            }
+        }
+        return copy;
+    }
+
+    /** Takes ownership of {@code upstreamQuery} and releases it once sent or abandoned. */
+    protected void sendUpstream(DnsQuery upstreamQuery, UpstreamQueryRegistry.PendingQuery pendingQuery, int retry) {
         if (retry > MAX_QUERY_RETRY_COUNT) {
-            LOGGER.info("{} | DoT Server request failed after retry# {}", query.id(), retry);
+            LOGGER.info("{} | DoT Server request failed after retry# {}", pendingQuery.originalId(), retry);
+            pendingQueries.cancel(pendingQuery);
+            upstreamQuery.release();
             return;
         }
 
         channelPool.getChannel().addListener(channelFuture -> {
             if (channelFuture.isSuccess()) {
+                @SuppressWarnings("unchecked")
                 EvictLinkedNode<Channel> channelRecord = (EvictLinkedNode<Channel>)channelFuture.get();
                 final Channel ch = channelRecord.value();
-                ch.writeAndFlush(query)
+                // The encoder releases the message it writes; keep our own reference for retries.
+                upstreamQuery.retain();
+                ch.writeAndFlush(upstreamQuery)
                     .addListener(
                         writeFuture -> {
                             if (!writeFuture.isSuccess()) {
                                 channelPool.returnFailedChannel(channelRecord);
-                                query(query, retry + 1);
+                                sendUpstream(upstreamQuery, pendingQuery, retry + 1);
                             } else {
                                 channelPool.returnChannel(channelRecord);
+                                upstreamQuery.release();
                             }
                         }
                     );
             } else {
-                LOGGER.info("{} | DoT Server request failed to get channel", query.id());
+                LOGGER.info("{} | DoT Server request failed to get channel", pendingQuery.originalId());
+                pendingQueries.cancel(pendingQuery);
+                upstreamQuery.release();
             }
         });
     }
@@ -230,26 +269,13 @@ public class DnsOverTlsClient {
     }
 
     public void handleQueryResp(DefaultDnsResponse msg) {
-        Pair<DnsQuestion, Consumer<DefaultDnsResponse>> pair = findCallback(msg.id());
-        if (pair != null) {
-            Consumer<DefaultDnsResponse> responseListener = pair.getValue();
-            responseListener.accept(msg);
+        UpstreamQueryRegistry.PendingQuery pendingQuery = pendingQueries.complete(msg);
+        if (pendingQuery != null) {
+            msg.setId(pendingQuery.originalId());
+            pendingQuery.callback().accept(msg);
             if (useCache) {
-                DnsQuestion question = pair.getKey();
-                checkNotNull(cache).putResponse(question, msg);
+                checkNotNull(cache).putResponse(pendingQuery.question(), msg);
             }
         }
-    }
-
-    protected @Nullable Pair<DnsQuestion, Consumer<DefaultDnsResponse>> findCallback(int queryId) {
-        Iterator<EvictLinkedNode<Pair<Integer, Pair<DnsQuestion, Consumer<DefaultDnsResponse>>>>> iterator = callbacks.iterator();
-        while (iterator.hasNext()) {
-            EvictLinkedNode<Pair<Integer, Pair<DnsQuestion, Consumer<DefaultDnsResponse>>>> cursor = iterator.next();
-            if (cursor.value().getKey().equals(queryId)) {
-                callbacks.markEvictable(cursor);
-                return cursor.value().getValue();
-            }
-        }
-        return null;
     }
 }

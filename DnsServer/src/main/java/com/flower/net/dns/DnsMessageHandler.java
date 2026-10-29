@@ -29,7 +29,6 @@ public class DnsMessageHandler extends SimpleChannelInboundHandler<DatagramDnsQu
     protected void channelRead0(ChannelHandlerContext ctx, DatagramDnsQuery query) {
         DnsQuestion qQuestion = query.recordAt(DnsSection.QUESTION, 0);
         LOGGER.info("{} | request: {} / question count {}", query.id(), qQuestion.name(), query.count(DnsSection.QUESTION));
-        query.retain();
 
         client.query(query,
             tcpResponse -> {

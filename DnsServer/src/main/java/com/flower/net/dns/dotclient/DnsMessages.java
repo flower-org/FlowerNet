@@ -31,6 +31,7 @@ public final class DnsMessages {
         return copy;
     }
 
+    /** Copies AA, TC, RA, RD and Z; Netty's 3-bit Z field also carries the AD and CD bits (RFC 4035). */
     public static void copyHeaderFlags(DnsResponse from, DnsResponse to) {
         to.setAuthoritativeAnswer(from.isAuthoritativeAnswer())
                 .setTruncated(from.isTruncated())

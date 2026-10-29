@@ -10,7 +10,11 @@ import io.netty.handler.codec.dns.DatagramDnsResponse;
 import io.netty.handler.codec.dns.DefaultDnsQuestion;
 import io.netty.handler.codec.dns.DefaultDnsRawRecord;
 import io.netty.handler.codec.dns.DefaultDnsResponse;
+import io.netty.channel.socket.DatagramPacket;
+import io.netty.handler.codec.dns.DatagramDnsResponseEncoder;
+import io.netty.handler.codec.dns.DnsOpCode;
 import io.netty.handler.codec.dns.DnsQuery;
+import io.netty.handler.codec.dns.DnsResponseCode;
 import io.netty.handler.codec.dns.DnsQuestion;
 import io.netty.handler.codec.dns.DnsRawRecord;
 import io.netty.handler.codec.dns.DnsRecordType;
@@ -27,12 +31,15 @@ import java.util.function.Consumer;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class DnsMessageHandlerTest {
     static final InetSocketAddress SERVER = new InetSocketAddress("127.0.0.1", 53);
     static final InetSocketAddress CLIENT = new InetSocketAddress("127.0.0.1", 40000);
     static final DnsQuestion QUESTION = new DefaultDnsQuestion("example.org.", DnsRecordType.A);
     static final byte[] ADDRESS = {9, 8, 7, 6};
+    /** In Netty's 3-bit Z field: AD is 0b010 and CD is 0b001. */
+    static final int AD_AND_CD = 0b011;
 
     /** Answers from a pooled buffer, either right away or when {@link #answerPending()} is called. */
     static class FakeClient extends DnsOverTlsClient {
@@ -51,7 +58,12 @@ public class DnsMessageHandlerTest {
             Runnable answer = () -> {
                 ByteBuf content = PooledByteBufAllocator.DEFAULT.directBuffer().writeBytes(ADDRESS);
                 buffers.add(content);
-                DefaultDnsResponse response = new DefaultDnsResponse(id);
+                DefaultDnsResponse response = new DefaultDnsResponse(id, DnsOpCode.QUERY, DnsResponseCode.NXDOMAIN);
+                response.setAuthoritativeAnswer(true)
+                        .setTruncated(true)
+                        .setRecursionDesired(true)
+                        .setRecursionAvailable(true)
+                        .setZ(AD_AND_CD);
                 response.addRecord(DnsSection.QUESTION, QUESTION);
                 response.addRecord(DnsSection.ANSWER,
                         new DefaultDnsRawRecord(QUESTION.name(), DnsRecordType.A, 60, content));
@@ -83,6 +95,13 @@ public class DnsMessageHandlerTest {
     void check(EmbeddedChannel channel) {
         DatagramDnsResponse response = channel.readOutbound();
         assertEquals(1234, response.id());
+        assertEquals(DnsOpCode.QUERY, response.opCode());
+        assertEquals(DnsResponseCode.NXDOMAIN, response.code());
+        assertTrue(response.isAuthoritativeAnswer());
+        assertTrue(response.isTruncated());
+        assertTrue(response.isRecursionDesired());
+        assertTrue(response.isRecursionAvailable());
+        assertEquals(AD_AND_CD, response.z());
         assertEquals(SERVER, response.sender());
         assertEquals(CLIENT, response.recipient());
         assertEquals(QUESTION.name(), response.recordAt(DnsSection.QUESTION, 0).name());
@@ -95,6 +114,23 @@ public class DnsMessageHandlerTest {
 
     DatagramDnsQuery query() {
         return (DatagramDnsQuery) new DatagramDnsQuery(CLIENT, SERVER, 1234).addRecord(DnsSection.QUESTION, QUESTION);
+    }
+
+    @Test
+    void headerFlagsReachTheWire() throws Exception {
+        client = new FakeClient(false);
+        EmbeddedChannel channel = new EmbeddedChannel(new DatagramDnsResponseEncoder(), new DnsMessageHandler(client));
+        channel.writeInbound(query());
+        DatagramPacket packet = channel.readOutbound();
+        try {
+            ByteBuf wire = packet.content();
+            assertEquals(1234, wire.getUnsignedShort(0));
+            // QR=1 OPCODE=0 AA=1 TC=1 RD=1 | RA=1 Z=0 AD=1 CD=1 RCODE=3 (NXDOMAIN)
+            assertEquals(0b1000_0111, wire.getUnsignedByte(2));
+            assertEquals(0b1011_0011, wire.getUnsignedByte(3));
+        } finally {
+            packet.release();
+        }
     }
 
     @Test

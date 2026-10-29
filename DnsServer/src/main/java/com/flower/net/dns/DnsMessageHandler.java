@@ -62,8 +62,10 @@ public class DnsMessageHandler extends SimpleChannelInboundHandler<DatagramDnsQu
                                                               DefaultDnsResponse tcpResponse) {
         // The reply goes back from where the query was received to whoever sent it
         DatagramDnsResponse udpResponse = new DatagramDnsResponse(
-                /* sender= */ queryRecipient, /* recipient= */ querySender, tcpResponse.id());
-        udpResponse.setCode(tcpResponse.code());
+                /* sender= */ queryRecipient, /* recipient= */ querySender, tcpResponse.id(),
+                tcpResponse.opCode(), tcpResponse.code());
+        // AA, TC, RA, RD and the Z bits (which include AD and CD)
+        DnsMessages.copyHeaderFlags(tcpResponse, udpResponse);
         for (DnsSection section : DnsSection.values()) {
             int count = tcpResponse.count(section);
             for (int i = 0; i < count; i++) {

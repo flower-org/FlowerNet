@@ -29,7 +29,6 @@ import io.netty.handler.codec.dns.DnsRawRecord;
 import io.netty.handler.codec.dns.DnsRecord;
 import io.netty.handler.codec.dns.DnsResponseCode;
 import io.netty.handler.codec.dns.DnsSection;
-import io.netty.handler.codec.dns.TcpDnsQueryEncoder;
 import io.netty.handler.codec.dns.TcpDnsResponseDecoder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -286,7 +285,7 @@ public class DnsOverTlsClient {
      */
     public void addDnsHandlers(ChannelPipeline p) {
         p.addLast(new IdleStateHandler(0, 0, CHANNEL_IDLE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))
-            .addLast(new TcpDnsQueryEncoder())
+            .addLast(new TcpDnsQueryFullHeaderEncoder())
             .addLast(new TcpDnsResponseDecoder())
             .addLast(new SimpleChannelInboundHandler<DefaultDnsResponse>() {
                 @Override

@@ -1,4 +1,32 @@
 ```
+Oct 29, 2026
+42004518
+SocksUi-1.5.0-amd64-all.jar
+SHA2-256(SocksUi/build/libs/SocksUi-1.5.0-amd64-all.jar)= 5441cc2d48b28c74ae86cb7c8f78d07c0cc3256d143f160bd73a04712c3dfe14
+42072905
+PacketUi-1.5.0-amd64-all.jar
+SHA2-256(PacketUi/build/libs/PacketUi-1.5.0-amd64-all.jar)= 7a1a3562a2aea2b59e97988fe5ed52e296cd272cfa9bf32bfb0a5722d91ebfae
+72262554
+SocksUi-1.5.0-portable-linux.zip
+SHA2-256(SocksUi-1.5.0-portable-linux.zip)= d078bf3def1fe1b03ee9b39dc14f1b003c950221ec3d0698ad31583a8f1d5e64
+67755649
+SocksUi-1.5.0-portable-macos.zip
+361f0554c5358c3a8674c982bb7ac8f3e26d4c04451141b45d9fbe4ceff30e6b  SocksUi-1.5.0-portable-macos.zip
+68512313
+SocksUi-1.5.0-portable-windows.zip
+BD5925A7F40BD1F041411B28AB88984B9A9C14BAEA914208C8D0976C12C08BA0
+72325269
+PacketUi-1.5.0-portable-linux.zip
+SHA2-256(PacketUi-1.5.0-portable-linux.zip)= 0b9669cf7a67eafabf763215779e1b871b193083a2bdc586b6565b10c5dea31a
+67716671
+PacketUi-1.5.0-portable-macos.zip
+45fea1f86aa7d4069bb48a13b2e0459f2e48775e40493ad7fb2a5cd2ea31397b  PacketUi-1.5.0-portable-macos.zip
+68576608
+PacketUi-1.5.0-portable-windows.zip
+B4365FB22A5163E668FD20A359A67F4B1D2C4092CA7F0A8F85ABCE4270A3E65C
+```
+
+```
 Oct 25, 2026
 41995102
 SocksUi-1.4.2-amd64-all.jar

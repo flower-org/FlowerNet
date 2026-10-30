@@ -1,0 +1,98 @@
+name: PacketUi JPackage
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+
+jobs:
+  build-packetui-image:
+    name: Build PacketUi on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    permissions:
+      contents: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: PacketUi-${{ github.ref_name }}-portable-linux
+            artifact_path: PacketUi/build/jpackage/PacketUi
+          - os: windows-latest
+            artifact_name: PacketUi-${{ github.ref_name }}-portable-windows
+            artifact_path: PacketUi/build/jpackage/PacketUi
+          - os: macos-latest
+            artifact_name: PacketUi-${{ github.ref_name }}-portable-macos
+            artifact_path: PacketUi/build/jpackage/PacketUi.app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: 8.14
+
+      - name: Build PacketUi app image
+        run: gradle :PacketUi:jpackageImage
+
+      - name: Archive app image (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: |
+          cd PacketUi/build/jpackage
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            zip -r ../../../${{ matrix.artifact_name }}.zip PacketUi.app
+          else
+            zip -r ../../../${{ matrix.artifact_name }}.zip PacketUi
+          fi
+
+      - name: Archive app image (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd PacketUi/build/jpackage
+          Compress-Archive -Path PacketUi -DestinationPath ..\..\..\${{ matrix.artifact_name }}.zip
+
+      - name: ls-PacketUi-zip (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: ls -al ${{ matrix.artifact_name }}.zip
+
+      - name: ls-PacketUi-zip (Windows)
+        if: runner.os == 'Windows'
+        run: dir ${{ matrix.artifact_name }}.zip
+
+      - name: sha256-PacketUi-zip (Linux)
+        if: runner.os == 'Linux'
+        run: openssl sha256 ${{ matrix.artifact_name }}.zip
+
+      - name: sha256-PacketUi-zip (macOS)
+        if: runner.os == 'macOS'
+        run: shasum -a 256 ${{ matrix.artifact_name }}.zip
+
+      - name: sha256-PacketUi-zip (Windows)
+        if: runner.os == 'Windows'
+        run: (Get-FileHash ${{ matrix.artifact_name }}.zip -Algorithm SHA256).Hash
+
+      - name: Upload PacketUi app image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}.zip
+          if-no-files-found: error
+
+      - name: Upload to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact_name }}.zip

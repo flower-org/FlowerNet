@@ -76,7 +76,7 @@ public class DnsOverTlsClient {
     private final ChannelPool channelPool;
     private final UpstreamQueryRegistry pendingQueries;
     private final InFlightQueries inFlight = new InFlightQueries();
-    private final ResolvedHosts resolvedHosts = new ResolvedHosts();
+    @Nullable private final ResolvedHosts resolvedHosts;
 
     @Nullable private final AnswerCache cache;
 
@@ -98,7 +98,7 @@ public class DnsOverTlsClient {
         this.dnsServerAddress = ServerUtil.getByName(dnsServerHost);
         this.dnsServerPort = dnsServerPort;
         this.bindClientToIp = bindClientToIp;
-
+        this.resolvedHosts = new ResolvedHosts();
 
         // Configure SSL.
         this.sslCtx = SslContextBuilder
@@ -131,7 +131,17 @@ public class DnsOverTlsClient {
 
     public DnsOverTlsClient(String dnsServerHost, int dnsServerPort, TrustManagerFactory trustManager, boolean useCache,
                             @Nullable String bindClientToIp) throws SSLException {
+        this(dnsServerHost, dnsServerPort, trustManager, useCache, true, bindClientToIp);
+    }
+
+    /**
+     * @param trackResolvedHosts whether to keep {@link #resolvedHosts()}; callers that never look IPs up
+     *                           can turn it off to save its memory
+     */
+    public DnsOverTlsClient(String dnsServerHost, int dnsServerPort, TrustManagerFactory trustManager, boolean useCache,
+                            boolean trackResolvedHosts, @Nullable String bindClientToIp) throws SSLException {
         this.bindClientToIp = bindClientToIp;
+        this.resolvedHosts = trackResolvedHosts ? new ResolvedHosts() : null;
         this.socksServerAddress = null;
         this.socksServerPort = null;
         this.dnsServerAddress = ServerUtil.getByName(dnsServerHost);
@@ -189,11 +199,14 @@ public class DnsOverTlsClient {
         DnsQuestion qQuestion = query.recordAt(DnsSection.QUESTION, 0);
         // The name is taken now: the query may be released before the answer arrives
         String questionName = qQuestion.name();
-        Consumer<DefaultDnsResponse> clientConsumer = dnsResponseConsumer;
-        dnsResponseConsumer = response -> {
-            resolvedHosts.record(questionName, response);
-            clientConsumer.accept(response);
-        };
+        ResolvedHosts hosts = resolvedHosts;
+        if (hosts != null) {
+            Consumer<DefaultDnsResponse> clientConsumer = dnsResponseConsumer;
+            dnsResponseConsumer = response -> {
+                hosts.record(questionName, response);
+                clientConsumer.accept(response);
+            };
+        }
         if (cache != null) {
             DefaultDnsResponse response = cache.getResponseIfPresent(query);
             if (response != null) {
@@ -357,8 +370,8 @@ public class DnsOverTlsClient {
         return sslCtx;
     }
 
-    /** The hosts this client has resolved for its callers, looked up by IP. */
-    public ResolvedHosts resolvedHosts() {
+    /** The hosts this client has resolved for its callers, looked up by IP; null if not tracked. */
+    public @Nullable ResolvedHosts resolvedHosts() {
         return resolvedHosts;
     }
 

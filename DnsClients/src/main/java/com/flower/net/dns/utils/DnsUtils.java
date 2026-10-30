@@ -4,13 +4,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flower.net.utils.IpAddressUtil;
 import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.dns.DefaultDnsQuestion;
 import io.netty.handler.codec.dns.DefaultDnsRawRecord;
 import io.netty.handler.codec.dns.DefaultDnsResponse;
 import io.netty.handler.codec.dns.DnsOpCode;
+import io.netty.handler.codec.dns.DnsRawRecord;
 import io.netty.handler.codec.dns.DnsRecord;
 import io.netty.handler.codec.dns.DnsRecordType;
 import io.netty.handler.codec.dns.DnsResponse;
 import io.netty.handler.codec.dns.DnsSection;
+import io.netty.util.ReferenceCounted;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.net.Inet4Address;
@@ -47,6 +50,33 @@ public class DnsUtils {
             }
         }
         return response;
+    }
+
+    /**
+     * Copies a response into unpooled heap buffers, so the copy stays valid after the original is released,
+     * can be shared between threads, and needn't be released.
+     */
+    public static DefaultDnsResponse unpooledCopy(DnsResponse response) {
+        DefaultDnsResponse copy = new DefaultDnsResponse(response.id(), response.opCode(), response.code());
+        copy.setAuthoritativeAnswer(response.isAuthoritativeAnswer())
+                .setTruncated(response.isTruncated())
+                .setRecursionAvailable(response.isRecursionAvailable())
+                .setRecursionDesired(response.isRecursionDesired())
+                .setZ(response.z());
+        for (DnsSection section : DnsSection.values()) {
+            for (int i = 0, count = response.count(section); i < count; i++) {
+                DnsRecord record = response.recordAt(section, i);
+                if (section == DnsSection.QUESTION) {
+                    copy.addRecord(section, new DefaultDnsQuestion(record.name(), record.type(), record.dnsClass()));
+                } else if (record instanceof DnsRawRecord raw) {
+                    copy.addRecord(section, new DefaultDnsRawRecord(raw.name(), raw.type(), raw.dnsClass(),
+                            raw.timeToLive(), Unpooled.copiedBuffer(raw.content())));
+                } else if (!(record instanceof ReferenceCounted)) {
+                    copy.addRecord(section, record);
+                }
+            }
+        }
+        return copy;
     }
 
     public static boolean dnsResponseHasIp(DnsResponse dnsResponse) {

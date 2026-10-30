@@ -15,6 +15,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
 
@@ -147,8 +148,8 @@ public class DnsServer implements AutoCloseable {
         }
     }
 
-    /** The hosts this server has resolved for its clients, looked up by IP. */
-    public ResolvedHosts resolvedHosts() {
+    /** The hosts this server has resolved for its clients, looked up by IP; null if its client doesn't track them. */
+    public @Nullable ResolvedHosts resolvedHosts() {
         return client.resolvedHosts();
     }
 

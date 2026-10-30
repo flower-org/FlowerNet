@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static com.flower.net.socksserver.FlowerSslContextBuilder.TLS_CIPHERS;
 import static com.flower.net.socksserver.FlowerSslContextBuilder.TLS_PROTOCOLS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The client must always get an answer: the upstream response, or SERVFAIL when upstream fails. */
@@ -139,6 +140,14 @@ public class DnsOverTlsClientFailureTest {
         assertEquals(1, queriesReceived.get());
         assertEquals(0, client.pendingQueries().inFlightCount());
         assertEquals(List.of("example.org"), client.resolvedHosts().hostsFor(InetAddress.getByName("1.2.3.4")));
+    }
+
+    @Test
+    void resolvedHostsCanBeTurnedOff() throws Exception {
+        client = new DnsOverTlsClient(InetAddress.getLoopbackAddress().getHostAddress(), startUpstream(),
+                InsecureTrustManagerFactory.INSTANCE, false, false, null);
+        assertEquals(DnsResponseCode.NOERROR, query(client).code());
+        assertNull(client.resolvedHosts());
     }
 
     @Test

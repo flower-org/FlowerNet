@@ -57,6 +57,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -297,7 +298,8 @@ public final class SocksServerConnectHandler extends SimpleChannelInboundHandler
                     if (!addresses.isEmpty()) {
                         transformedPromise.setSuccess(addresses.get(ThreadLocalRandom.current().nextInt(addresses.size())));
                     } else {
-                        transformedPromise.setFailure(f.cause());
+                        transformedPromise.setFailure(new UnknownHostException(
+                                "No addresses for " + address + " (" + msg.code() + ")"));
                     }
                 } else {
                     transformedPromise.setFailure(f.cause());

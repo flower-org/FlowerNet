@@ -78,6 +78,8 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     volatile AutoAddRulesMode autoAddRulesMode = AutoAddRulesMode.NONE;
     /** Capture views in tab order; snapshot replaced on the UI thread, read on connection threads */
     volatile List<CaptureForm> captureForms = List.of();
+    /** Answers of active lists per destination; invalidated right after rules, list activation or list order change */
+    final RuleLookupCache ruleLookupCache = new RuleLookupCache(this::lookupActiveLists);
 
     /** Numbering for new lists; never reused within a session */
     int untitledListCounter = 0;
@@ -130,6 +132,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         TabPane tabPane = checkNotNull(ruleListsTabPane);
         tabPane.getTabs().addListener((ListChangeListener<Tab>) change -> {
             ruleLists = tabPane.getTabs().stream().map(tab -> (RuleListForm) tab.getContent()).toList();
+            ruleLookupCache.invalidate();
             // e.g. closing an active Allow list may deny existing connections
             filteringChanged();
             schedulePersistRuleLists();
@@ -231,7 +234,9 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
             ruleList.setStage(stage);
         }
         ruleList.setRulesChangedListener(this::rulesChanged);
+        ruleList.addRulesChangeListener(ruleLookupCache::invalidate);
         ruleList.activeProperty().addListener((obs, oldValue, newValue) -> {
+            ruleLookupCache.invalidate();
             filteringChanged();
             schedulePersistRuleLists();
         });
@@ -405,28 +410,35 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         }
     }
 
-    /** First match among active lists, in tab order. Thread-safe. */
+    /** First match among active lists, in tab order. Thread-safe, cached. */
     @Nullable Access getActiveListsAccess(String dstHost, int dstPort) {
+        return ruleLookupCache.get(dstHost, dstPort).access();
+    }
+
+    /** An endpoint is a known server if any active list has a host+port rule for it. Thread-safe, cached. */
+    @Override
+    public boolean isKnownServer(String host, int port) {
+        return ruleLookupCache.get(host, port).knownServer();
+    }
+
+    /** Uncached lookup over active lists, in tab order. */
+    RuleLookupCache.Result lookupActiveLists(String host, int port) {
+        Access access = null;
+        boolean knownServer = false;
         for (RuleListForm ruleList : ruleLists) {
             if (ruleList.isActive()) {
-                Access access = ruleList.getAccess(dstHost, dstPort);
-                if (access != null) {
-                    return access;
+                if (access == null) {
+                    access = ruleList.getAccess(host, port);
+                }
+                if (!knownServer) {
+                    knownServer = ruleList.hasAddressRule(host, port);
+                }
+                if (access != null && knownServer) {
+                    break;
                 }
             }
         }
-        return null;
-    }
-
-    /** An endpoint is a known server if any active list has a host+port rule for it. Thread-safe. */
-    @Override
-    public boolean isKnownServer(String host, int port) {
-        for (RuleListForm ruleList : ruleLists) {
-            if (ruleList.isActive() && ruleList.hasAddressRule(host, port)) {
-                return true;
-            }
-        }
-        return false;
+        return new RuleLookupCache.Result(access, knownServer);
     }
 
     CheckResult getCheckResult(String dstHost, int dstPort) {

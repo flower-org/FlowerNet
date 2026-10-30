@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
@@ -47,6 +48,7 @@ public class AllowDenyConnectionFilter {
     final WildcardTrie<AddressRecord> wildcardAddressTrie;
     final WildcardTrie<HostRecord> wildcardHostTrie;
     final ReadWriteLock lock = new ReentrantReadWriteLock();
+    final List<Runnable> changeListeners = new CopyOnWriteArrayList<>();
 
     public AllowDenyConnectionFilter(List<Pair<AddressFilterList, Boolean>> addressLists) {
         this();
@@ -82,6 +84,25 @@ public class AllowDenyConnectionFilter {
         wildcardHostRecords = new ConcurrentHashMap<>();
         wildcardAddressTrie = new WildcardTrie<>();
         wildcardHostTrie = new WildcardTrie<>();
+    }
+
+    /**
+     * Called after every mutation, once its changes are visible to lookups (also after a no-op mutation).
+     * Can be called on any thread, possibly while a bulk mutation like {@link #addList} still holds the write lock;
+     * listeners must be fast and must not mutate this filter.
+     */
+    public void addChangeListener(Runnable listener) {
+        changeListeners.add(listener);
+    }
+
+    public void removeChangeListener(Runnable listener) {
+        changeListeners.remove(listener);
+    }
+
+    void notifyChanged() {
+        for (Runnable listener : changeListeners) {
+            listener.run();
+        }
     }
 
     public boolean isListOverrideRequired(AddressFilterList list) {
@@ -156,6 +177,7 @@ public class AllowDenyConnectionFilter {
     
         } finally {
             lock.writeLock().unlock();
+            notifyChanged();
         }
     }
 
@@ -185,6 +207,7 @@ public class AllowDenyConnectionFilter {
     
         } finally {
             lock.writeLock().unlock();
+            notifyChanged();
         }
     }
 
@@ -211,6 +234,7 @@ public class AllowDenyConnectionFilter {
     
         } finally {
             lock.writeLock().unlock();
+            notifyChanged();
         }
     }
 
@@ -225,6 +249,7 @@ public class AllowDenyConnectionFilter {
     
         } finally {
             lock.writeLock().unlock();
+            notifyChanged();
         }
     }
 
@@ -249,6 +274,7 @@ public class AllowDenyConnectionFilter {
     
         } finally {
             lock.writeLock().unlock();
+            notifyChanged();
         }
     }
 
@@ -264,6 +290,7 @@ public class AllowDenyConnectionFilter {
     
         } finally {
             lock.writeLock().unlock();
+            notifyChanged();
         }
     }
 
@@ -274,6 +301,7 @@ public class AllowDenyConnectionFilter {
     
         } finally {
             lock.writeLock().unlock();
+            notifyChanged();
         }
     }
 
@@ -290,6 +318,7 @@ public class AllowDenyConnectionFilter {
     
         } finally {
             lock.writeLock().unlock();
+            notifyChanged();
         }
     }
 
@@ -332,6 +361,7 @@ public class AllowDenyConnectionFilter {
     
         } finally {
             lock.writeLock().unlock();
+            notifyChanged();
         }
     }
 

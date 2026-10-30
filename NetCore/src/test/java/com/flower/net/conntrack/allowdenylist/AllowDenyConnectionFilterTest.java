@@ -5,6 +5,8 @@ import com.flower.net.utils.WildcardTrie;
 import com.flower.net.utils.WildcardTrie.Match;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -137,6 +139,32 @@ class AllowDenyConnectionFilterTest {
         assertFalse(filter.hasAddressRecord("a.com", 80));
         assertTrue(filter.hasAddressRecord("b.org", 80));
         assertFalse(filter.hasAddressRecord("b.org", 443));
+    }
+
+    @Test
+    void testChangeListenerSeesMutation() {
+        AllowDenyConnectionFilter filter = new AllowDenyConnectionFilter();
+        AtomicInteger notifications = new AtomicInteger();
+        List<Access> seen = new ArrayList<>();
+        filter.addChangeListener(() -> {
+            notifications.incrementAndGet();
+            seen.add(filter.getRecordRule("a.com", 443));
+        });
+
+        filter.addAddressRecord(address("a.com", 443, DENY, false), true);
+        assertEquals(DENY, seen.get(seen.size() - 1));
+        filter.removeAddressRecord(address("a.com", 443, DENY, false));
+        assertNull(seen.get(seen.size() - 1));
+        filter.addHostRecord(host("*.com", ALLOW, true), true);
+        assertEquals(ALLOW, seen.get(seen.size() - 1));
+        filter.clearFilterType(ALLOW);
+        assertNull(seen.get(seen.size() - 1));
+        filter.addPortRecord(port(443, DENY), true);
+        filter.removePortRecord(port(443, DENY));
+        filter.addHostRecord(host("a.com", DENY, false), true);
+        filter.removeHostRecord(host("a.com", DENY, false));
+        filter.clear();
+        assertEquals(9, notifications.get());
     }
 
     @Test

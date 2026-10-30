@@ -412,6 +412,11 @@ public class RuleListForm extends AnchorPane implements Refreshable {
         return mainRuleManager.filter.hasAddressRecord(dstHost, dstPort);
     }
 
+    /** Runs synchronously, on the mutating thread, right after any change to this list's rules. */
+    public void addRulesChangeListener(Runnable listener) {
+        mainRuleManager.filter.addChangeListener(listener);
+    }
+
     /**
      * Adds an address rule with the given access if this list has no rule for the destination yet.
      * Meant to be called by the parent on the auto-add target list, once no active list matched.

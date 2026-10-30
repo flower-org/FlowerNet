@@ -77,4 +77,7 @@ nft add rule inet nfbridge in  queue num 0
 nft add rule inet nfbridge out queue num 0
 nft add rule inet nfbridge forward_chain queue num 0
 
+# mkdir /run/nfbridge/
+# chown {USERNAME_THAT_RUNS_PACKET_UI} /run/nfbridge/
+
 # nohup /etc/nfbridge >/dev/null 2>&1 &

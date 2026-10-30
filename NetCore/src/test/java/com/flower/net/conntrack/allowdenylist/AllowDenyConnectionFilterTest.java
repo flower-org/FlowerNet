@@ -88,24 +88,38 @@ class AllowDenyConnectionFilterTest {
         filter.addPortRecord(port(443, DENY), true);
         assertEquals(DENY, filter.getRecordRule("a.com", 443));
 
-        // Priority 3 beats priority 4
+        // Wildcard host beats port
         filter.addHostRecord(host("*.com", ALLOW, true), true);
         assertEquals(ALLOW, filter.getRecordRule("a.com", 443));
 
-        // Priority 2 beats priority 3, even if less specific
-        filter.addAddressRecord(address("*", 443, DENY, true), true);
+        // Exact host beats wildcard host
+        filter.addHostRecord(host("a.com", DENY, false), true);
         assertEquals(DENY, filter.getRecordRule("a.com", 443));
-        assertEquals(ALLOW, filter.getRecordRule("a.com", 80));
+        assertEquals(DENY, filter.getRecordRule("a.com", 80));
 
-        // Priority 1 beats wildcards
-        filter.addHostRecord(host("a.com", ALLOW, false), true);
+        // Wildcard host+port beats exact host, even if the pattern is less specific
+        filter.addAddressRecord(address("*", 443, ALLOW, true), true);
         assertEquals(ALLOW, filter.getRecordRule("a.com", 443));
+        assertEquals(DENY, filter.getRecordRule("a.com", 80));
 
-        // Priority 0 beats everything
+        // Exact host+port beats everything
         filter.addAddressRecord(address("a.com", 443, DENY, false), true);
         assertEquals(DENY, filter.getRecordRule("a.com", 443));
 
         assertNull(filter.getRecordRule("a.org", 80));
+    }
+
+    @Test
+    void testHostPortRuleBeatsHostRule() {
+        AllowDenyConnectionFilter filter = new AllowDenyConnectionFilter();
+        filter.addHostRecord(host("a.com", DENY, false), true);
+        filter.addAddressRecord(address("*.com", 443, ALLOW, true), true);
+        filter.addPortRecord(port(80, ALLOW), true);
+
+        assertEquals(ALLOW, filter.getRecordRule("a.com", 443));
+        // Host rule beats port rule
+        assertEquals(DENY, filter.getRecordRule("a.com", 80));
+        assertEquals(ALLOW, filter.getRecordRule("b.org", 80));
     }
 
     @Test

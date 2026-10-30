@@ -20,7 +20,10 @@ import static com.flower.net.conntrack.allowdenylist.AddressFilterList.HostRecor
 import static com.flower.net.conntrack.allowdenylist.AddressFilterList.PortRecord;
 
 /**
- * Wildcard rules (priorities 2 and 3) are indexed in two {@link WildcardTrie}s, one per record type.
+ * Lookup priority follows "most specific rule wins" (see {@link #getRecordRule}):
+ * host+port (exact, then wildcard) > host (exact, then wildcard) > port.
+ * <p>
+ * Wildcard rules (priorities 1 and 3) are indexed in two {@link WildcardTrie}s, one per record type.
  * When several wildcard patterns match,
  * the most specific one wins (see {@link #compareSpecificity}); on a specificity tie DENY wins.
  * <p>
@@ -33,9 +36,9 @@ public class AllowDenyConnectionFilter {
     //Priority 0
     final ConcurrentHashMap<String, ConcurrentHashMap<Integer, AddressRecord>> addressRecords;
     //Priority 1
-    final ConcurrentHashMap<String, HostRecord> hostRecords;
-    //Priority 2
     final ConcurrentHashMap<String, ConcurrentHashMap<Integer, AddressRecord>> wildcardAddressRecords;
+    //Priority 2
+    final ConcurrentHashMap<String, HostRecord> hostRecords;
     //Priority 3
     final ConcurrentHashMap<String, HostRecord> wildcardHostRecords;
     //Priority 4
@@ -488,6 +491,7 @@ public class AllowDenyConnectionFilter {
         lock.readLock().lock();
         try {
             // Priority 0 - exact hostname/port match
+            // Most specific rule wins: any host+port rule beats any host-only rule, which beats a port-only rule
             Map<Integer, AddressRecord> portMap = addressRecords.get(dstHost);
             if (portMap != null) {
                 AddressRecord record = portMap.get(dstPort);
@@ -502,7 +506,14 @@ public class AllowDenyConnectionFilter {
                 }
             }
 
-            // Priority 1 - hostname match (without port)
+            // Priority 1 - wildcard hostname/port match (most specific pattern wins)
+            Access wildcardAddressAccess = resolveMostSpecific(wildcardAddressTrie.matchText(dstHost),
+                    record -> record.dstPort() == dstPort, AddressRecord::access);
+            if (wildcardAddressAccess != null) {
+                return wildcardAddressAccess;
+            }
+
+            // Priority 2 - exact hostname match (without port)
             HostRecord hostRecord = hostRecords.get(dstHost);
             if (hostRecord != null) {
                 if (hostRecord.access() == Access.ALLOW) {
@@ -512,13 +523,6 @@ public class AllowDenyConnectionFilter {
                 } else {
                     throw new IllegalArgumentException("Unknown filter type: " + hostRecord.access());
                 }
-            }
-
-            // Priority 2 - wildcard hostname/port match (most specific pattern wins)
-            Access wildcardAddressAccess = resolveMostSpecific(wildcardAddressTrie.matchText(dstHost),
-                    record -> record.dstPort() == dstPort, AddressRecord::access);
-            if (wildcardAddressAccess != null) {
-                return wildcardAddressAccess;
             }
 
             // Priority 3 - wildcard hostname match (without port, most specific pattern wins)

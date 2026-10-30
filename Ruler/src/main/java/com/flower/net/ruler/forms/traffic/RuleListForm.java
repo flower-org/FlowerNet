@@ -24,6 +24,7 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.*;
@@ -175,7 +176,11 @@ public class RuleListForm extends AnchorPane implements Refreshable {
         };
 
         trafficRules = FXCollections.observableArrayList();
-        checkNotNull(trafficRulesTable).itemsProperty().set(trafficRules);
+        // Sorted through the table's comparator, so a column sort survives the list being refilled
+        TableView<TrafficRule> table = checkNotNull(trafficRulesTable);
+        SortedList<TrafficRule> sortedRules = new SortedList<>(trafficRules);
+        sortedRules.comparatorProperty().bind(table.comparatorProperty());
+        table.itemsProperty().set(sortedRules);
 
         CheckBox checkBox = checkNotNull(activeCheckBox);
         checkBox.selectedProperty().bindBidirectional(active);

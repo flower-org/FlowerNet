@@ -17,8 +17,9 @@ import java.util.concurrent.LinkedBlockingDeque;
 
 /**
  * Decides packets by checking the remote endpoint against {@link ConnectionFilter}s.
- * Remote endpoint: source for inbound hooks (PREROUTING/INPUT), destination for outbound/forwarded ones,
- * so replies from an allowed server are allowed too. Packets that aren't valid IP are dropped.
+ * Remote endpoint is the server: the endpoint a filter knows as a server (a host+port rule matches it).
+ * Without a single such endpoint, it's the source for inbound hooks (PREROUTING/INPUT) and the destination for
+ * outbound/forwarded ones, so replies from an allowed server are allowed too. Packets that aren't valid IP are dropped.
  */
 public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
     private static final Logger LOGGER = LoggerFactory.getLogger(ConnectionFilterDecider.class);
@@ -52,10 +53,12 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
             return false;
         }
 
-        boolean inbound = isInbound(hook);
-        String remoteHost = hostFor(inbound ? info.srcHost() : info.dstHost());
-        int remotePort = inbound ? info.srcPort() : info.dstPort();
-        InetSocketAddress local = inbound
+        String srcHost = hostFor(info.srcHost());
+        String dstHost = hostFor(info.dstHost());
+        boolean remoteIsSrc = remoteIsSource(srcHost, info.srcPort(), dstHost, info.dstPort(), hook);
+        String remoteHost = remoteIsSrc ? srcHost : dstHost;
+        int remotePort = remoteIsSrc ? info.srcPort() : info.dstPort();
+        InetSocketAddress local = remoteIsSrc
                 ? InetSocketAddress.createUnresolved(info.dstHost(), info.dstPort())
                 : InetSocketAddress.createUnresolved(info.srcHost(), info.srcPort());
         Protocol protocol = toProtocol(info.ipProtocol());
@@ -82,6 +85,28 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
         } catch (UnknownHostException e) {
             return ip;
         }
+    }
+
+    /**
+     * The remote endpoint is the server: the one endpoint some filter knows as a server (host+port rule match).
+     * If neither or both are known servers, falls back to the hook: source for inbound, destination otherwise.
+     */
+    boolean remoteIsSource(String srcHost, int srcPort, String dstHost, int dstPort, int hook) {
+        boolean srcIsServer = isKnownServer(srcHost, srcPort);
+        boolean dstIsServer = isKnownServer(dstHost, dstPort);
+        if (srcIsServer != dstIsServer) {
+            return srcIsServer;
+        }
+        return isInbound(hook);
+    }
+
+    boolean isKnownServer(String host, int port) {
+        for (ConnectionFilter filter : connectionFilters) {
+            if (filter.isKnownServer(host, port)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static boolean isInbound(int hook) {

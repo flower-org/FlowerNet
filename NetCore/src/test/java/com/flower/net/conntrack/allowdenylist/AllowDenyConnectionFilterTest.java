@@ -123,6 +123,23 @@ class AllowDenyConnectionFilterTest {
     }
 
     @Test
+    void testHasAddressRecord() {
+        AllowDenyConnectionFilter filter = new AllowDenyConnectionFilter();
+        filter.addHostRecord(host("a.com", ALLOW, false), true);
+        filter.addPortRecord(port(443, ALLOW), true);
+        filter.addHostRecord(host("*.org", DENY, true), true);
+        assertFalse(filter.hasAddressRecord("a.com", 443));
+        assertFalse(filter.hasAddressRecord("b.org", 443));
+
+        filter.addAddressRecord(address("a.com", 443, DENY, false), true);
+        filter.addAddressRecord(address("*.org", 80, ALLOW, true), true);
+        assertTrue(filter.hasAddressRecord("a.com", 443));
+        assertFalse(filter.hasAddressRecord("a.com", 80));
+        assertTrue(filter.hasAddressRecord("b.org", 80));
+        assertFalse(filter.hasAddressRecord("b.org", 443));
+    }
+
+    @Test
     void testOverrideAndRemoveKeepTrieInSync() {
         AllowDenyConnectionFilter filter = new AllowDenyConnectionFilter();
         filter.addHostRecord(host("*.com", ALLOW, true), true);

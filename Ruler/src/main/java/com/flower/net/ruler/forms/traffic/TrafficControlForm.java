@@ -418,6 +418,17 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         return null;
     }
 
+    /** An endpoint is a known server if any active list has a host+port rule for it. Thread-safe. */
+    @Override
+    public boolean isKnownServer(String host, int port) {
+        for (RuleListForm ruleList : ruleLists) {
+            if (ruleList.isActive() && ruleList.hasAddressRule(host, port)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     CheckResult getCheckResult(String dstHost, int dstPort) {
         Access checkResult = getActiveListsAccess(dstHost, dstPort);
 

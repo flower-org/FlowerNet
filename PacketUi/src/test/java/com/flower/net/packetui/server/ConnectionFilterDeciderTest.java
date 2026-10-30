@@ -60,6 +60,7 @@ public class ConnectionFilterDeciderTest {
 
     static class RecordingFilter implements ConnectionFilter {
         final List<Call> calls = new ArrayList<>();
+        final List<String> knownServers = new ArrayList<>();
         final Access result;
 
         RecordingFilter(Access result) { this.result = result; }
@@ -68,6 +69,11 @@ public class ConnectionFilterDeciderTest {
         public Access approveConnection(String dstHost, int dstPort, Protocol protocol, @Nullable SocketAddress from) {
             calls.add(new Call(dstHost, dstPort, from, protocol));
             return result;
+        }
+
+        @Override
+        public boolean isKnownServer(String host, int port) {
+            return knownServers.contains(host + ":" + port);
         }
 
         @Override public void allow(String host, int port) {}
@@ -160,5 +166,40 @@ public class ConnectionFilterDeciderTest {
         assertEquals(Protocol.ICMP, filter.calls.get(0).protocol());
 
         assertFalse(decider.decide(new byte[]{1, 2, 3}, 2, 0, LOCAL_OUT, 0, 0, 2));
+    }
+
+    @Test
+    public void knownServerIsRemoteRegardlessOfHook() {
+        ConnectionFilterDecider decider = new ConnectionFilterDecider();
+        RecordingFilter filter = new RecordingFilter(Access.ALLOW);
+        filter.knownServers.add("127.0.0.1:5300");
+        decider.addConnectionFilter(filter);
+
+        // Query 127.0.0.1:40000 -> 127.0.0.1:5300 on INPUT: the hook alone would pick the source (client port)
+        decider.decide(ipv4(17, new int[]{127, 0, 0, 1}, new int[]{127, 0, 0, 1}, 40000, 5300, 0), 1, 0x0800, LOCAL_IN, 0, 1, 0);
+        // Reply 127.0.0.1:5300 -> 127.0.0.1:40000 on OUTPUT: the hook alone would pick the destination (client port)
+        decider.decide(ipv4(17, new int[]{127, 0, 0, 1}, new int[]{127, 0, 0, 1}, 5300, 40000, 0), 2, 0x0800, LOCAL_OUT, 0, 0, 1);
+
+        assertEquals(2, filter.calls.size());
+        for (Call call : filter.calls) {
+            assertEquals("127.0.0.1", call.host());
+            assertEquals(5300, call.port());
+            assertEquals(40000, ((InetSocketAddress) call.from()).getPort());
+        }
+    }
+
+    @Test
+    public void bothOrNeitherKnownServerFallsBackToHook() {
+        ConnectionFilterDecider decider = new ConnectionFilterDecider();
+        RecordingFilter filter = new RecordingFilter(Access.ALLOW);
+        filter.knownServers.add("127.0.0.1:5300");
+        filter.knownServers.add("127.0.0.1:40000");
+        decider.addConnectionFilter(filter);
+
+        decider.decide(ipv4(17, new int[]{127, 0, 0, 1}, new int[]{127, 0, 0, 1}, 40000, 5300, 0), 1, 0x0800, LOCAL_IN, 0, 1, 0);
+        decider.decide(ipv4(17, new int[]{10, 0, 0, 2}, new int[]{8, 8, 8, 8}, 40000, 53, 0), 2, 0x0800, LOCAL_IN, 0, 1, 0);
+        assertEquals(40000, filter.calls.get(0).port());
+        assertEquals("10.0.0.2", filter.calls.get(1).host());
+        assertEquals(40000, filter.calls.get(1).port());
     }
 }

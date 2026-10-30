@@ -407,6 +407,11 @@ public class RuleListForm extends AnchorPane implements Refreshable {
         return mainRuleManager.filter.getRecordRule(dstHost, dstPort);
     }
 
+    /** True if this list has a host+port rule (exact or wildcard host) for the destination. Thread-safe. */
+    public boolean hasAddressRule(String dstHost, int dstPort) {
+        return mainRuleManager.filter.hasAddressRecord(dstHost, dstPort);
+    }
+
     /**
      * Adds an address rule with the given access if this list has no rule for the destination yet.
      * Meant to be called by the parent on the auto-add target list, once no active list matched.

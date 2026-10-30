@@ -550,6 +550,27 @@ public class AllowDenyConnectionFilter {
         }
     }
 
+    /** True if a host+port rule (exact or wildcard host) matches the destination, i.e. it's a known server. */
+    public boolean hasAddressRecord(String dstHost, int dstPort) {
+        lock.readLock().lock();
+        try {
+            Map<Integer, AddressRecord> portMap = addressRecords.get(dstHost);
+            if (portMap != null && portMap.containsKey(dstPort)) {
+                return true;
+            }
+            for (Match<AddressRecord> match : wildcardAddressTrie.matchText(dstHost)) {
+                for (AddressRecord record : match.values()) {
+                    if (record.dstPort() == dstPort) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
     /**
      * @return access of the applicable records under the most specific matching pattern; DENY wins on a tie.
      *         Null if no matching pattern has applicable records.

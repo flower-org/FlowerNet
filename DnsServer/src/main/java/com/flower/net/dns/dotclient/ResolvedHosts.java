@@ -27,6 +27,12 @@ import java.util.Set;
  * <p>
  * Entries are (IP, host) pairs, kept by recency up to a fixed number and evicted least-recently-used first;
  * DNS TTLs don't apply. Resolving a host again bumps its IPs; looking up an IP bumps its hosts.
+ * <p>
+ * This is deliberately decoupled from {@link AnswerCache}: an answer expiring there does not evict its IPs here.
+ * A TTL only limits how long a resolver may reuse an answer, not how long the IP stays in use: clients keep
+ * their own caches, and connections outlive the TTL. Evicting on expiry would turn such traffic into IP-only
+ * traffic that no longer matches host rules. When an IP moves to another host, the new answer ranks it first,
+ * and the stale pair ages out via LRU.
  * Hosts are the names clients asked for (lowercase, without the trailing dot), even when the answer came
  * through a CNAME chain. Thread-safe.
  */

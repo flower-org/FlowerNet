@@ -173,6 +173,48 @@ public class ConnectionFilterDeciderTest {
     }
 
     @Test
+    public void outsideOfInternalSubnetsIsServer() {
+        ConnectionFilterDecider decider = new ConnectionFilterDecider();
+        RecordingFilter filter = new RecordingFilter(Access.ALLOW);
+        decider.addConnectionFilter(filter);
+        decider.setInternalSubnets(Subnets.parse("10.42.0.0/24"));
+
+        // Forwarded reply from an unresolved server: the hook alone would pick the LAN client
+        decider.decide(ipv4(6, new int[]{5, 6, 7, 8}, new int[]{10, 42, 0, 5}, 443, 51234, 0), 1, 0x0800, FORWARD, 0, 2, 1);
+        assertEquals("5.6.7.8", filter.calls.get(0).host());
+        assertEquals(443, filter.calls.get(0).port());
+        assertEquals("10.42.0.5", ((InetSocketAddress) filter.calls.get(0).from()).getHostString());
+
+        // Both internal: falls back to the hook (FORWARD -> destination)
+        decider.decide(ipv4(6, new int[]{10, 42, 0, 7}, new int[]{10, 42, 0, 5}, 443, 51234, 0), 2, 0x0800, FORWARD, 0, 2, 1);
+        assertEquals("10.42.0.5", filter.calls.get(1).host());
+        assertEquals(51234, filter.calls.get(1).port());
+    }
+
+    @Test
+    public void subnetsBeatResolvedAndRuleBeatsSubnets() throws Exception {
+        ConnectionFilterDecider decider = new ConnectionFilterDecider();
+        RecordingFilter filter = new RecordingFilter(Access.ALLOW);
+        filter.knownServers.add("10.42.0.5:8080");
+        decider.addConnectionFilter(filter);
+        ResolvedHosts hosts = new ResolvedHosts();
+        // DNS names an internal IP, e.g. a NAS behind DDNS
+        hosts.record("nas.example.com", List.of(InetAddress.getByName("10.42.0.9")));
+        decider.setResolvedHosts(hosts);
+        decider.setInternalSubnets(Subnets.parse("10.42.0.0/24"));
+
+        // The internal NAS initiates to an external server: the resolved name doesn't make the NAS the server
+        decider.decide(ipv4(6, new int[]{10, 42, 0, 9}, new int[]{5, 6, 7, 8}, 40000, 443, 0), 1, 0x0800, FORWARD, 0, 1, 2);
+        assertEquals("5.6.7.8", filter.calls.get(0).host());
+        assertEquals(443, filter.calls.get(0).port());
+
+        // A rule marks the internal side: it wins over the subnets
+        decider.decide(ipv4(6, new int[]{5, 6, 7, 8}, new int[]{10, 42, 0, 5}, 51234, 8080, 0), 2, 0x0800, FORWARD, 0, 2, 1);
+        assertEquals("10.42.0.5", filter.calls.get(1).host());
+        assertEquals(8080, filter.calls.get(1).port());
+    }
+
+    @Test
     public void outboundChecksDestination() {
         ConnectionFilterDecider decider = new ConnectionFilterDecider();
         RecordingFilter filter = new RecordingFilter(Access.ALLOW);

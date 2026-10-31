@@ -21,6 +21,7 @@ import java.util.concurrent.LinkedBlockingDeque;
  * Remote endpoint is the server, picked by the first of these that singles out one endpoint:
  * <ol>
  *     <li>a filter knows it as a server (any rule matches it: rules describe servers);</li>
+ *     <li>it's outside the internal subnets while the other endpoint is inside (see {@link #setInternalSubnets});</li>
  *     <li>our DNS server resolved a name to its IP (clients look servers up, not the other way around);</li>
  *     <li>the hook: the source for inbound hooks (PREROUTING/INPUT), the destination for outbound/forwarded ones,
  *     so replies from an allowed server are allowed too.</li>
@@ -38,10 +39,19 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
 
     private final Deque<ConnectionFilter> connectionFilters = new LinkedBlockingDeque<>();
     @Nullable private volatile ResolvedHosts resolvedHosts;
+    private volatile Subnets internalSubnets = Subnets.EMPTY;
+
+    /**
+     * Our own networks and addresses (e.g. the LAN and the router's public IP). When exactly one endpoint is inside them
+     * and no rule singles out a server, the other endpoint is the server.
+     */
+    public void setInternalSubnets(Subnets internalSubnets) {
+        this.internalSubnets = internalSubnets;
+    }
 
     /**
      * When set, IPs that our DNS server resolved are checked as their host name instead,
-     * and count as servers when no rule singles out one endpoint.
+     * and count as servers when neither rules nor internal subnets single out one endpoint.
      */
     public void setResolvedHosts(@Nullable ResolvedHosts resolvedHosts) {
         this.resolvedHosts = resolvedHosts;
@@ -66,11 +76,7 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
 
         String srcHost = hostFor(info.srcHost());
         String dstHost = hostFor(info.dstHost());
-        // hostFor returns the IP itself when our DNS server never resolved it
-        boolean srcResolved = !srcHost.equals(info.srcHost());
-        boolean dstResolved = !dstHost.equals(info.dstHost());
-        boolean remoteIsSrc = remoteIsSource(srcHost, info.srcPort(), srcResolved,
-                dstHost, info.dstPort(), dstResolved, hook);
+        boolean remoteIsSrc = remoteIsSource(info, srcHost, dstHost, hook);
         String remoteHost = remoteIsSrc ? srcHost : dstHost;
         int remotePort = remoteIsSrc ? info.srcPort() : info.dstPort();
         InetSocketAddress local = remoteIsSrc
@@ -104,17 +110,27 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
     }
 
     /**
-     * The remote endpoint is the server: the one endpoint some filter knows as a server (any rule matches it),
-     * else the one endpoint our DNS server resolved. If neither singles out one endpoint, falls back to the hook:
-     * source for inbound, destination otherwise.
+     * The remote endpoint is the server, the one endpoint singled out by (first that decides):
+     * a filter knows it as a server (any rule matches it); it's outside the internal subnets while the other is inside;
+     * our DNS server resolved it. Otherwise falls back to the hook: source for inbound, destination otherwise.
+     * @param srcHost the source as checked against rules: its resolved host name, or the IP if there's none
+     * @param dstHost the destination as checked against rules, likewise
      */
-    boolean remoteIsSource(String srcHost, int srcPort, boolean srcResolved,
-                           String dstHost, int dstPort, boolean dstResolved, int hook) {
-        boolean srcIsServer = isKnownServerFromRules(srcHost, srcPort);
-        boolean dstIsServer = isKnownServerFromRules(dstHost, dstPort);
+    boolean remoteIsSource(PacketInfo info, String srcHost, String dstHost, int hook) {
+        boolean srcIsServer = isKnownServerFromRules(srcHost, info.srcPort());
+        boolean dstIsServer = isKnownServerFromRules(dstHost, info.dstPort());
         if (srcIsServer != dstIsServer) {
             return srcIsServer;
         }
+        Subnets subnets = internalSubnets;
+        boolean srcInternal = subnets.contains(info.srcHost());
+        boolean dstInternal = subnets.contains(info.dstHost());
+        if (srcInternal != dstInternal) {
+            return !srcInternal;
+        }
+        // hostFor returns the IP itself when our DNS server never resolved it
+        boolean srcResolved = !srcHost.equals(info.srcHost());
+        boolean dstResolved = !dstHost.equals(info.dstHost());
         if (srcResolved != dstResolved) {
             return srcResolved;
         }

@@ -7,6 +7,7 @@ import com.flower.net.dns.DnsServer;
 import com.flower.net.packetui.MainApp;
 import com.flower.net.packetui.server.ConnectionFilterDecider;
 import com.flower.net.packetui.server.DeciderServer;
+import com.flower.net.packetui.server.Subnets;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.control.Alert;
@@ -15,16 +16,22 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.Stage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.prefs.Preferences;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class ServerForm extends AnchorPane implements Refreshable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ServerForm.class);
+    static final String INTERNAL_SUBNETS_PREF = "packetUiInternalSubnetsPref";
+
     final ReentrantLock startLock;
     final MainApp mainApp;
     final ConnectionFilterDecider decider;
@@ -38,6 +45,10 @@ public class ServerForm extends AnchorPane implements Refreshable {
     @Nullable @FXML Button startButton;
     @Nullable @FXML Button stopButton;
     @Nullable @FXML TextField socketPathTextField;
+    @Nullable @FXML TextField internalSubnetsTextField;
+    @Nullable @FXML Button applyInternalSubnetsButton;
+    /** What the decider currently uses; Apply is enabled only when the field says something else. */
+    Subnets appliedSubnets = Subnets.EMPTY;
 
     @Nullable Stage stage;
 
@@ -62,6 +73,7 @@ public class ServerForm extends AnchorPane implements Refreshable {
 
         decider = new ConnectionFilterDecider();
         server = new DeciderServer(decider);
+        loadInternalSubnets();
 
         refreshContent();
     }
@@ -135,6 +147,52 @@ public class ServerForm extends AnchorPane implements Refreshable {
         } finally {
             startLock.unlock();
         }
+    }
+
+    void loadInternalSubnets() {
+        TextField textField = checkNotNull(internalSubnetsTextField);
+        textField.textProperty().addListener((observable, oldText, newText) -> updateApplyInternalSubnetsButton());
+        String text = Preferences.userRoot().get(INTERNAL_SUBNETS_PREF, "");
+        try {
+            appliedSubnets = Subnets.parse(text);
+            decider.setInternalSubnets(appliedSubnets);
+        } catch (IllegalArgumentException e) {
+            LOGGER.warn("Ignoring invalid saved internal subnets '{}': {}", text, e.getMessage());
+        }
+        textField.setText(text);
+        updateApplyInternalSubnetsButton();
+    }
+
+    /** Enabled when the field differs from the applied subnets, or is invalid (so Apply shows the error). */
+    void updateApplyInternalSubnetsButton() {
+        boolean nothingToApply;
+        try {
+            nothingToApply = Subnets.parse(checkNotNull(internalSubnetsTextField).getText()).toString()
+                    .equals(appliedSubnets.toString());
+        } catch (IllegalArgumentException e) {
+            nothingToApply = false;
+        }
+        checkNotNull(applyInternalSubnetsButton).setDisable(nothingToApply);
+    }
+
+    public void applyInternalSubnets() {
+        if (checkNotNull(applyInternalSubnetsButton).isDisable()) {
+            return; // Enter in the field with nothing to apply
+        }
+        TextField textField = checkNotNull(internalSubnetsTextField);
+        Subnets subnets;
+        try {
+            subnets = Subnets.parse(textField.getText());
+        } catch (IllegalArgumentException e) {
+            new Alert(Alert.AlertType.ERROR, "Invalid internal subnets:\n" + e.getMessage(), ButtonType.OK).showAndWait();
+            return;
+        }
+        decider.setInternalSubnets(subnets);
+        appliedSubnets = subnets;
+        String normalized = subnets.toString();
+        textField.setText(normalized);
+        Preferences.userRoot().put(INTERNAL_SUBNETS_PREF, normalized);
+        mainApp.setStatusText(subnets.isEmpty() ? "Internal subnets cleared" : "Internal subnets: " + normalized);
     }
 
     @Override

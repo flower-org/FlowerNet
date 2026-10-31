@@ -18,9 +18,14 @@ import java.util.concurrent.LinkedBlockingDeque;
 
 /**
  * Decides packets by checking the remote endpoint against {@link ConnectionFilter}s.
- * Remote endpoint is the server: the endpoint a filter knows as a server (any rule matches it: rules describe servers).
- * Without a single such endpoint, it's the source for inbound hooks (PREROUTING/INPUT) and the destination for
- * outbound/forwarded ones, so replies from an allowed server are allowed too. Packets that aren't valid IP are dropped.
+ * Remote endpoint is the server, picked by the first of these that singles out one endpoint:
+ * <ol>
+ *     <li>a filter knows it as a server (any rule matches it: rules describe servers);</li>
+ *     <li>our DNS server resolved a name to its IP (clients look servers up, not the other way around);</li>
+ *     <li>the hook: the source for inbound hooks (PREROUTING/INPUT), the destination for outbound/forwarded ones,
+ *     so replies from an allowed server are allowed too.</li>
+ * </ol>
+ * Packets that aren't valid IP are dropped.
  */
 public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
     private static final Logger LOGGER = LoggerFactory.getLogger(ConnectionFilterDecider.class);
@@ -34,7 +39,10 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
     private final Deque<ConnectionFilter> connectionFilters = new LinkedBlockingDeque<>();
     @Nullable private volatile ResolvedHosts resolvedHosts;
 
-    /** When set, remote IPs that our DNS server resolved are checked as their host name instead. */
+    /**
+     * When set, IPs that our DNS server resolved are checked as their host name instead,
+     * and count as servers when no rule singles out one endpoint.
+     */
     public void setResolvedHosts(@Nullable ResolvedHosts resolvedHosts) {
         this.resolvedHosts = resolvedHosts;
     }
@@ -58,7 +66,11 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
 
         String srcHost = hostFor(info.srcHost());
         String dstHost = hostFor(info.dstHost());
-        boolean remoteIsSrc = remoteIsSource(srcHost, info.srcPort(), dstHost, info.dstPort(), hook);
+        // hostFor returns the IP itself when our DNS server never resolved it
+        boolean srcResolved = !srcHost.equals(info.srcHost());
+        boolean dstResolved = !dstHost.equals(info.dstHost());
+        boolean remoteIsSrc = remoteIsSource(srcHost, info.srcPort(), srcResolved,
+                dstHost, info.dstPort(), dstResolved, hook);
         String remoteHost = remoteIsSrc ? srcHost : dstHost;
         int remotePort = remoteIsSrc ? info.srcPort() : info.dstPort();
         InetSocketAddress local = remoteIsSrc
@@ -92,19 +104,24 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
     }
 
     /**
-     * The remote endpoint is the server: the one endpoint some filter knows as a server (any rule matches it).
-     * If neither or both are known servers, falls back to the hook: source for inbound, destination otherwise.
+     * The remote endpoint is the server: the one endpoint some filter knows as a server (any rule matches it),
+     * else the one endpoint our DNS server resolved. If neither singles out one endpoint, falls back to the hook:
+     * source for inbound, destination otherwise.
      */
-    boolean remoteIsSource(String srcHost, int srcPort, String dstHost, int dstPort, int hook) {
-        boolean srcIsServer = isKnownServer(srcHost, srcPort);
-        boolean dstIsServer = isKnownServer(dstHost, dstPort);
+    boolean remoteIsSource(String srcHost, int srcPort, boolean srcResolved,
+                           String dstHost, int dstPort, boolean dstResolved, int hook) {
+        boolean srcIsServer = isKnownServerFromRules(srcHost, srcPort);
+        boolean dstIsServer = isKnownServerFromRules(dstHost, dstPort);
         if (srcIsServer != dstIsServer) {
             return srcIsServer;
+        }
+        if (srcResolved != dstResolved) {
+            return srcResolved;
         }
         return isInbound(hook);
     }
 
-    boolean isKnownServer(String host, int port) {
+    boolean isKnownServerFromRules(String host, int port) {
         for (ConnectionFilter filter : connectionFilters) {
             if (filter.isKnownServer(host, port)) {
                 return true;

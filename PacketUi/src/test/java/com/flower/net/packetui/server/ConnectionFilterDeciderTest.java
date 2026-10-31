@@ -131,6 +131,48 @@ public class ConnectionFilterDeciderTest {
     }
 
     @Test
+    public void resolvedEndpointIsServerWhenNoRuleDecides() throws Exception {
+        ConnectionFilterDecider decider = new ConnectionFilterDecider();
+        RecordingFilter filter = new RecordingFilter(Access.ALLOW);
+        decider.addConnectionFilter(filter);
+        ResolvedHosts hosts = new ResolvedHosts();
+        hosts.record("example.com", List.of(InetAddress.getByName("93.184.216.34")));
+        decider.setResolvedHosts(hosts);
+
+        // Forwarded request and reply: the hook alone would pick the LAN client for the reply
+        decider.decide(ipv4(6, new int[]{10, 42, 0, 5}, new int[]{93, 184, 216, 34}, 51234, 443, 0), 1, 0x0800, FORWARD, 0, 1, 2);
+        decider.decide(ipv4(6, new int[]{93, 184, 216, 34}, new int[]{10, 42, 0, 5}, 443, 51234, 0), 2, 0x0800, FORWARD, 0, 2, 1);
+        assertEquals(2, filter.calls.size());
+        for (Call call : filter.calls) {
+            assertEquals("example.com", call.host());
+            assertEquals(443, call.port());
+            assertEquals("10.42.0.5", ((InetSocketAddress) call.from()).getHostString());
+        }
+    }
+
+    @Test
+    public void ruleBeatsResolvedAndBothResolvedFallsBackToHook() throws Exception {
+        ConnectionFilterDecider decider = new ConnectionFilterDecider();
+        RecordingFilter filter = new RecordingFilter(Access.ALLOW);
+        filter.knownServers.add("10.42.0.5:8080");
+        decider.addConnectionFilter(filter);
+        ResolvedHosts hosts = new ResolvedHosts();
+        hosts.record("example.com", List.of(InetAddress.getByName("93.184.216.34")));
+        hosts.record("other.com", List.of(InetAddress.getByName("5.6.7.8")));
+        decider.setResolvedHosts(hosts);
+
+        // A rule marks the unresolved side: it wins over the resolved one
+        decider.decide(ipv4(6, new int[]{93, 184, 216, 34}, new int[]{10, 42, 0, 5}, 51234, 8080, 0), 1, 0x0800, FORWARD, 0, 2, 1);
+        assertEquals("10.42.0.5", filter.calls.get(0).host());
+        assertEquals(8080, filter.calls.get(0).port());
+
+        // Both resolved, no rule: FORWARD falls back to the destination
+        decider.decide(ipv4(6, new int[]{93, 184, 216, 34}, new int[]{5, 6, 7, 8}, 443, 40000, 0), 2, 0x0800, FORWARD, 0, 2, 1);
+        assertEquals("other.com", filter.calls.get(1).host());
+        assertEquals(40000, filter.calls.get(1).port());
+    }
+
+    @Test
     public void outboundChecksDestination() {
         ConnectionFilterDecider decider = new ConnectionFilterDecider();
         RecordingFilter filter = new RecordingFilter(Access.ALLOW);

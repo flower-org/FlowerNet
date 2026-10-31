@@ -50,6 +50,25 @@ nft add rule inet nfbridge in  queue num 0
 nft add rule inet nfbridge out queue num 0
 nft add rule inet nfbridge forward_chain queue num 0
 
+# ================ Router (NetworkManager "share internet", LAN 10.42.0.0/24) ================
+# Address translation only, no filtering: PacketUi still decides every packet.
+# Matches the LAN subnet, not an interface, so on a machine that isn't sharing internet these rules match nothing.
+# Own table, not "nat": NetworkManager adds its rules to "ip nat" via iptables-nft, and mixing ours in could break that.
+# PacketUi sees LAN addresses: dstnat happens before filtering and srcnat after it.
+nft add table ip nfbridge_nat
+
+# NAT for the LAN (replaces NetworkManager's masquerade rule, which "nft flush ruleset" removes)
+nft add chain ip nfbridge_nat postrouting '{ type nat hook postrouting priority srcnat; policy accept; }'
+nft add rule ip nfbridge_nat postrouting ip saddr 10.42.0.0/24 ip daddr != 10.42.0.0/24 masquerade
+
+# All LAN DNS goes to the router's dnsmasq (-> systemd-resolved -> PacketUi DNS), whichever server a device asked:
+# PacketUi only knows host names for IPs its DNS resolved. Shows up in PacketUi as IN to 10.42.0.1:53.
+nft add chain ip nfbridge_nat prerouting '{ type nat hook prerouting priority dstnat; policy accept; }'
+nft add rule ip nfbridge_nat prerouting ip saddr 10.42.0.0/24 udp dport 53 redirect to :53
+nft add rule ip nfbridge_nat prerouting ip saddr 10.42.0.0/24 tcp dport 53 redirect to :53
+
+# ============== END Router ==============
+
 # mkdir /run/nfbridge/
 # chown {USERNAME_THAT_RUNS_PACKET_UI} /run/nfbridge/
 

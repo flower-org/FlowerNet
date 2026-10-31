@@ -7,10 +7,13 @@ class CheckResult {
     final Access checkResult;
     final boolean isDirectIpBlock;
     final boolean isRuleMatched;
+    /** Decided by the direction default */
+    final boolean isDirectionDefault;
 
-    CheckResult(Access checkResult, boolean isDirectIpBlock, boolean isRuleMatched) {
+    CheckResult(Access checkResult, boolean isDirectIpBlock, boolean isRuleMatched, boolean isDirectionDefault) {
         this.checkResult = checkResult;
         this.isDirectIpBlock = isDirectIpBlock;
         this.isRuleMatched = isRuleMatched;
+        this.isDirectionDefault = isDirectionDefault;
     }
 }

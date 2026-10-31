@@ -17,6 +17,8 @@ public class CapturedRequest {
     /** Ture if not based on any rules, but based on general policy Allow/Deny */
     private final boolean isRuleMatched;
     private final boolean isDirectIpBlock;
+    /** Decided by the direction default */
+    private final boolean isDirectionDefault;
     final long creationTimestamp;
     final @Nullable String fromHost;
     final @Nullable Integer fromPort;
@@ -24,14 +26,15 @@ public class CapturedRequest {
     final @Nullable TrafficDirection direction;
 
     public CapturedRequest(String host, Integer port, Access access, boolean isRuleMatched, Protocol protocol,
-                           boolean isDirectIpBlock, @Nullable String fromHost, @Nullable Integer fromPort,
-                           @Nullable TrafficDirection direction) {
+                           boolean isDirectIpBlock, boolean isDirectionDefault, @Nullable String fromHost,
+                           @Nullable Integer fromPort, @Nullable TrafficDirection direction) {
         this.host = host;
         this.port = port;
         this.access = access;
         this.protocol = protocol;
         this.isRuleMatched = isRuleMatched;
         this.isDirectIpBlock = isDirectIpBlock;
+        this.isDirectionDefault = isDirectionDefault;
         this.creationTimestamp = System.currentTimeMillis();
         this.fromHost = fromHost;
         this.fromPort = fromPort;
@@ -40,7 +43,7 @@ public class CapturedRequest {
 
     /** Builds a request from a raw source address: resolved address -> IP, unresolved -> original host string */
     public static CapturedRequest of(String host, int port, Access access, boolean isRuleMatched, Protocol protocol,
-                                     boolean isDirectIpBlock, @Nullable SocketAddress from,
+                                     boolean isDirectIpBlock, boolean isDirectionDefault, @Nullable SocketAddress from,
                                      @Nullable TrafficDirection direction) {
         String fromHost = null;
         Integer fromPort = null;
@@ -48,7 +51,8 @@ public class CapturedRequest {
             fromHost = isa.getAddress() != null ? isa.getAddress().getHostAddress() : isa.getHostString();
             fromPort = isa.getPort();
         }
-        return new CapturedRequest(host, port, access, isRuleMatched, protocol, isDirectIpBlock, fromHost, fromPort, direction);
+        return new CapturedRequest(host, port, access, isRuleMatched, protocol, isDirectIpBlock, isDirectionDefault,
+                fromHost, fromPort, direction);
     }
 
     public String getHost() { return host; }
@@ -60,15 +64,21 @@ public class CapturedRequest {
     public boolean isRuleMatched() { return isRuleMatched; }
 
     public String getFilterResult() {
-        return formatFilterResult(access, isRuleMatched, isDirectIpBlock);
+        return formatFilterResult(access, isRuleMatched, isDirectIpBlock, isDirectionDefault);
     }
 
-    static String formatFilterResult(Access access, boolean isRuleMatched, boolean isDirectIpBlock) {
+    static String formatFilterResult(Access access, boolean isRuleMatched, boolean isDirectIpBlock,
+                                     boolean isDirectionDefault) {
         return (access == Access.ALLOW ? "Allowed" : "Denied")
-                + (isDirectIpBlock ? " (direct IP block)" : (isRuleMatched ? " (rule match)" : " (default)"));
+                + (isDirectIpBlock ? " (direct IP block)"
+                : isRuleMatched ? " (rule match)"
+                : isDirectionDefault ? " (direction)"
+                : " (default)");
     }
 
     public boolean isDirectIpBlock() { return isDirectIpBlock; }
+
+    public boolean isDirectionDefault() { return isDirectionDefault; }
 
     public Protocol getProtocol() {
         return protocol;

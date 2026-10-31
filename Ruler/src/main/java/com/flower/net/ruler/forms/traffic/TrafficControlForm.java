@@ -20,6 +20,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
@@ -40,9 +41,14 @@ import java.io.File;
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
+import java.util.prefs.Preferences;
 import java.util.regex.Pattern;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -59,9 +65,19 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
     final static String UNTITLED_LIST_NAME = "Untitled ";
 
+    final static String DIRECTION_DEFAULT_FLAG_PREF = "directionDefaultFlagPref";
+    final static String DIRECTION_DEFAULT_ALLOW_IN_PREF = "directionDefaultAllowInPref";
+    final static String DIRECTION_DEFAULT_ALLOW_OUT_PREF = "directionDefaultAllowOutPref";
+    final static String DIRECTION_DEFAULT_ALLOW_FORWARD_PREF = "directionDefaultAllowForwardPref";
+
     @Nullable Stage stage;
     @Nullable @FXML ComboBox<String> filteringModeComboBox;
     @Nullable @FXML CheckBox allowDirectIpAccessCheckBox;
+    @Nullable @FXML CheckBox directionDefaultCheckBox;
+    @Nullable @FXML MenuButton directionDefaultMenuButton;
+    @Nullable @FXML CheckMenuItem directionDefaultInMenuItem;
+    @Nullable @FXML CheckMenuItem directionDefaultOutMenuItem;
+    @Nullable @FXML CheckMenuItem directionDefaultForwardMenuItem;
     @Nullable @FXML ComboBox<String> autoAddComboBox;
     @Nullable @FXML TabPane ruleListsTabPane;
     @Nullable @FXML MenuButton appendMenuButton;
@@ -79,6 +95,13 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     /** List in the selected tab: target for allow/deny actions and auto-add */
     volatile @Nullable RuleListForm selectedRuleList;
     volatile AutoAddRulesMode autoAddRulesMode = AutoAddRulesMode.NONE;
+    /**
+     * Direction default: when enabled, decides unmatched traffic by its direction (as reported by nfbridge) before
+     * the filtering mode does; allowed directions get ALLOW, the rest DENY. Traffic without a direction (SOCKS)
+     * isn't affected. Snapshots replaced on the UI thread, read on connection threads.
+     */
+    volatile boolean directionDefaultEnabled;
+    volatile Set<TrafficDirection> directionDefaultAllowed = Collections.unmodifiableSet(EnumSet.allOf(TrafficDirection.class));
     /** Capture views in tab order; snapshot replaced on the UI thread, read on connection threads */
     volatile List<CaptureForm> captureForms = List.of();
     /** Answers of active lists per destination; invalidated right after rules, list activation or list order change */
@@ -131,6 +154,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
         checkNotNull(filteringModeComboBox).valueProperty().addListener((obs, oldValue, newValue) -> filteringChanged());
         checkNotNull(allowDirectIpAccessCheckBox).selectedProperty().addListener((obs, oldValue, newValue) -> filteringChanged());
+        initDirectionDefault();
 
         TabPane tabPane = checkNotNull(ruleListsTabPane);
         tabPane.getTabs().addListener((ListChangeListener<Tab>) change -> {
@@ -159,6 +183,57 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         rebuildAppendMenu();
         persistDelay.setOnFinished(event -> persistRuleLists());
         restoreRuleLists();
+    }
+
+    /** Restores the direction default controls from preferences and keeps them saved */
+    void initDirectionDefault() {
+        Preferences preferences = Preferences.userRoot();
+        CheckBox enabledCheckBox = checkNotNull(directionDefaultCheckBox);
+        enabledCheckBox.setSelected(preferences.getBoolean(DIRECTION_DEFAULT_FLAG_PREF, false));
+        checkNotNull(directionDefaultInMenuItem).setSelected(preferences.getBoolean(DIRECTION_DEFAULT_ALLOW_IN_PREF, true));
+        checkNotNull(directionDefaultOutMenuItem).setSelected(preferences.getBoolean(DIRECTION_DEFAULT_ALLOW_OUT_PREF, true));
+        checkNotNull(directionDefaultForwardMenuItem).setSelected(preferences.getBoolean(DIRECTION_DEFAULT_ALLOW_FORWARD_PREF, true));
+        updateDirectionDefault();
+
+        enabledCheckBox.selectedProperty().addListener((obs, oldValue, newValue) -> directionDefaultChanged());
+        for (CheckMenuItem item : List.of(directionDefaultInMenuItem, directionDefaultOutMenuItem, directionDefaultForwardMenuItem)) {
+            item.selectedProperty().addListener((obs, oldValue, newValue) -> directionDefaultChanged());
+        }
+    }
+
+    void directionDefaultChanged() {
+        updateDirectionDefault();
+        Preferences preferences = Preferences.userRoot();
+        preferences.putBoolean(DIRECTION_DEFAULT_FLAG_PREF, directionDefaultEnabled);
+        preferences.putBoolean(DIRECTION_DEFAULT_ALLOW_IN_PREF, checkNotNull(directionDefaultInMenuItem).isSelected());
+        preferences.putBoolean(DIRECTION_DEFAULT_ALLOW_OUT_PREF, checkNotNull(directionDefaultOutMenuItem).isSelected());
+        preferences.putBoolean(DIRECTION_DEFAULT_ALLOW_FORWARD_PREF, checkNotNull(directionDefaultForwardMenuItem).isSelected());
+        filteringChanged();
+    }
+
+    /** Copies the controls into the snapshot read by connection threads, and updates the menu button */
+    void updateDirectionDefault() {
+        EnumSet<TrafficDirection> allowed = EnumSet.noneOf(TrafficDirection.class);
+        if (checkNotNull(directionDefaultInMenuItem).isSelected()) { allowed.add(TrafficDirection.IN); }
+        if (checkNotNull(directionDefaultOutMenuItem).isSelected()) { allowed.add(TrafficDirection.OUT); }
+        if (checkNotNull(directionDefaultForwardMenuItem).isSelected()) { allowed.add(TrafficDirection.FORWARD); }
+        directionDefaultAllowed = Collections.unmodifiableSet(allowed);
+        directionDefaultEnabled = checkNotNull(directionDefaultCheckBox).isSelected();
+
+        MenuButton menuButton = checkNotNull(directionDefaultMenuButton);
+        menuButton.setDisable(!directionDefaultEnabled);
+        menuButton.setText(formatDirectionDefault(allowed));
+    }
+
+    /** Allowed directions, e.g. "IN/OUT/FORWARD", "IN"; "DENY" if all are denied */
+    static String formatDirectionDefault(Set<TrafficDirection> allowed) {
+        List<String> names = new ArrayList<>();
+        for (TrafficDirection direction : TrafficDirection.values()) {
+            if (allowed.contains(direction)) {
+                names.add(direction.name());
+            }
+        }
+        return names.isEmpty() ? "DENY" : String.join("/", names);
     }
 
     /**
@@ -467,10 +542,15 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         return new RuleLookupCache.Result(null);
     }
 
-    CheckResult getCheckResult(String dstHost, int dstPort) {
+    /**
+     * Precedence: rules of active lists, then the direct IP block, then the direction default (if enabled and the
+     * traffic has a direction), then the filtering mode.
+     */
+    CheckResult getCheckResult(String dstHost, int dstPort, @Nullable TrafficDirection direction) {
         Access checkResult = getActiveListsAccess(dstHost, dstPort);
 
         boolean isDirectIpBlock = false;
+        boolean isDirectionDefault = false;
         boolean isRuleMatched;
 
         if (checkResult != null) {
@@ -481,18 +561,21 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
             if (!isDirectIpAccessAllowed && IpAddressUtil.isIPAddress(dstHost)) {
                 isDirectIpBlock = true;
                 checkResult = Access.DENY;
+            } else if (direction != null && directionDefaultEnabled) {
+                isDirectionDefault = true;
+                checkResult = directionDefaultAllowed.contains(direction) ? Access.ALLOW : Access.DENY;
             } else {
                 checkResult = getDefaultAccessType();
             }
         }
 
-        return new CheckResult(checkResult, isDirectIpBlock, isRuleMatched);
+        return new CheckResult(checkResult, isDirectIpBlock, isRuleMatched, isDirectionDefault);
     }
 
     @Override
     public Access approveConnection(String dstHost, int dstPort, Protocol protocol, @Nullable SocketAddress from,
                                     @Nullable TrafficDirection direction) {
-        CheckResult check = getCheckResult(dstHost, dstPort);
+        CheckResult check = getCheckResult(dstHost, dstPort, direction);
 
         // from == null is a re-check of an existing connection (see DeniedHostsListener) - never auto-add there
         if (!check.isRuleMatched && from != null) {
@@ -502,7 +585,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 Access autoAddAccess = autoAddRulesMode == AutoAddRulesMode.AUTO_ALLOW ? Access.ALLOW : Access.DENY;
                 // Auto-add even when the target list is inactive; the added rule only counts if it's active
                 if (target.autoAddIfAbsent(dstHost, dstPort, autoAddAccess)) {
-                    check = getCheckResult(dstHost, dstPort);
+                    check = getCheckResult(dstHost, dstPort, direction);
                 }
             }
         }
@@ -514,7 +597,8 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 if (captureForm.isCaptureEnabled()) {
                     if (capturedRequest == null) {
                         capturedRequest = CapturedRequest.of(dstHost, dstPort, finalCheck.checkResult,
-                                finalCheck.isRuleMatched, protocol, finalCheck.isDirectIpBlock, from, direction);
+                                finalCheck.isRuleMatched, protocol, finalCheck.isDirectIpBlock,
+                                finalCheck.isDirectionDefault, from, direction);
                     }
                     captureForm.addCapture(capturedRequest);
                 }

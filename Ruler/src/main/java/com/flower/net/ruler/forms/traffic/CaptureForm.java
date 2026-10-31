@@ -1,6 +1,9 @@
 package com.flower.net.ruler.forms.traffic;
 
 import com.flower.net.conntrack.ConnectionFilter;
+import com.flower.net.conntrack.TrafficDirection;
+
+import javax.annotation.Nullable;
 
 /** A view in the Capture tab pane of TrafficControlForm that receives captured requests */
 public interface CaptureForm {
@@ -16,7 +19,7 @@ public interface CaptureForm {
     /** Gives the result the current rules and filtering settings produce for a destination. UI thread only. */
     @FunctionalInterface
     interface RuleEvaluator {
-        CheckResult evaluate(String host, int port);
+        CheckResult evaluate(String host, int port, @Nullable TrafficDirection direction);
     }
 
     /**

@@ -4,6 +4,7 @@
 <?import javafx.collections.FXCollections?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.CheckMenuItem?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.MenuButton?>
@@ -29,6 +30,14 @@
                            </FXCollections>
                        </items>
                    </ComboBox>
+                   <CheckBox fx:id="directionDefaultCheckBox" mnemonicParsing="false" />
+                   <MenuButton fx:id="directionDefaultMenuButton" disable="true" mnemonicParsing="false" text="IN/OUT/FORWARD">
+                       <items>
+                           <CheckMenuItem fx:id="directionDefaultInMenuItem" mnemonicParsing="false" selected="true" text="IN" />
+                           <CheckMenuItem fx:id="directionDefaultOutMenuItem" mnemonicParsing="false" selected="true" text="OUT" />
+                           <CheckMenuItem fx:id="directionDefaultForwardMenuItem" mnemonicParsing="false" selected="true" text="FORWARD" />
+                       </items>
+                   </MenuButton>
                    <CheckBox fx:id="allowDirectIpAccessCheckBox" mnemonicParsing="false" text="Allow direct IP Access" />
                    <Separator orientation="VERTICAL" prefHeight="200.0" />
                    <Button mnemonicParsing="false" onAction="#newRuleList" text="New list" />

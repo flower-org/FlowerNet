@@ -218,7 +218,7 @@ public class CaptureStatsForm extends AnchorPane implements CaptureForm {
     @Override
     public void rulesChanged(RuleEvaluator evaluator) {
         for (CaptureStatsEntry entry : capturedRequests) {
-            entry.reevaluate(evaluator.evaluate(entry.getHost(), entry.getPort()));
+            entry.reevaluate(evaluator.evaluate(entry.getHost(), entry.getPort(), entry.getLastDirection()));
         }
         removeFilteredOutEntries();
     }

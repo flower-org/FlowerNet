@@ -9,6 +9,7 @@ import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.beans.property.ReadOnlyStringWrapper;
 
+import javax.annotation.Nullable;
 import java.util.EnumSet;
 import java.util.stream.Collectors;
 
@@ -23,6 +24,8 @@ public class CaptureStatsEntry {
     /** All directions seen: a server's requests and replies show up as OUT and IN, so the last one would flip-flop */
     private final EnumSet<TrafficDirection> directionsSeen = EnumSet.noneOf(TrafficDirection.class);
     private final ReadOnlyStringWrapper directions = new ReadOnlyStringWrapper("");
+    /** Direction of the most recent request, for re-evaluating with the direction default */
+    private @Nullable TrafficDirection lastDirection;
     /** Latest result, kept for re-applying the capture filter */
     private final ReadOnlyObjectWrapper<Access> access = new ReadOnlyObjectWrapper<>(Access.DENY);
     private boolean isRuleMatched;
@@ -42,20 +45,21 @@ public class CaptureStatsEntry {
         long timestamp = request.getCreationTimestamp();
         if (timestamp >= lastAccess.get()) {
             lastAccess.set(timestamp);
-            setResult(request.getAccess(), request.isRuleMatched(), request.isDirectIpBlock());
+            setResult(request.getAccess(), request.isRuleMatched(), request.isDirectIpBlock(), request.isDirectionDefault());
             from.set(request.getFrom());
+            lastDirection = direction;
         }
     }
 
     /** Replaces the result with what the current rules give; count, last access and source stay */
     void reevaluate(CheckResult check) {
-        setResult(check.checkResult, check.isRuleMatched, check.isDirectIpBlock);
+        setResult(check.checkResult, check.isRuleMatched, check.isDirectIpBlock, check.isDirectionDefault);
     }
 
-    private void setResult(Access access, boolean isRuleMatched, boolean isDirectIpBlock) {
+    private void setResult(Access access, boolean isRuleMatched, boolean isDirectIpBlock, boolean isDirectionDefault) {
         this.access.set(access);
         this.isRuleMatched = isRuleMatched;
-        filterResult.set(CapturedRequest.formatFilterResult(access, isRuleMatched, isDirectIpBlock));
+        filterResult.set(CapturedRequest.formatFilterResult(access, isRuleMatched, isDirectIpBlock, isDirectionDefault));
     }
 
     public Access getAccess() { return access.get(); }
@@ -81,6 +85,8 @@ public class CaptureStatsEntry {
     public ReadOnlyStringProperty filterResultProperty() { return filterResult.getReadOnlyProperty(); }
 
     public String getDirections() { return directions.get(); }
+
+    public @Nullable TrafficDirection getLastDirection() { return lastDirection; }
 
     public ReadOnlyStringProperty directionsProperty() { return directions.getReadOnlyProperty(); }
 

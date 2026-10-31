@@ -12,7 +12,7 @@ public interface ConnectionFilter {
                                            @Nullable TrafficDirection direction);
 
         /**
-         * Whether the endpoint is a server according to this filter's rules (a host+port rule matches it).
+         * Whether the endpoint is a server according to this filter's rules (any rule matches it: rules describe servers).
          * Lets packet-level callers, which can't tell who initiated a connection, pick the server side as destination.
          */
         default boolean isKnownServer(String host, int port) {

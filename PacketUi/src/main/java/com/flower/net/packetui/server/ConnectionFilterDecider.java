@@ -18,7 +18,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 
 /**
  * Decides packets by checking the remote endpoint against {@link ConnectionFilter}s.
- * Remote endpoint is the server: the endpoint a filter knows as a server (a host+port rule matches it).
+ * Remote endpoint is the server: the endpoint a filter knows as a server (any rule matches it: rules describe servers).
  * Without a single such endpoint, it's the source for inbound hooks (PREROUTING/INPUT) and the destination for
  * outbound/forwarded ones, so replies from an allowed server are allowed too. Packets that aren't valid IP are dropped.
  */
@@ -92,7 +92,7 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
     }
 
     /**
-     * The remote endpoint is the server: the one endpoint some filter knows as a server (host+port rule match).
+     * The remote endpoint is the server: the one endpoint some filter knows as a server (any rule matches it).
      * If neither or both are known servers, falls back to the hook: source for inbound, destination otherwise.
      */
     boolean remoteIsSource(String srcHost, int srcPort, String dstHost, int dstPort, int hook) {

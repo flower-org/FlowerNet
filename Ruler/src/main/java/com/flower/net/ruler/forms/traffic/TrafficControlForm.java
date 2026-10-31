@@ -147,7 +147,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         restoreRuleLists();
     }
 
-    /** Adds a capture view as a tab; it receives captures while its tab is open */
+    /** Adds a capture view as a non-closeable tab */
     <T extends Node & CaptureForm> void addCaptureForm(String title, T captureForm) {
         captureForm.setConnectionFilter(this);
         checkNotNull(captureTabPane).getTabs().add(new Tab(title, captureForm));

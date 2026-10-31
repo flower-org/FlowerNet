@@ -1,22 +1,21 @@
 #!/bin/bash
+# Sends all INPUT/OUTPUT/FORWARD packets to NFQUEUE 0 (PacketUi) using nftables only.
+# Each packet must be queued from one place only: a second queue rule (e.g. iptables) makes PacketUi decide
+# and capture every packet twice. The file name is kept for existing startup setups (see "run on startup.md").
 
-iptables -t nat -F
-ip6tables -t nat -F
-iptables -t mangle -F
-ip6tables -t mangle -F
-iptables -F
-ip6tables -F
-iptables -X
-ip6tables -X
+# Start from a clean slate: removes all tables and chains of every family (ip/ip6 nat, mangle, filter, ...).
+# Replaces the iptables/ip6tables -t nat -F, -t mangle -F, -F and -X calls. Covers iptables rules too,
+# since Mint's iptables is iptables-nft.
+nft flush ruleset
 
-iptables -P OUTPUT DROP
-ip6tables -P OUTPUT DROP
-iptables -P INPUT DROP
-ip6tables -P INPUT DROP
-iptables -P FORWARD DROP
-ip6tables -P FORWARD DROP
+# Default DROP for INPUT/OUTPUT/FORWARD (replaces iptables/ip6tables -P ... DROP): the base chains' policy.
+# When PacketUi isn't running, queued packets are dropped (no bypass).
+nft add table inet nfbridge
+nft add chain inet nfbridge in  '{ type filter hook input   priority 0; policy drop; }'
+nft add chain inet nfbridge out '{ type filter hook output  priority 0; policy drop; }'
+nft add chain inet nfbridge forward_chain '{ type filter hook forward priority 0; policy drop; }'
 
-# Override rules MUST come BEFORE the NFQUEUE rules: NFQUEUE is terminal, so rules after it are never reached.
+# Override rules MUST come BEFORE the queue rules: queue is terminal, so rules after it are never reached.
 
 # ================ xfce4-session service ================
 # We need to allow traffic to local xfce4-session service, on port 4101.
@@ -28,51 +27,25 @@ ip6tables -P FORWARD DROP
 
 # ----- IPV4 -----
 # local client, sends TCP traffic to [127.0.0.1:4101] from [127.0.0.1:any, any out]
-iptables -A OUTPUT -p tcp --dport 4101 -d 127.0.0.1 -s 127.0.0.1 -j ACCEPT
+nft add rule inet nfbridge out ip daddr 127.0.0.1 ip saddr 127.0.0.1 tcp dport 4101 accept
 # local client recieves TCP traffic back from [127.0.0.1:4101] to [127.0.0.1:any, any in]
-iptables -A INPUT -p tcp --sport 4101 -s 127.0.0.1 -d 127.0.0.1 -m state --state ESTABLISHED,RELATED -j ACCEPT
+nft add rule inet nfbridge in ip saddr 127.0.0.1 ip daddr 127.0.0.1 tcp sport 4101 ct state established,related accept
 
 # local server, sends TCP traffic from [127.0.0.1:4101, out lo] to [127.0.0.1:any port, any in]
-iptables -A OUTPUT -o lo -p tcp --sport 4101 -s 127.0.0.1 -d 127.0.0.1 -j ACCEPT
+nft add rule inet nfbridge out oifname lo ip saddr 127.0.0.1 ip daddr 127.0.0.1 tcp sport 4101 accept
 # local server accepts TCP traffic at [127.0.0.1:4101, in lo] from [127.0.0.1:any port, any out]
-iptables -A INPUT -i lo -p tcp --dport 4101 -d 127.0.0.1 -s 127.0.0.1 -j ACCEPT
+nft add rule inet nfbridge in iifname lo ip daddr 127.0.0.1 ip saddr 127.0.0.1 tcp dport 4101 accept
 
 # ----- IPV6 -----
-ip6tables -A OUTPUT -p tcp --dport 4101 -d ::1 -s ::1 -j ACCEPT
-ip6tables -A INPUT -p tcp --sport 4101 -s ::1 -d ::1 -m state --state ESTABLISHED,RELATED -j ACCEPT
+nft add rule inet nfbridge out ip6 daddr ::1 ip6 saddr ::1 tcp dport 4101 accept
+nft add rule inet nfbridge in ip6 saddr ::1 ip6 daddr ::1 tcp sport 4101 ct state established,related accept
 
-ip6tables -A OUTPUT -o lo -p tcp --sport 4101 -s ::1 -d ::1 -j ACCEPT
-ip6tables -A INPUT -i lo -p tcp --dport 4101 -d ::1 -s ::1 -j ACCEPT
+nft add rule inet nfbridge out oifname lo ip6 saddr ::1 ip6 daddr ::1 tcp sport 4101 accept
+nft add rule inet nfbridge in iifname lo ip6 daddr ::1 ip6 saddr ::1 tcp dport 4101 accept
 
 # ============== END xfce4-session service ==============
 
-
-# Log all dropped packages, debug only.
-#iptables -N logging
-#iptables -A INPUT -j logging
-#iptables -A OUTPUT -j logging
-#iptables -A logging -m limit --limit 2/min -j LOG --log-prefix "IPTables general: " --log-level 7
-#iptables -A logging -j DROP
-
-#ip6tables -N logging
-#ip6tables -A INPUT -j logging
-#ip6tables -A OUTPUT -j logging
-#ip6tables -A logging -m limit --limit 2/min -j LOG --log-prefix "IPTables general: " --log-level 7
-#ip6tables -A logging -j DROP
-
-
-# Everything goes to the NFQUEUE 0.
-iptables -A INPUT  -j NFQUEUE --queue-num 0
-iptables -A OUTPUT -j NFQUEUE --queue-num 0
-iptables -A FORWARD -j NFQUEUE --queue-num 0
-
-# NFTables
-
-nft add table inet nfbridge
-nft add chain inet nfbridge in  '{ type filter hook input   priority 0; policy drop; }'
-nft add chain inet nfbridge out '{ type filter hook output  priority 0; policy drop; }'
-nft add chain inet nfbridge forward_chain '{ type filter hook forward priority 0; policy drop; }'
-
+# Everything else goes to the NFQUEUE 0.
 nft add rule inet nfbridge in  queue num 0
 nft add rule inet nfbridge out queue num 0
 nft add rule inet nfbridge forward_chain queue num 0

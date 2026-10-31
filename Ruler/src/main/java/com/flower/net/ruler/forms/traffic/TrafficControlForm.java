@@ -25,6 +25,8 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -139,12 +141,38 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         });
         tabPane.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) ->
                 selectedRuleList = newTab == null ? null : (RuleListForm) newTab.getContent());
+        tabPane.addEventHandler(MouseEvent.MOUSE_CLICKED, event -> {
+            if (event.getButton() == MouseButton.SECONDARY && event.isStillSincePress()
+                    && event.getTarget() instanceof Node target) {
+                Tab tab = findTabHeaderTab(target, tabPane);
+                if (tab != null) {
+                    RuleListForm ruleList = (RuleListForm) tab.getContent();
+                    ruleList.setActive(!ruleList.isActive());
+                    event.consume();
+                }
+            }
+        });
 
         MenuButton appendMenu = checkNotNull(appendMenuButton);
         appendMenu.setOnShowing(event -> rebuildAppendMenu());
         rebuildAppendMenu();
         persistDelay.setOnFinished(event -> persistRuleLists());
         restoreRuleLists();
+    }
+
+    /**
+     * @return the tab whose header contains the node, or null if the node isn't in a tab header.
+     * Relies on an undocumented JavaFX implementation detail: TabPaneSkin's header keeps its Tab in getProperties()
+     * under Tab.class (verified on JavaFX 21; Tab.getStyleableNode() returns null there). If a JavaFX upgrade drops it,
+     * this returns null and right-click toggling of rule lists silently stops working.
+     */
+    static @Nullable Tab findTabHeaderTab(Node node, TabPane tabPane) {
+        for (Node n = node; n != null && n != tabPane; n = n.getParent()) {
+            if (n.getProperties().get(Tab.class) instanceof Tab tab && tab.getTabPane() == tabPane) {
+                return tab;
+            }
+        }
+        return null;
     }
 
     /** Adds a capture view as a non-closeable tab */
@@ -246,6 +274,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         Tab tab = new Tab();
         tab.setContent(ruleList);
         tab.textProperty().bind(ruleList.titleProperty());
+        tab.setGraphic(ActiveTabMarker.create(ruleList.activeProperty()));
         tab.setOnCloseRequest(event -> {
             if (ruleList.isDirty() && JavaFxUtils.showYesNoDialog(
                     "\"" + ruleList.getListName() + "\" has unsaved changes that will be lost. Close anyway?") != JavaFxUtils.YesNo.YES) {

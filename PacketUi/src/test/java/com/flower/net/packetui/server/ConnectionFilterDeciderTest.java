@@ -3,6 +3,7 @@ package com.flower.net.packetui.server;
 import com.flower.net.config.access.Access;
 import com.flower.net.config.access.Protocol;
 import com.flower.net.conntrack.ConnectionFilter;
+import com.flower.net.conntrack.TrafficDirection;
 import com.flower.net.dns.dotclient.ResolvedHosts;
 import org.junit.jupiter.api.Test;
 
@@ -21,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ConnectionFilterDeciderTest {
     static final int LOCAL_IN = 1;
+    static final int FORWARD = 2;
     static final int LOCAL_OUT = 3;
 
     static byte[] ipv4(int protocol, int[] src, int[] dst, int srcPort, int dstPort, int fragmentOffset) {
@@ -56,7 +58,8 @@ public class ConnectionFilterDeciderTest {
         return p;
     }
 
-    record Call(String host, int port, SocketAddress from, @Nullable Protocol protocol) {}
+    record Call(String host, int port, SocketAddress from, @Nullable Protocol protocol,
+                @Nullable TrafficDirection direction) {}
 
     static class RecordingFilter implements ConnectionFilter {
         final List<Call> calls = new ArrayList<>();
@@ -66,8 +69,9 @@ public class ConnectionFilterDeciderTest {
         RecordingFilter(Access result) { this.result = result; }
 
         @Override
-        public Access approveConnection(String dstHost, int dstPort, Protocol protocol, @Nullable SocketAddress from) {
-            calls.add(new Call(dstHost, dstPort, from, protocol));
+        public Access approveConnection(String dstHost, int dstPort, Protocol protocol, @Nullable SocketAddress from,
+                                        @Nullable TrafficDirection direction) {
+            calls.add(new Call(dstHost, dstPort, from, protocol, direction));
             return result;
         }
 
@@ -138,6 +142,7 @@ public class ConnectionFilterDeciderTest {
         assertEquals("8.8.8.8", call.host());
         assertEquals(53, call.port());
         assertEquals(Protocol.UDP, call.protocol());
+        assertEquals(TrafficDirection.OUT, call.direction());
         InetSocketAddress from = (InetSocketAddress) call.from();
         assertEquals("10.0.0.2", from.getHostString());
         assertEquals(40000, from.getPort());
@@ -153,6 +158,7 @@ public class ConnectionFilterDeciderTest {
         assertFalse(decider.decide(packet, 1, 0x0800, LOCAL_IN, 0, 2, 0));
         assertEquals("93.184.216.34", filter.calls.get(0).host());
         assertEquals(443, filter.calls.get(0).port());
+        assertEquals(TrafficDirection.IN, filter.calls.get(0).direction());
     }
 
     @Test
@@ -201,5 +207,17 @@ public class ConnectionFilterDeciderTest {
         assertEquals(40000, filter.calls.get(0).port());
         assertEquals("10.0.0.2", filter.calls.get(1).host());
         assertEquals(40000, filter.calls.get(1).port());
+    }
+
+    @Test
+    public void hookMapsToDirection() {
+        ConnectionFilterDecider decider = new ConnectionFilterDecider();
+        RecordingFilter filter = new RecordingFilter(Access.ALLOW);
+        decider.addConnectionFilter(filter);
+
+        decider.decide(ipv4(6, new int[]{10, 0, 0, 2}, new int[]{8, 8, 8, 8}, 40000, 443, 0), 1, 0x0800, FORWARD, 0, 1, 2);
+        decider.decide(ipv4(6, new int[]{10, 0, 0, 2}, new int[]{8, 8, 8, 8}, 40000, 443, 0), 2, 0x0800, 0, 0, 1, 0);
+        assertEquals(TrafficDirection.FORWARD, filter.calls.get(0).direction());
+        assertNull(filter.calls.get(1).direction());
     }
 }

@@ -2,6 +2,7 @@ package com.flower.net.ruler.forms.traffic;
 
 import com.flower.net.config.access.Access;
 import com.flower.net.config.access.Protocol;
+import com.flower.net.conntrack.TrafficDirection;
 
 import javax.annotation.Nullable;
 import java.net.InetSocketAddress;
@@ -19,9 +20,12 @@ public class CapturedRequest {
     final long creationTimestamp;
     final @Nullable String fromHost;
     final @Nullable Integer fromPort;
+    /** Chain of a packet capture; null for connection captures */
+    final @Nullable TrafficDirection direction;
 
     public CapturedRequest(String host, Integer port, Access access, boolean isRuleMatched, Protocol protocol,
-                           boolean isDirectIpBlock, @Nullable String fromHost, @Nullable Integer fromPort) {
+                           boolean isDirectIpBlock, @Nullable String fromHost, @Nullable Integer fromPort,
+                           @Nullable TrafficDirection direction) {
         this.host = host;
         this.port = port;
         this.access = access;
@@ -31,18 +35,20 @@ public class CapturedRequest {
         this.creationTimestamp = System.currentTimeMillis();
         this.fromHost = fromHost;
         this.fromPort = fromPort;
+        this.direction = direction;
     }
 
     /** Builds a request from a raw source address: resolved address -> IP, unresolved -> original host string */
     public static CapturedRequest of(String host, int port, Access access, boolean isRuleMatched, Protocol protocol,
-                                     boolean isDirectIpBlock, @Nullable SocketAddress from) {
+                                     boolean isDirectIpBlock, @Nullable SocketAddress from,
+                                     @Nullable TrafficDirection direction) {
         String fromHost = null;
         Integer fromPort = null;
         if (from instanceof InetSocketAddress isa) {
             fromHost = isa.getAddress() != null ? isa.getAddress().getHostAddress() : isa.getHostString();
             fromPort = isa.getPort();
         }
-        return new CapturedRequest(host, port, access, isRuleMatched, protocol, isDirectIpBlock, fromHost, fromPort);
+        return new CapturedRequest(host, port, access, isRuleMatched, protocol, isDirectIpBlock, fromHost, fromPort, direction);
     }
 
     public String getHost() { return host; }
@@ -78,6 +84,15 @@ public class CapturedRequest {
 
     static String formatTimestamp(long timestamp) {
         return String.format("%s", new Date(timestamp));
+    }
+
+    public @Nullable TrafficDirection getTrafficDirection() {
+        return direction;
+    }
+
+    /** Empty for connection captures */
+    public String getDirection() {
+        return direction == null ? "" : direction.name();
     }
 
     public @Nullable String getFromHost() {

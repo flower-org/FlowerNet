@@ -7,7 +7,9 @@ import javax.annotation.Nullable;
 import java.net.SocketAddress;
 
 public interface ConnectionFilter {
-        @Nullable Access approveConnection(String dstHost, int dstPort, Protocol protocol, @Nullable SocketAddress from);
+        /** @param direction chain of a packet-level check; null for connection-level checks and re-checks */
+        @Nullable Access approveConnection(String dstHost, int dstPort, Protocol protocol, @Nullable SocketAddress from,
+                                           @Nullable TrafficDirection direction);
 
         /**
          * Whether the endpoint is a server according to this filter's rules (a host+port rule matches it).

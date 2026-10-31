@@ -59,6 +59,11 @@
                                 <PropertyValueFactory property="port" />
                             </cellValueFactory>
                         </TableColumn>
+                        <TableColumn minWidth="100.0" prefWidth="120.0" text="Direction">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="directions" />
+                            </cellValueFactory>
+                        </TableColumn>
                         <TableColumn minWidth="250.0" prefWidth="220.0" text="Last filter result">
                             <cellValueFactory>
                                 <PropertyValueFactory property="filterResult" />

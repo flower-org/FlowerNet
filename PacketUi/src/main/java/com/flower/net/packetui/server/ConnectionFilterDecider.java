@@ -3,6 +3,7 @@ package com.flower.net.packetui.server;
 import com.flower.net.config.access.Access;
 import com.flower.net.config.access.Protocol;
 import com.flower.net.conntrack.ConnectionFilter;
+import com.flower.net.conntrack.TrafficDirection;
 import com.flower.net.dns.dotclient.ResolvedHosts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +28,8 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
     // Netfilter hooks (enum nf_inet_hooks)
     static final int NF_INET_PRE_ROUTING = 0;
     static final int NF_INET_LOCAL_IN = 1;
+    static final int NF_INET_FORWARD = 2;
+    static final int NF_INET_LOCAL_OUT = 3;
 
     private final Deque<ConnectionFilter> connectionFilters = new LinkedBlockingDeque<>();
     @Nullable private volatile ResolvedHosts resolvedHosts;
@@ -62,10 +65,11 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
                 ? InetSocketAddress.createUnresolved(info.dstHost(), info.dstPort())
                 : InetSocketAddress.createUnresolved(info.srcHost(), info.srcPort());
         Protocol protocol = toProtocol(info.ipProtocol());
+        TrafficDirection direction = toDirection(hook);
 
         boolean allow = true;
         for (ConnectionFilter filter : connectionFilters) {
-            if (filter.approveConnection(remoteHost, remotePort, protocol, local) == Access.DENY) {
+            if (filter.approveConnection(remoteHost, remotePort, protocol, local, direction) == Access.DENY) {
                 allow = false;
             }
         }
@@ -111,6 +115,16 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
 
     static boolean isInbound(int hook) {
         return hook == NF_INET_PRE_ROUTING || hook == NF_INET_LOCAL_IN;
+    }
+
+    /** null for hooks PacketUi doesn't queue from (PREROUTING/POSTROUTING), where the chain is ambiguous */
+    static @Nullable TrafficDirection toDirection(int hook) {
+        switch (hook) {
+            case NF_INET_LOCAL_IN: return TrafficDirection.IN;
+            case NF_INET_LOCAL_OUT: return TrafficDirection.OUT;
+            case NF_INET_FORWARD: return TrafficDirection.FORWARD;
+            default: return null;
+        }
     }
 
     static Protocol toProtocol(int ipProtocol) {

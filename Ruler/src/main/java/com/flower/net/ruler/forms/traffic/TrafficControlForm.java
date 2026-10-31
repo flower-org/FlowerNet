@@ -6,6 +6,7 @@ import com.flower.net.config.access.Access;
 import com.flower.net.config.access.Protocol;
 import com.flower.net.conntrack.AutoAddRulesMode;
 import com.flower.net.conntrack.ConnectionFilter;
+import com.flower.net.conntrack.TrafficDirection;
 import com.flower.net.ruler.interfaces.ConnectionsTextSetter;
 import com.flower.net.ruler.interfaces.DeniedHostsListener;
 import com.flower.net.utils.IpAddressUtil;
@@ -493,7 +494,8 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     }
 
     @Override
-    public Access approveConnection(String dstHost, int dstPort, Protocol protocol, @Nullable SocketAddress from) {
+    public Access approveConnection(String dstHost, int dstPort, Protocol protocol, @Nullable SocketAddress from,
+                                    @Nullable TrafficDirection direction) {
         CheckResult check = getCheckResult(dstHost, dstPort);
 
         // from == null is a re-check of an existing connection (see DeniedHostsListener) - never auto-add there
@@ -516,7 +518,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
                 if (captureForm.isCaptureEnabled()) {
                     if (capturedRequest == null) {
                         capturedRequest = CapturedRequest.of(dstHost, dstPort, finalCheck.checkResult,
-                                finalCheck.isRuleMatched, protocol, finalCheck.isDirectIpBlock, from);
+                                finalCheck.isRuleMatched, protocol, finalCheck.isDirectIpBlock, from, direction);
                     }
                     captureForm.addCapture(capturedRequest);
                 }

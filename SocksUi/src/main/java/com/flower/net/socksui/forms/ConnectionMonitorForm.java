@@ -202,7 +202,7 @@ public class ConnectionMonitorForm extends AnchorPane implements Refreshable, Co
                 Destination dest = info.connectionInfo.destination;
 
                 if (dest != null) {
-                    if (trafficControlForm.approveConnection(dest.host, dest.port, Protocol.TCP, null) == DENY) {
+                    if (trafficControlForm.approveConnection(dest.host, dest.port, Protocol.TCP, null, null) == DENY) {
                         info.connectionInfo.channel.close();
                     }
                 }

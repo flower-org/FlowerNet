@@ -179,7 +179,7 @@ public final class SocksServerHandler extends SimpleChannelInboundHandler<SocksM
         Access access = Access.ALLOW;
         if (connectionFilters != null) {
             for (ConnectionFilter filter : connectionFilters) {
-                if (filter.approveConnection(dstHost, dstPort, Protocol.TCP, from) == Access.DENY) {
+                if (filter.approveConnection(dstHost, dstPort, Protocol.TCP, from, null) == Access.DENY) {
                     access = Access.DENY;
                 }
             }

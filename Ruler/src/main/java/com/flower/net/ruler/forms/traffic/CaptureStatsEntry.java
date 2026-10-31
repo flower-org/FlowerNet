@@ -3,6 +3,8 @@ package com.flower.net.ruler.forms.traffic;
 import com.flower.net.config.access.Access;
 import javafx.beans.property.ReadOnlyLongProperty;
 import javafx.beans.property.ReadOnlyLongWrapper;
+import javafx.beans.property.ReadOnlyObjectProperty;
+import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.beans.property.ReadOnlyStringWrapper;
 
@@ -15,7 +17,7 @@ public class CaptureStatsEntry {
     private final ReadOnlyStringWrapper filterResult = new ReadOnlyStringWrapper("");
     private final ReadOnlyStringWrapper from = new ReadOnlyStringWrapper("");
     /** Latest result, kept for re-applying the capture filter */
-    private Access access = Access.DENY;
+    private final ReadOnlyObjectWrapper<Access> access = new ReadOnlyObjectWrapper<>(Access.DENY);
     private boolean isRuleMatched;
 
     public CaptureStatsEntry(String host, int port) {
@@ -40,12 +42,14 @@ public class CaptureStatsEntry {
     }
 
     private void setResult(Access access, boolean isRuleMatched, boolean isDirectIpBlock) {
-        this.access = access;
+        this.access.set(access);
         this.isRuleMatched = isRuleMatched;
         filterResult.set(CapturedRequest.formatFilterResult(access, isRuleMatched, isDirectIpBlock));
     }
 
-    public Access getAccess() { return access; }
+    public Access getAccess() { return access.get(); }
+
+    public ReadOnlyObjectProperty<Access> accessProperty() { return access.getReadOnlyProperty(); }
 
     public boolean isRuleMatched() { return isRuleMatched; }
 

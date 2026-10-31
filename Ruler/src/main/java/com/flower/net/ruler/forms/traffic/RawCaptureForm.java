@@ -51,6 +51,7 @@ public class RawCaptureForm extends AnchorPane implements CaptureForm {
 
         capturedRequests = FXCollections.observableArrayList();
         checkNotNull(capturedRequestsTable).itemsProperty().set(capturedRequests);
+        AccessRowStyle.install(checkNotNull(capturedRequestsTable), CapturedRequest::getAccess);
 
         checkNotNull(maxRequests).setTextFormatter(new TextFormatter<String>(
                 change -> change.getControlNewText().matches("\\d*") ? change : null));

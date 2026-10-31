@@ -1,0 +1,25 @@
+/* Row tints set by AccessRowStyle. -fx-background drives Modena's row fill and text color. */
+.table-row-cell:allow {
+    -fx-background: #d4edd4;
+}
+.table-row-cell:allow:odd {
+    -fx-background: #c8e6c8;
+}
+.table-row-cell:deny {
+    -fx-background: #f7d4d4;
+}
+.table-row-cell:deny:odd {
+    -fx-background: #f0c8c8;
+}
+
+/* Author styles override Modena regardless of specificity, so restore the selection colors */
+.table-row-cell:allow:selected,
+.table-row-cell:deny:selected {
+    -fx-background: -fx-selection-bar-non-focused;
+    -fx-table-cell-border-color: derive(-fx-selection-bar-non-focused, 20%);
+}
+.table-view:focused .table-row-cell:allow:selected,
+.table-view:focused .table-row-cell:deny:selected {
+    -fx-background: -fx-selection-bar;
+    -fx-table-cell-border-color: derive(-fx-selection-bar, 20%);
+}

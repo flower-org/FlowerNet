@@ -68,6 +68,7 @@ public class CaptureStatsForm extends AnchorPane implements CaptureForm {
         SortedList<CaptureStatsEntry> sortedEntries = new SortedList<>(capturedRequests);
         sortedEntries.comparatorProperty().bind(table.comparatorProperty());
         table.setItems(sortedEntries);
+        AccessRowStyle.installObservable(table, CaptureStatsEntry::accessProperty);
         // Most recently accessed first (sortType is DESCENDING in FXML)
         table.getSortOrder().add(checkNotNull(lastAccessColumn));
 

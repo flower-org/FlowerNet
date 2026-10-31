@@ -181,6 +181,7 @@ public class RuleListForm extends AnchorPane implements Refreshable {
         SortedList<TrafficRule> sortedRules = new SortedList<>(trafficRules);
         sortedRules.comparatorProperty().bind(table.comparatorProperty());
         table.itemsProperty().set(sortedRules);
+        AccessRowStyle.install(table, TrafficRule::getFilterType);
 
         CheckBox checkBox = checkNotNull(activeCheckBox);
         checkBox.selectedProperty().bindBidirectional(active);

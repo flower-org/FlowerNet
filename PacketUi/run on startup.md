@@ -1,3 +1,11 @@
+Prerequisites:
+to run `nfbridge`, make sure that the following is installed:
+```
+sudo apt install libnetfilter-queue1
+```
+
+---
+
 Debian no longer supports /etc/rc.local, so we need to create a systemd service for that
 
 

@@ -116,6 +116,9 @@ Two things don't persist on their own:
 - **PacketUi itself.** Until it's started and you click **Start**, DNS fails, including right after boot.
 - **`resolvectl` commands** (`revert`, `default-route`, `dns`) only last until the next restart. Use them for one-off
   fixes, not as configuration.
+  - Keep in mind that our DNS is PacketUI, so we want to ignore any DHCP-supplied DNS.
+  - One way to fix that DHCP override permanently is:
+    - `sudo nmcli con mod "$c" ipv4.ignore-auto-dns yes ipv6.ignore-auto-dns yes`
 
 ## Troubleshooting
 

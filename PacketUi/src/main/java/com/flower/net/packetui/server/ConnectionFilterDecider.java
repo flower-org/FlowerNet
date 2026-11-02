@@ -26,7 +26,8 @@ import java.util.concurrent.LinkedBlockingDeque;
  *     <li>the hook: the source for inbound hooks (PREROUTING/INPUT), the destination for outbound/forwarded ones,
  *     so replies from an allowed server are allowed too.</li>
  * </ol>
- * Packets that aren't valid IP are dropped.
+ * Packets that aren't valid IP are dropped. Only headers are read, so nfbridge may send headers only
+ * ({@code --headers-only}); a packet whose headers were cut off is dropped too.
  */
 public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
     private static final Logger LOGGER = LoggerFactory.getLogger(ConnectionFilterDecider.class);
@@ -66,11 +67,18 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
     }
 
     @Override
-    public boolean decide(byte[] packet, int packetId, int hwProto, int hook, int mark, int indev, int outdev) {
+    public boolean decide(byte[] packet, boolean truncated, int packetId, int hwProto, int hook, int mark,
+                          int indev, int outdev) {
         PacketInfo info = PacketInfo.parse(packet);
         if (info == null) {
-            LOGGER.debug("Dropping unparseable packet {} (hwProto 0x{}, hook {})",
-                    packetId, Integer.toHexString(hwProto), hook);
+            if (truncated) {
+                LOGGER.warn("Dropping packet {} (hwProto 0x{}, hook {}): its headers don't fit into the {} bytes "
+                                + "nfbridge sent, increase nfbridge --copy-range",
+                        packetId, Integer.toHexString(hwProto), hook, packet.length);
+            } else {
+                LOGGER.debug("Dropping unparseable packet {} (hwProto 0x{}, hook {})",
+                        packetId, Integer.toHexString(hwProto), hook);
+            }
             return false;
         }
 

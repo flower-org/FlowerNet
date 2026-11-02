@@ -29,9 +29,18 @@ public final class DeciderServer {
     private static final int DECISION_ALLOW = 1;
     private static final int DECISION_DROP = 2;
     private static final int MAX_PAYLOAD = 65535;
+    /** Request flag: the payload is only the first bytes of the packet (nfbridge --copy-range / --headers-only). */
+    static final int FLAG_TRUNCATED = 0x01;
+    private static final int FLAGS_KNOWN = FLAG_TRUNCATED;
 
     public interface PacketDecider {
-        boolean decide(byte[] packet, int packetId, int hwProto, int hook, int mark, int indev, int outdev);
+        /**
+         * Decides whether to let the packet through.
+         * @param packet the packet starting at the IP header, or only its first bytes if {@code truncated}
+         * @param truncated nfbridge sent only the first bytes of the packet; its full length is in the IP header
+         */
+        boolean decide(byte[] packet, boolean truncated, int packetId, int hwProto, int hook, int mark,
+                       int indev, int outdev);
     }
 
     private final PacketDecider decider;
@@ -131,7 +140,11 @@ public final class DeciderServer {
             int packetId = in.readInt();
             int hwProto = in.readUnsignedShort();
             int hook = in.readUnsignedByte();
-            in.readUnsignedByte();                   // flags, reserved
+            int flags = in.readUnsignedByte();
+            if ((flags & ~FLAGS_KNOWN) != 0) {
+                throw new IOException("unknown request flags: 0x" + Integer.toHexString(flags));
+            }
+            boolean truncated = (flags & FLAG_TRUNCATED) != 0;
             int mark = in.readInt();
             int indev = in.readInt();
             int outdev = in.readInt();
@@ -146,7 +159,7 @@ public final class DeciderServer {
 
             boolean allow;
             try {
-                allow = decider.decide(packet, packetId, hwProto, hook, mark, indev, outdev);
+                allow = decider.decide(packet, truncated, packetId, hwProto, hook, mark, indev, outdev);
             } catch (RuntimeException e) {
                 LOGGER.error("Decider failed, allowing packet {}", packetId, e);
                 allow = true;

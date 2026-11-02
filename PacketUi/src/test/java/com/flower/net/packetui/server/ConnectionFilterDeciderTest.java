@@ -12,6 +12,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -124,8 +125,8 @@ public class ConnectionFilterDeciderTest {
         hosts.record("example.com.", List.of(InetAddress.getByName("93.184.216.34")));
         decider.setResolvedHosts(hosts);
 
-        decider.decide(ipv4(6, new int[]{10, 0, 0, 2}, new int[]{93, 184, 216, 34}, 40000, 443, 0), 1, 0x0800, LOCAL_OUT, 0, 0, 0);
-        decider.decide(ipv4(6, new int[]{10, 0, 0, 2}, new int[]{5, 6, 7, 8}, 40000, 443, 0), 2, 0x0800, LOCAL_OUT, 0, 0, 0);
+        decider.decide(ipv4(6, new int[]{10, 0, 0, 2}, new int[]{93, 184, 216, 34}, 40000, 443, 0), false, 1, 0x0800, LOCAL_OUT, 0, 0, 0);
+        decider.decide(ipv4(6, new int[]{10, 0, 0, 2}, new int[]{5, 6, 7, 8}, 40000, 443, 0), false, 2, 0x0800, LOCAL_OUT, 0, 0, 0);
         assertEquals("example.com", filter.calls.get(0).host());
         assertEquals("5.6.7.8", filter.calls.get(1).host());
     }
@@ -140,8 +141,8 @@ public class ConnectionFilterDeciderTest {
         decider.setResolvedHosts(hosts);
 
         // Forwarded request and reply: the hook alone would pick the LAN client for the reply
-        decider.decide(ipv4(6, new int[]{10, 42, 0, 5}, new int[]{93, 184, 216, 34}, 51234, 443, 0), 1, 0x0800, FORWARD, 0, 1, 2);
-        decider.decide(ipv4(6, new int[]{93, 184, 216, 34}, new int[]{10, 42, 0, 5}, 443, 51234, 0), 2, 0x0800, FORWARD, 0, 2, 1);
+        decider.decide(ipv4(6, new int[]{10, 42, 0, 5}, new int[]{93, 184, 216, 34}, 51234, 443, 0), false, 1, 0x0800, FORWARD, 0, 1, 2);
+        decider.decide(ipv4(6, new int[]{93, 184, 216, 34}, new int[]{10, 42, 0, 5}, 443, 51234, 0), false, 2, 0x0800, FORWARD, 0, 2, 1);
         assertEquals(2, filter.calls.size());
         for (Call call : filter.calls) {
             assertEquals("example.com", call.host());
@@ -162,12 +163,12 @@ public class ConnectionFilterDeciderTest {
         decider.setResolvedHosts(hosts);
 
         // A rule marks the unresolved side: it wins over the resolved one
-        decider.decide(ipv4(6, new int[]{93, 184, 216, 34}, new int[]{10, 42, 0, 5}, 51234, 8080, 0), 1, 0x0800, FORWARD, 0, 2, 1);
+        decider.decide(ipv4(6, new int[]{93, 184, 216, 34}, new int[]{10, 42, 0, 5}, 51234, 8080, 0), false, 1, 0x0800, FORWARD, 0, 2, 1);
         assertEquals("10.42.0.5", filter.calls.get(0).host());
         assertEquals(8080, filter.calls.get(0).port());
 
         // Both resolved, no rule: FORWARD falls back to the destination
-        decider.decide(ipv4(6, new int[]{93, 184, 216, 34}, new int[]{5, 6, 7, 8}, 443, 40000, 0), 2, 0x0800, FORWARD, 0, 2, 1);
+        decider.decide(ipv4(6, new int[]{93, 184, 216, 34}, new int[]{5, 6, 7, 8}, 443, 40000, 0), false, 2, 0x0800, FORWARD, 0, 2, 1);
         assertEquals("other.com", filter.calls.get(1).host());
         assertEquals(40000, filter.calls.get(1).port());
     }
@@ -180,13 +181,13 @@ public class ConnectionFilterDeciderTest {
         decider.setInternalSubnets(Subnets.parse("10.42.0.0/24"));
 
         // Forwarded reply from an unresolved server: the hook alone would pick the LAN client
-        decider.decide(ipv4(6, new int[]{5, 6, 7, 8}, new int[]{10, 42, 0, 5}, 443, 51234, 0), 1, 0x0800, FORWARD, 0, 2, 1);
+        decider.decide(ipv4(6, new int[]{5, 6, 7, 8}, new int[]{10, 42, 0, 5}, 443, 51234, 0), false, 1, 0x0800, FORWARD, 0, 2, 1);
         assertEquals("5.6.7.8", filter.calls.get(0).host());
         assertEquals(443, filter.calls.get(0).port());
         assertEquals("10.42.0.5", ((InetSocketAddress) filter.calls.get(0).from()).getHostString());
 
         // Both internal: falls back to the hook (FORWARD -> destination)
-        decider.decide(ipv4(6, new int[]{10, 42, 0, 7}, new int[]{10, 42, 0, 5}, 443, 51234, 0), 2, 0x0800, FORWARD, 0, 2, 1);
+        decider.decide(ipv4(6, new int[]{10, 42, 0, 7}, new int[]{10, 42, 0, 5}, 443, 51234, 0), false, 2, 0x0800, FORWARD, 0, 2, 1);
         assertEquals("10.42.0.5", filter.calls.get(1).host());
         assertEquals(51234, filter.calls.get(1).port());
     }
@@ -204,12 +205,12 @@ public class ConnectionFilterDeciderTest {
         decider.setInternalSubnets(Subnets.parse("10.42.0.0/24"));
 
         // The internal NAS initiates to an external server: the resolved name doesn't make the NAS the server
-        decider.decide(ipv4(6, new int[]{10, 42, 0, 9}, new int[]{5, 6, 7, 8}, 40000, 443, 0), 1, 0x0800, FORWARD, 0, 1, 2);
+        decider.decide(ipv4(6, new int[]{10, 42, 0, 9}, new int[]{5, 6, 7, 8}, 40000, 443, 0), false, 1, 0x0800, FORWARD, 0, 1, 2);
         assertEquals("5.6.7.8", filter.calls.get(0).host());
         assertEquals(443, filter.calls.get(0).port());
 
         // A rule marks the internal side: it wins over the subnets
-        decider.decide(ipv4(6, new int[]{5, 6, 7, 8}, new int[]{10, 42, 0, 5}, 51234, 8080, 0), 2, 0x0800, FORWARD, 0, 2, 1);
+        decider.decide(ipv4(6, new int[]{5, 6, 7, 8}, new int[]{10, 42, 0, 5}, 51234, 8080, 0), false, 2, 0x0800, FORWARD, 0, 2, 1);
         assertEquals("10.42.0.5", filter.calls.get(1).host());
         assertEquals(8080, filter.calls.get(1).port());
     }
@@ -221,7 +222,7 @@ public class ConnectionFilterDeciderTest {
         decider.addConnectionFilter(filter);
 
         byte[] packet = ipv4(17, new int[]{10, 0, 0, 2}, new int[]{8, 8, 8, 8}, 40000, 53, 0);
-        assertTrue(decider.decide(packet, 1, 0x0800, LOCAL_OUT, 0, 0, 2));
+        assertTrue(decider.decide(packet, false, 1, 0x0800, LOCAL_OUT, 0, 0, 2));
         Call call = filter.calls.get(0);
         assertEquals("8.8.8.8", call.host());
         assertEquals(53, call.port());
@@ -239,7 +240,7 @@ public class ConnectionFilterDeciderTest {
         decider.addConnectionFilter(filter);
 
         byte[] packet = ipv4(6, new int[]{93, 184, 216, 34}, new int[]{10, 0, 0, 2}, 443, 40000, 0);
-        assertFalse(decider.decide(packet, 1, 0x0800, LOCAL_IN, 0, 2, 0));
+        assertFalse(decider.decide(packet, false, 1, 0x0800, LOCAL_IN, 0, 2, 0));
         assertEquals("93.184.216.34", filter.calls.get(0).host());
         assertEquals(443, filter.calls.get(0).port());
         assertEquals(TrafficDirection.IN, filter.calls.get(0).direction());
@@ -251,11 +252,37 @@ public class ConnectionFilterDeciderTest {
         RecordingFilter filter = new RecordingFilter(Access.ALLOW);
         decider.addConnectionFilter(filter);
 
-        assertTrue(decider.decide(ipv4(1, new int[]{10, 0, 0, 2}, new int[]{1, 1, 1, 1}, 0, 0, 0), 1, 0x0800, LOCAL_OUT, 0, 0, 2));
+        assertTrue(decider.decide(ipv4(1, new int[]{10, 0, 0, 2}, new int[]{1, 1, 1, 1}, 0, 0, 0), false, 1, 0x0800, LOCAL_OUT, 0, 0, 2));
         assertEquals(0, filter.calls.get(0).port());
         assertEquals(Protocol.ICMP, filter.calls.get(0).protocol());
 
-        assertFalse(decider.decide(new byte[]{1, 2, 3}, 2, 0, LOCAL_OUT, 0, 0, 2));
+        assertFalse(decider.decide(new byte[]{1, 2, 3}, false, 2, 0, LOCAL_OUT, 0, 0, 2));
+    }
+
+    @Test
+    public void truncatedPacketIsDecidedByItsHeaders() {
+        ConnectionFilterDecider decider = new ConnectionFilterDecider();
+        RecordingFilter filter = new RecordingFilter(Access.DENY);
+        decider.addConnectionFilter(filter);
+
+        // IPv4 + the TCP ports only, as if nfbridge sent just the first 24 bytes
+        byte[] packet = Arrays.copyOf(ipv4(6, new int[]{10, 0, 0, 2}, new int[]{93, 184, 216, 34}, 40000, 443, 0), 24);
+        assertFalse(decider.decide(packet, true, 1, 0x0800, LOCAL_OUT, 0, 0, 2));
+        assertEquals("93.184.216.34", filter.calls.get(0).host());
+        assertEquals(443, filter.calls.get(0).port());
+        assertEquals(Protocol.TCP, filter.calls.get(0).protocol());
+    }
+
+    @Test
+    public void truncatedPacketWithHeadersCutOffIsDropped() {
+        ConnectionFilterDecider decider = new ConnectionFilterDecider();
+        RecordingFilter filter = new RecordingFilter(Access.ALLOW);
+        decider.addConnectionFilter(filter);
+
+        // Cut inside the IPv6 hop-by-hop header: the transport header can't be found
+        byte[] packet = Arrays.copyOf(ipv6WithHopByHop(50000, 80), 41);
+        assertFalse(decider.decide(packet, true, 1, 0x86DD, LOCAL_OUT, 0, 0, 2));
+        assertTrue(filter.calls.isEmpty());
     }
 
     @Test
@@ -266,9 +293,9 @@ public class ConnectionFilterDeciderTest {
         decider.addConnectionFilter(filter);
 
         // Query 127.0.0.1:40000 -> 127.0.0.1:5300 on INPUT: the hook alone would pick the source (client port)
-        decider.decide(ipv4(17, new int[]{127, 0, 0, 1}, new int[]{127, 0, 0, 1}, 40000, 5300, 0), 1, 0x0800, LOCAL_IN, 0, 1, 0);
+        decider.decide(ipv4(17, new int[]{127, 0, 0, 1}, new int[]{127, 0, 0, 1}, 40000, 5300, 0), false, 1, 0x0800, LOCAL_IN, 0, 1, 0);
         // Reply 127.0.0.1:5300 -> 127.0.0.1:40000 on OUTPUT: the hook alone would pick the destination (client port)
-        decider.decide(ipv4(17, new int[]{127, 0, 0, 1}, new int[]{127, 0, 0, 1}, 5300, 40000, 0), 2, 0x0800, LOCAL_OUT, 0, 0, 1);
+        decider.decide(ipv4(17, new int[]{127, 0, 0, 1}, new int[]{127, 0, 0, 1}, 5300, 40000, 0), false, 2, 0x0800, LOCAL_OUT, 0, 0, 1);
 
         assertEquals(2, filter.calls.size());
         for (Call call : filter.calls) {
@@ -286,8 +313,8 @@ public class ConnectionFilterDeciderTest {
         filter.knownServers.add("127.0.0.1:40000");
         decider.addConnectionFilter(filter);
 
-        decider.decide(ipv4(17, new int[]{127, 0, 0, 1}, new int[]{127, 0, 0, 1}, 40000, 5300, 0), 1, 0x0800, LOCAL_IN, 0, 1, 0);
-        decider.decide(ipv4(17, new int[]{10, 0, 0, 2}, new int[]{8, 8, 8, 8}, 40000, 53, 0), 2, 0x0800, LOCAL_IN, 0, 1, 0);
+        decider.decide(ipv4(17, new int[]{127, 0, 0, 1}, new int[]{127, 0, 0, 1}, 40000, 5300, 0), false, 1, 0x0800, LOCAL_IN, 0, 1, 0);
+        decider.decide(ipv4(17, new int[]{10, 0, 0, 2}, new int[]{8, 8, 8, 8}, 40000, 53, 0), false, 2, 0x0800, LOCAL_IN, 0, 1, 0);
         assertEquals(40000, filter.calls.get(0).port());
         assertEquals("10.0.0.2", filter.calls.get(1).host());
         assertEquals(40000, filter.calls.get(1).port());
@@ -299,8 +326,8 @@ public class ConnectionFilterDeciderTest {
         RecordingFilter filter = new RecordingFilter(Access.ALLOW);
         decider.addConnectionFilter(filter);
 
-        decider.decide(ipv4(6, new int[]{10, 0, 0, 2}, new int[]{8, 8, 8, 8}, 40000, 443, 0), 1, 0x0800, FORWARD, 0, 1, 2);
-        decider.decide(ipv4(6, new int[]{10, 0, 0, 2}, new int[]{8, 8, 8, 8}, 40000, 443, 0), 2, 0x0800, 0, 0, 1, 0);
+        decider.decide(ipv4(6, new int[]{10, 0, 0, 2}, new int[]{8, 8, 8, 8}, 40000, 443, 0), false, 1, 0x0800, FORWARD, 0, 1, 2);
+        decider.decide(ipv4(6, new int[]{10, 0, 0, 2}, new int[]{8, 8, 8, 8}, 40000, 443, 0), false, 2, 0x0800, 0, 0, 1, 0);
         assertEquals(TrafficDirection.FORWARD, filter.calls.get(0).direction());
         assertNull(filter.calls.get(1).direction());
     }

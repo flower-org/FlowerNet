@@ -72,4 +72,4 @@ nft add rule ip nfbridge_nat prerouting ip saddr 10.42.0.0/24 tcp dport 53 redir
 # mkdir /run/nfbridge/
 # chown {USERNAME_THAT_RUNS_PACKET_UI} /run/nfbridge/
 
-# nohup /etc/nfbridge >/dev/null 2>&1 &
+# nohup /etc/nfbridge --headers-only >/dev/null 2>&1 &

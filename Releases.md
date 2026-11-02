@@ -1,5 +1,27 @@
 ```
 Nov 1, 2026
+-rw-r--r-- 1 runner runner 5158 Nov  2 05:51 PacketUI-install-doc.zip
+SHA2-256(PacketUI-install-doc.zip)= 508212c5e7a0b87c74c8ef647d92e449ed8a01abedac5a61ec8c5f54e7233c42
+-rw-r--r-- 1 runner runner 42088798 Nov  2 05:52 PacketUi-1.5.3-amd64-all.jar
+SHA2-256(PacketUi/build/libs/PacketUi-1.5.3-amd64-all.jar)= 111ab5b8d2a3c4060c29d9c825488a8f26c4e2ab7a3d63e0e437a70e4e3a441d
+-rw-r--r-- 1 runner runner 72340183 Nov  2 05:52 PacketUi-1.5.3-portable-linux.zip
+SHA2-256(PacketUi-1.5.3-portable-linux.zip)= a42b2aec31f510b8d6c7b6fd2b39530124e89dfffd5fbcaf432be3003114ee84
+-rw-r--r--  1 runner  staff  67833332 Nov  2 05:52 PacketUi-1.5.3-portable-macos.zip
+597960d311ccb22a3380f4e8ce1a95fa0b60fc69317c624c6c7dd2ac3f0c3505  PacketUi-1.5.3-portable-macos.zip
+-a---           11/2/2026  5:53 AM       68591279 PacketUi-1.5.3-portable-windows.zip
+AF3E840BA78A1FB6970EE4288215710F80C487E048E96316206BCD3DBE35350D
+-rw-r--r-- 1 runner runner 42015335 Nov  2 05:52 SocksUi-1.5.3-amd64-all.jar
+SHA2-256(SocksUi/build/libs/SocksUi-1.5.3-amd64-all.jar)= 2287ec9d324c3709ae7412cb1cb3e31eb17126067c7af3b62e9cd76e838de05c
+-rw-r--r-- 1 runner runner 72272836 Nov  2 05:52 SocksUi-1.5.3-portable-linux.zip
+SHA2-256(SocksUi-1.5.3-portable-linux.zip)= db4361c7e4e0288a4c9b7f832df0bcfee3646bfb518c555ee2862e14fc1d7454
+-rw-r--r--  1 runner  staff  67765886 Nov  2 05:52 SocksUi-1.5.3-portable-macos.zip
+ce877868c23bb0001a44e05db54ae85bd641997b712457635e6c7ad519356593  SocksUi-1.5.3-portable-macos.zip
+-a---           11/2/2026  5:53 AM       68522617 SocksUi-1.5.3-portable-windows.zip
+980819425E2FD0C835817F1AB540AE877B621E0A262C9CA8E817A2341F5040EB
+```
+
+```
+Nov 1, 2026
 -rw-r--r-- 1 runner runner 5158 Nov  2 05:33 PacketUI-install-doc.zip
 SHA2-256(PacketUI-install-doc.zip)= 74283af331c657b32d5e5834129349abfef6349707fee58a204d4176110d89e2
 -rw-r--r-- 1 runner runner 42088312 Nov  2 05:34 PacketUi-1.5.2-amd64-all.jar

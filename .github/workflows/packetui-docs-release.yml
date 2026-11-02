@@ -1,0 +1,30 @@
+name: Release Packet UI Install Docs
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  release-docs:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Zip install docs
+        run: |
+          zip -j PacketUI-install-doc.zip \
+            PacketUi/DNS-SETUP.md \
+            PacketUi/nf-iptables.sh \
+            "PacketUi/run on startup.md"
+          unzip -l PacketUI-install-doc.zip
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: PacketUI-install-doc.zip

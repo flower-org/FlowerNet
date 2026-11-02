@@ -50,5 +50,3 @@ jobs:
         with:
           files: |
             PacketUi/build/libs/PacketUi-${{ github.ref_name }}-amd64-all.jar
-            PacketUi/DNS-SETUP.md
-            PacketUi/nf-iptables.sh

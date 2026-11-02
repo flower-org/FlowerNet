@@ -65,6 +65,8 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
     final static String UNTITLED_LIST_NAME = "Untitled ";
 
+    final static String FILTERING_MODE_PREF = "filteringModePref";
+    final static String ALLOW_DIRECT_IP_ACCESS_PREF = "allowDirectIpAccessPref";
     final static String DIRECTION_DEFAULT_FLAG_PREF = "directionDefaultFlagPref";
     final static String DIRECTION_DEFAULT_ALLOW_IN_PREF = "directionDefaultAllowInPref";
     final static String DIRECTION_DEFAULT_ALLOW_OUT_PREF = "directionDefaultAllowOutPref";
@@ -152,8 +154,8 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         autoAddCombo.valueProperty().addListener((obs, oldValue, newValue) -> autoAddRulesMode = toAutoAddRulesMode(newValue));
         autoAddRulesMode = toAutoAddRulesMode(autoAddCombo.getValue());
 
-        checkNotNull(filteringModeComboBox).valueProperty().addListener((obs, oldValue, newValue) -> filteringChanged());
-        checkNotNull(allowDirectIpAccessCheckBox).selectedProperty().addListener((obs, oldValue, newValue) -> filteringChanged());
+        initFilteringMode();
+        initDirectIpAccess();
         initDirectionDefault();
 
         TabPane tabPane = checkNotNull(ruleListsTabPane);
@@ -183,6 +185,33 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         rebuildAppendMenu();
         persistDelay.setOnFinished(event -> persistRuleLists());
         restoreRuleLists();
+    }
+
+    /** Restores the filtering mode from preferences and keeps it saved */
+    void initFilteringMode() {
+        Preferences preferences = Preferences.userRoot();
+        ComboBox<String> comboBox = checkNotNull(filteringModeComboBox);
+        String savedMode = preferences.get(FILTERING_MODE_PREF, null);
+        if (savedMode != null && comboBox.getItems().contains(savedMode)) {
+            comboBox.setValue(savedMode);
+        }
+        comboBox.valueProperty().addListener((obs, oldValue, newValue) -> {
+            if (newValue != null) {
+                preferences.put(FILTERING_MODE_PREF, newValue);
+            }
+            filteringChanged();
+        });
+    }
+
+    /** Restores the direct IP access checkbox from preferences and keeps it saved */
+    void initDirectIpAccess() {
+        Preferences preferences = Preferences.userRoot();
+        CheckBox checkBox = checkNotNull(allowDirectIpAccessCheckBox);
+        checkBox.setSelected(preferences.getBoolean(ALLOW_DIRECT_IP_ACCESS_PREF, checkBox.isSelected()));
+        checkBox.selectedProperty().addListener((obs, oldValue, newValue) -> {
+            preferences.putBoolean(ALLOW_DIRECT_IP_ACCESS_PREF, newValue);
+            filteringChanged();
+        });
     }
 
     /** Restores the direction default controls from preferences and keeps them saved */

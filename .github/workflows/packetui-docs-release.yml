@@ -24,6 +24,12 @@ jobs:
             "PacketUi/run on startup.md"
           unzip -l PacketUI-install-doc.zip
 
+      - name: ls
+        run: ls -al PacketUI-install-doc.zip
+
+      - name: sha256
+        run: openssl sha256 PacketUI-install-doc.zip
+
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:

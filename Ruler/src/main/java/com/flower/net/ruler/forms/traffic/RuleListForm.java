@@ -413,6 +413,11 @@ public class RuleListForm extends AnchorPane implements Refreshable {
         return mainRuleManager.filter.getRecordRule(dstHost, dstPort);
     }
 
+    /** Whether a host+port rule (exact or wildcard host) matches the destination; host-only and port-only don't count. */
+    public boolean hasAddressRule(String dstHost, int dstPort) {
+        return mainRuleManager.filter.getAddressRecordRule(dstHost, dstPort) != null;
+    }
+
     /** Runs synchronously, on the mutating thread, right after any change to this list's rules. */
     public void addRulesChangeListener(Runnable listener) {
         mainRuleManager.filter.addChangeListener(listener);

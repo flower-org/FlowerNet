@@ -119,7 +119,7 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
 
     /**
      * The remote endpoint is the server, the one endpoint singled out by (first that decides):
-     * a filter knows it as a server (any rule matches it); it's outside the internal subnets while the other is inside;
+     * a filter knows it as a server (a host+port rule matches it); it's outside the internal subnets while the other is inside;
      * our DNS server resolved it. Otherwise falls back to the hook: source for inbound, destination otherwise.
      * @param srcHost the source as checked against rules: its resolved host name, or the IP if there's none
      * @param dstHost the destination as checked against rules, likewise

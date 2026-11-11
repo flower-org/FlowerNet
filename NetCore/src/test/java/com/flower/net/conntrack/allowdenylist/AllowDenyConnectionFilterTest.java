@@ -112,6 +112,26 @@ class AllowDenyConnectionFilterTest {
     }
 
     @Test
+    void testAddressRecordRuleIgnoresHostAndPortRules() {
+        AllowDenyConnectionFilter filter = new AllowDenyConnectionFilter();
+        filter.addHostRecord(host("127.0.0.1", ALLOW, false), true);
+        filter.addHostRecord(host("*.com", ALLOW, true), true);
+        filter.addPortRecord(port(80, ALLOW), true);
+        filter.addAddressRecord(address("127.0.0.1", 5300, DENY, false), true);
+        filter.addAddressRecord(address("*.com", 443, ALLOW, true), true);
+
+        assertEquals(DENY, filter.getAddressRecordRule("127.0.0.1", 5300));
+        assertNull(filter.getAddressRecordRule("127.0.0.1", 41234));
+        assertEquals(ALLOW, filter.getAddressRecordRule("a.com", 443));
+        assertNull(filter.getAddressRecordRule("a.com", 8443));
+        assertNull(filter.getAddressRecordRule("a.org", 80));
+
+        // The full lookup still falls back to host and port rules
+        assertEquals(ALLOW, filter.getRecordRule("127.0.0.1", 41234));
+        assertEquals(ALLOW, filter.getRecordRule("a.org", 80));
+    }
+
+    @Test
     void testHostPortRuleBeatsHostRule() {
         AllowDenyConnectionFilter filter = new AllowDenyConnectionFilter();
         filter.addHostRecord(host("a.com", DENY, false), true);

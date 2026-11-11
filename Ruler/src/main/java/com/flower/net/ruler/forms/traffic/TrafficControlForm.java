@@ -550,8 +550,9 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     }
 
     /**
-     * An endpoint is a known server if any rule of an active list matches it (host+port, host or port;
-     * exact or wildcard): rules only ever describe servers. Thread-safe, cached.
+     * An endpoint is a known server only if both its host and port match a host+port rule (exact or wildcard host)
+     * of an active list. Host-only and port-only rules don't count: e.g. a "127.0.0.1" host rule would match both
+     * ends of a loopback connection. Thread-safe, cached.
      */
     @Override
     public boolean isKnownServer(String host, int port) {
@@ -560,15 +561,22 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
     /** Uncached lookup over active lists, in tab order. */
     RuleLookupCache.Result lookupActiveLists(String host, int port) {
+        Access access = null;
+        boolean knownServer = false;
         for (RuleListForm ruleList : ruleLists) {
             if (ruleList.isActive()) {
-                Access access = ruleList.getAccess(host, port);
-                if (access != null) {
-                    return new RuleLookupCache.Result(access);
+                if (access == null) {
+                    access = ruleList.getAccess(host, port);
+                }
+                if (!knownServer) {
+                    knownServer = ruleList.hasAddressRule(host, port);
+                }
+                if (access != null && knownServer) {
+                    break;
                 }
             }
         }
-        return new RuleLookupCache.Result(null);
+        return new RuleLookupCache.Result(access, knownServer);
     }
 
     /**

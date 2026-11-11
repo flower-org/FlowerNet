@@ -18,13 +18,11 @@ import java.util.function.BiFunction;
 final class RuleLookupCache {
     static final long DEFAULT_MAX_SIZE = 10_000;
 
-    /** @param access access of the first matching rule among active lists, null if none matched */
-    record Result(@Nullable Access access) {
-        /** Whether any rule of an active list matches the destination, i.e. it's a known server. */
-        boolean knownServer() {
-            return access != null;
-        }
-    }
+    /**
+     * @param access access of the first matching rule among active lists, null if none matched
+     * @param knownServer whether a host+port rule (exact or wildcard host) of an active list matches the destination
+     */
+    record Result(@Nullable Access access, boolean knownServer) {}
 
     private record Key(String host, int port) {}
     private record Entry(long generation, Result result) {}

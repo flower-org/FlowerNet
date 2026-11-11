@@ -18,7 +18,7 @@ class RuleLookupCacheTest {
         AtomicReference<Access> access = new AtomicReference<>(Access.ALLOW);
         RuleLookupCache cache = new RuleLookupCache((host, port) -> {
             lookups.incrementAndGet();
-            return new RuleLookupCache.Result(port == 443 ? access.get() : null);
+            return new RuleLookupCache.Result(port == 443 ? access.get() : null, port == 443);
         });
 
         assertEquals(Access.ALLOW, cache.get("a.com", 443).access());
@@ -42,7 +42,7 @@ class RuleLookupCacheTest {
         AtomicInteger lookups = new AtomicInteger();
         RuleLookupCache cache = new RuleLookupCache((host, port) -> {
             lookups.incrementAndGet();
-            return new RuleLookupCache.Result(null);
+            return new RuleLookupCache.Result(null, false);
         });
 
         assertNull(cache.get("a.com", 443).access());
@@ -62,7 +62,7 @@ class RuleLookupCacheTest {
                 access.set(Access.DENY);
                 cacheRef.get().invalidate();
             }
-            return new RuleLookupCache.Result(result);
+            return new RuleLookupCache.Result(result, false);
         });
         cacheRef.set(cache);
 
@@ -72,7 +72,7 @@ class RuleLookupCacheTest {
 
     @Test
     void sizeIsBounded() {
-        RuleLookupCache cache = new RuleLookupCache((host, port) -> new RuleLookupCache.Result(null), 10);
+        RuleLookupCache cache = new RuleLookupCache((host, port) -> new RuleLookupCache.Result(null, false), 10);
         for (int port = 0; port < 1000; port++) {
             cache.get("a.com", port);
         }
@@ -81,7 +81,7 @@ class RuleLookupCacheTest {
 
     @Test
     void invalidateClearsEntries() {
-        RuleLookupCache cache = new RuleLookupCache((host, port) -> new RuleLookupCache.Result(null));
+        RuleLookupCache cache = new RuleLookupCache((host, port) -> new RuleLookupCache.Result(null, false));
         cache.get("a.com", 1);
         cache.get("a.com", 2);
         assertEquals(2, cache.size());

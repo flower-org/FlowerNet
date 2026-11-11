@@ -517,30 +517,49 @@ public class AllowDenyConnectionFilter {
                 .build();
     }
 
+    /**
+     * Access of the host+port rule (priorities 0 and 1) matching the destination, ignoring host-only and port-only
+     * rules. Non-null means both host and port match a rule, i.e. the destination is a known server.
+     */
+    @Nullable public Access getAddressRecordRule(String dstHost, int dstPort) {
+        lock.readLock().lock();
+        try {
+            return addressRecordRule(dstHost, dstPort);
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    /** Must be called under the read lock. */
+    @Nullable private Access addressRecordRule(String dstHost, int dstPort) {
+        // Priority 0 - exact hostname/port match
+        Map<Integer, AddressRecord> portMap = addressRecords.get(dstHost);
+        if (portMap != null) {
+            AddressRecord record = portMap.get(dstPort);
+            if (record != null) {
+                if (record.access() == Access.ALLOW) {
+                    return Access.ALLOW;
+                } else if (record.access() == Access.DENY) {
+                    return Access.DENY;
+                } else {
+                    throw new IllegalArgumentException("Unknown filter type: " + record.access());
+                }
+            }
+        }
+
+        // Priority 1 - wildcard hostname/port match (most specific pattern wins)
+        return resolveMostSpecific(wildcardAddressTrie.matchText(dstHost),
+                record -> record.dstPort() == dstPort, AddressRecord::access);
+    }
+
     @Nullable public Access getRecordRule(String dstHost, int dstPort) {
         lock.readLock().lock();
         try {
-            // Priority 0 - exact hostname/port match
+            // Priorities 0 and 1 - host+port match
             // Most specific rule wins: any host+port rule beats any host-only rule, which beats a port-only rule
-            Map<Integer, AddressRecord> portMap = addressRecords.get(dstHost);
-            if (portMap != null) {
-                AddressRecord record = portMap.get(dstPort);
-                if (record != null) {
-                    if (record.access() == Access.ALLOW) {
-                        return Access.ALLOW;
-                    } else if (record.access() == Access.DENY) {
-                        return Access.DENY;
-                    } else {
-                        throw new IllegalArgumentException("Unknown filter type: " + record.access());
-                    }
-                }
-            }
-
-            // Priority 1 - wildcard hostname/port match (most specific pattern wins)
-            Access wildcardAddressAccess = resolveMostSpecific(wildcardAddressTrie.matchText(dstHost),
-                    record -> record.dstPort() == dstPort, AddressRecord::access);
-            if (wildcardAddressAccess != null) {
-                return wildcardAddressAccess;
+            Access addressAccess = addressRecordRule(dstHost, dstPort);
+            if (addressAccess != null) {
+                return addressAccess;
             }
 
             // Priority 2 - exact hostname match (without port)

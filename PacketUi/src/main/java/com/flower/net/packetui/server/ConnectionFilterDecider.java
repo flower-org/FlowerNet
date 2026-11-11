@@ -20,7 +20,7 @@ import java.util.concurrent.LinkedBlockingDeque;
  * Decides packets by checking the remote endpoint against {@link ConnectionFilter}s.
  * Remote endpoint is the server, picked by the first of these that singles out one endpoint:
  * <ol>
- *     <li>a filter knows it as a server (any rule matches it: rules describe servers);</li>
+ *     <li>a filter knows it as a server (a host+port rule matches it);</li>
  *     <li>it's outside the internal subnets while the other endpoint is inside (see {@link #setInternalSubnets});</li>
  *     <li>our DNS server resolved a name to its IP (clients look servers up, not the other way around);</li>
  *     <li>the hook: the source for inbound hooks (PREROUTING/INPUT), the destination for outbound/forwarded ones,
@@ -51,7 +51,7 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
     }
 
     /**
-     * When set, IPs that our DNS server resolved are checked as their host name instead,
+     * When set, IPs that our DNS server resolved are checked as one of their host names instead (see {@link #hostFor}),
      * and count as servers when neither rules nor internal subnets single out one endpoint.
      */
     public void setResolvedHosts(@Nullable ResolvedHosts resolvedHosts) {
@@ -82,8 +82,8 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
             return false;
         }
 
-        String srcHost = hostFor(info.srcHost());
-        String dstHost = hostFor(info.dstHost());
+        String srcHost = hostFor(info.srcHost(), info.srcPort());
+        String dstHost = hostFor(info.dstHost(), info.dstPort());
         boolean remoteIsSrc = remoteIsSource(info, srcHost, dstHost, hook);
         String remoteHost = remoteIsSrc ? srcHost : dstHost;
         int remotePort = remoteIsSrc ? info.srcPort() : info.dstPort();
@@ -102,19 +102,37 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
         return allow;
     }
 
-    /** The most recently resolved host name for {@code ip}, or {@code ip} itself if there's none. */
-    String hostFor(String ip) {
+    /**
+     * The host name our DNS server resolved to {@code ip}, or {@code ip} itself if there's none.
+     * An IP can have several names (CNAMEs, shared CDN IPs); they're tried most recently resolved first, greedily:
+     * the first name a host+port rule matches, else the first name any rule matches, else the most recent name.
+     */
+    String hostFor(String ip, int port) {
         ResolvedHosts hosts = resolvedHosts;
         if (hosts == null) {
             return ip;
         }
+        List<String> names;
         try {
             // An IP literal: parsed, never looked up
-            List<String> names = hosts.hostsFor(InetAddress.getByName(ip));
-            return names.isEmpty() ? ip : names.get(0);
+            names = hosts.hostsFor(InetAddress.getByName(ip));
         } catch (UnknownHostException e) {
             return ip;
         }
+        if (names.isEmpty()) {
+            return ip;
+        }
+        for (String name : names) {
+            if (isKnownServerFromRules(name, port)) {
+                return name;
+            }
+        }
+        for (String name : names) {
+            if (hasRuleFromRules(name, port)) {
+                return name;
+            }
+        }
+        return names.get(0);
     }
 
     /**
@@ -148,6 +166,15 @@ public class ConnectionFilterDecider implements DeciderServer.PacketDecider {
     boolean isKnownServerFromRules(String host, int port) {
         for (ConnectionFilter filter : connectionFilters) {
             if (filter.isKnownServer(host, port)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    boolean hasRuleFromRules(String host, int port) {
+        for (ConnectionFilter filter : connectionFilters) {
+            if (filter.hasRule(host, port)) {
                 return true;
             }
         }

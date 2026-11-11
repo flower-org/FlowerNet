@@ -559,6 +559,12 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         return ruleLookupCache.get(host, port).knownServer();
     }
 
+    /** Whether any rule of an active list matches the endpoint. Thread-safe, cached. */
+    @Override
+    public boolean hasRule(String host, int port) {
+        return ruleLookupCache.get(host, port).access() != null;
+    }
+
     /** Uncached lookup over active lists, in tab order. */
     RuleLookupCache.Result lookupActiveLists(String host, int port) {
         Access access = null;

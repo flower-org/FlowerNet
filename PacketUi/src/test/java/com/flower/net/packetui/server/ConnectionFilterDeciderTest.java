@@ -65,6 +65,7 @@ public class ConnectionFilterDeciderTest {
     static class RecordingFilter implements ConnectionFilter {
         final List<Call> calls = new ArrayList<>();
         final List<String> knownServers = new ArrayList<>();
+        final List<String> rules = new ArrayList<>();
         final Access result;
 
         RecordingFilter(Access result) { this.result = result; }
@@ -79,6 +80,12 @@ public class ConnectionFilterDeciderTest {
         @Override
         public boolean isKnownServer(String host, int port) {
             return knownServers.contains(host + ":" + port);
+        }
+
+        /** Known servers are host+port rules; {@link #rules} holds the other rules, as "host" or ":port" */
+        @Override
+        public boolean hasRule(String host, int port) {
+            return isKnownServer(host, port) || rules.contains(host) || rules.contains(":" + port);
         }
 
         @Override public void allow(String host, int port) {}
@@ -129,6 +136,41 @@ public class ConnectionFilterDeciderTest {
         decider.decide(ipv4(6, new int[]{10, 0, 0, 2}, new int[]{5, 6, 7, 8}, 40000, 443, 0), false, 2, 0x0800, LOCAL_OUT, 0, 0, 0);
         assertEquals("example.com", filter.calls.get(0).host());
         assertEquals("5.6.7.8", filter.calls.get(1).host());
+    }
+
+    @Test
+    public void ipWithSeveralNamesIsCheckedAsTheNameARuleMatches() throws Exception {
+        ConnectionFilterDecider decider = new ConnectionFilterDecider();
+        RecordingFilter filter = new RecordingFilter(Access.ALLOW);
+        decider.addConnectionFilter(filter);
+        InetAddress ip = InetAddress.getByName("93.184.216.34");
+        ResolvedHosts hosts = new ResolvedHosts();
+        decider.setResolvedHosts(hosts);
+        byte[] packet = ipv4(6, new int[]{10, 0, 0, 2}, new int[]{93, 184, 216, 34}, 40000, 443, 0);
+
+        // No rule matches: the most recently resolved name
+        hosts.record("s3.tradingview.com", List.of(ip));
+        hosts.record("s3.tradingview.b-cdn.net", List.of(ip));
+        decider.decide(packet, false, 1, 0x0800, LOCAL_OUT, 0, 0, 0);
+        assertEquals("s3.tradingview.b-cdn.net", filter.calls.get(0).host());
+
+        // A host rule matches an older name: it wins over the more recent one
+        filter.rules.add("s3.tradingview.com");
+        hosts.record("s3.tradingview.b-cdn.net", List.of(ip));
+        decider.decide(packet, false, 2, 0x0800, LOCAL_OUT, 0, 0, 0);
+        assertEquals("s3.tradingview.com", filter.calls.get(1).host());
+
+        // Both match a rule: the most recent wins (greedy)
+        filter.rules.add("s3.tradingview.b-cdn.net");
+        hosts.record("s3.tradingview.b-cdn.net", List.of(ip));
+        decider.decide(packet, false, 3, 0x0800, LOCAL_OUT, 0, 0, 0);
+        assertEquals("s3.tradingview.b-cdn.net", filter.calls.get(2).host());
+
+        // A host+port rule beats host rules on more recent names
+        filter.knownServers.add("s3.tradingview.com:443");
+        hosts.record("s3.tradingview.b-cdn.net", List.of(ip));
+        decider.decide(packet, false, 4, 0x0800, LOCAL_OUT, 0, 0, 0);
+        assertEquals("s3.tradingview.com", filter.calls.get(3).host());
     }
 
     @Test

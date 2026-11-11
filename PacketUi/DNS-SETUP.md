@@ -119,6 +119,7 @@ Two things don't persist on their own:
   - Keep in mind that our DNS is PacketUI, so we want to ignore any DHCP-supplied DNS.
   - One way to fix that DHCP override permanently is:
     - `sudo nmcli con mod "$c" ipv4.ignore-auto-dns yes ipv6.ignore-auto-dns yes`
+      - e.g. `sudo nmcli con mod "Wired connection 1" ipv4.ignore-auto-dns yes ipv6.ignore-auto-dns yes`
 
 ## Troubleshooting
 
@@ -144,3 +145,13 @@ nmcli -g NAME con show | while read -r c; do
 done
 sudo nmcli con up "Wired connection 1"     # or reconnect your Wi-Fi
 ```
+
+## Useful commands for debian
+
+`apt install dnsutils systemd-resolved git`
+
+`apt remove gstreamer* avahi* cups* *office* *cron* *wpa* *modem* *speech* *speak* *task*`
+
+`apt autoremove`
+
+`xset dpms 0 0 0 && xset s off`

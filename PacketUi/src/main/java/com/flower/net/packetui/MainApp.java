@@ -55,7 +55,7 @@ public class MainApp implements ConnectionsTextSetter {
     }
 
     public void showAboutDialog() {
-        Alert alert = new Alert(Alert.AlertType.NONE, "Packet UI v 1.5.4", ButtonType.OK);
+        Alert alert = new Alert(Alert.AlertType.NONE, "Packet UI v 1.5.5", ButtonType.OK);
         alert.showAndWait();
     }
 

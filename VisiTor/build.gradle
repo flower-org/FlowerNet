@@ -8,7 +8,7 @@ plugins {
 }
 
 group 'com.flower.visitor'
-version '1.5.4-amd64'
+version '1.5.5-amd64'
 
 repositories {
     mavenCentral()

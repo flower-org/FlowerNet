@@ -116,7 +116,7 @@ public class ServerForm extends AnchorPane implements Refreshable {
                             ButtonType.OK).showAndWait();
                     return;
                 }
-                mainApp.setStatusText("Server started on " + socketPath + ", DNS on 127.0.0.1:" + DNS_PORT);
+                mainApp.setStatusText("Server started on " + socketPath + ", DNS on 127.0.0.1 and ::1 port " + DNS_PORT);
                 isStarted = true;
             }
             checkNotNull(socketPathTextField).setDisable(true);

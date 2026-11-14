@@ -58,7 +58,7 @@ server.close();                                    // on app shutdown
 For a SOCKS proxy, build a `DnsOverTlsClient` yourself and call `DnsServer.start(port, client)`; the server owns
 the client and shuts it down on `close()`.
 
-Access: by default the server listens on 127.0.0.1 only, so it isn't an open resolver. To serve a network, pass a bind
+Access: by default the server listens on loopback only (127.0.0.1 and ::1), so it isn't an open resolver. To serve a network, pass a bind
 address and a `ClientAccess`: `DnsServer.start("0.0.0.0", port, client, new ClientAccess(List.of("192.168.1.0/24"),
 50, 100))`. Clients outside the allowed subnets get REFUSED; each client IP is rate limited (queries/second, burst)
 and queries over the limit are dropped. `ClientAccess.defaults()` allows loopback, private and link-local networks

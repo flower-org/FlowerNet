@@ -1,26 +1,30 @@
-# Making PacketUi's DNS server the system DNS (Linux Mint)
+# Making PacketUi's DNS server the system DNS (Linux Mint / Debian)
 
-PacketUi runs a DNS server on `127.0.0.1:5300`. Hosts it resolves are remembered, so packet rules can match host names
+PacketUi runs a DNS server on `127.0.0.1:5300` and `[::1]:5300`. Hosts it resolves are remembered, so packet rules can match host names
 instead of IPs. That only works if every program on the machine uses this server. This guide makes it the only DNS
 server, with no fallback, and keeps it that way across reboots.
 
-How it fits together: programs ask systemd-resolved (`127.0.0.53`, from `/etc/resolv.conf`), which forwards everything
-to `127.0.0.1:5300`. NetworkManager is told to stop handing over DNS servers it gets from DHCP (your router), so
-nothing else can answer.
+How it fits together: nftables rules in [`nf-iptables.sh`](nf-iptables.sh) redirect `127.0.0.1:53` and `[::1]:53`
+(UDP and TCP) to port `5300` on the same address. Replies are translated back by conntrack, so programs see the
+answer coming from port 53. `/etc/resolv.conf` needs no `nameserver` line: without one, programs ask `127.0.0.1`
+(and `dig` also `::1`), which is where the redirect is. systemd-resolved isn't needed and is purged to reduce the
+attack surface. NetworkManager is told to stop managing DNS.
 
 > While PacketUi is stopped, **nothing resolves** (that's the point: no bypass). Start PacketUi first, and see
 > [Undo](#undo) if you're stuck.
 
-Tested on Linux Mint 22 (systemd 255, NetworkManager 1.46). Requires systemd 246 or later for the `IP:port` syntax.
+## 1. Load the nftables rules
 
-## 1. Check the prerequisites
+The redirect is the `DNS` section of [`nf-iptables.sh`](nf-iptables.sh). Set the script up as described in
+[run on startup.md](run%20on%20startup.md), then check:
 
 ```bash
-ls -l /etc/resolv.conf      # must point to ../run/systemd/resolve/stub-resolv.conf
-resolvectl --version        # systemd 246 or later
+sudo nft list table ip nfbridge_dns     # the 127.0.0.1 rules from the DNS section of the script
+sudo nft list table ip6 nfbridge_dns    # the ::1 rules
 ```
 
-If `/etc/resolv.conf` isn't that symlink, systemd-resolved isn't in use and this guide doesn't apply as-is.
+The redirect happens before filtering, so PacketUi sees programs' DNS as going to `127.0.0.1:5300` /
+`[::1]:5300`. PacketUi's packet rules must allow that (on `lo`, both directions).
 
 ## 2. Start PacketUi and check its DNS server
 
@@ -28,28 +32,10 @@ Click **Start** in PacketUi, then:
 
 ```bash
 dig @127.0.0.1 -p 5300 example.com +short    # prints IPs
+dig @::1 -p 5300 example.com +short          # prints IPs
 ```
 
-## 3. Send all DNS to PacketUi (systemd-resolved)
-
-```bash
-sudo mkdir -p /etc/systemd/resolved.conf.d
-sudo tee /etc/systemd/resolved.conf.d/flowernet.conf <<'EOF'
-[Resolve]
-DNS=127.0.0.1:5300
-Domains=~.
-FallbackDNS=
-DNSSEC=no
-DNSOverTLS=no
-Cache=no
-EOF
-```
-
-- `Domains=~.`: every domain goes to this server.
-- `FallbackDNS=`: no built-in fallback servers.
-- `Cache=no`: every lookup reaches PacketUi, so its IP-to-host data stays current. PacketUi caches answers itself.
-
-## 4. Stop NetworkManager handing out other DNS servers
+## 3. Stop NetworkManager managing DNS
 
 ```bash
 sudo tee /etc/NetworkManager/conf.d/flowernet-dns.conf <<'EOF'
@@ -58,42 +44,47 @@ dns=none
 EOF
 ```
 
-This applies to every connection, including Wi-Fi networks you join later. Without it, each DHCP lease puts the
-router's DNS server back next to PacketUi's, and it answers whenever PacketUi doesn't.
+With `dns=none`, NetworkManager doesn't write DNS servers from DHCP (your router) into `/etc/resolv.conf`.
+This applies to every connection, including Wi-Fi networks you join later.
 
-## 5. Apply
+## 4. Purge systemd-resolved
+
+First see what else would be removed, and make sure it's nothing you need:
 
 ```bash
-sudo systemctl restart NetworkManager systemd-resolved
+apt -s purge systemd-resolved libnss-resolve | grep '^Purg'
 ```
 
-## 6. Verify
+Then:
 
 ```bash
-resolvectl status
+sudo systemctl disable --now systemd-resolved
+sudo apt purge systemd-resolved libnss-resolve
+grep '^hosts:' /etc/nsswitch.conf     # must not contain "resolve"; if it does, remove that word (and its [..] action)
+sudo systemctl restart NetworkManager
 ```
 
-Expected:
+Whatever is left in `/etc/resolv.conf` (nothing, or a copy with only `search .`) is fine, as long as it has no
+`nameserver` line pointing somewhere else.
 
-- **Global:** `DNS Servers: 127.0.0.1:5300` and `DNS Domain: ~.`.
-- **Each link** (`enp0s31f6`, `wlp...`): **no** `DNS Servers` line, and `Current Scopes: none`.
-
-If a link still lists a DNS server (left over from before step 4), clear it, using your interface name:
+## 5. Verify
 
 ```bash
-sudo resolvectl revert enp0s31f6
+grep nameserver /etc/resolv.conf     # nothing (or only 127.0.0.1 / ::1)
+systemctl status systemd-resolved    # "could not be found"
+ss -tulpn | grep ':53 '              # nothing on 127.0.0.53 (dnsmasq on 10.42.0.1 is fine when sharing internet)
 ```
 
 Then check that there's no bypass:
 
 ```bash
-dig example.com                # with PacketUi running: NOERROR with IPs
+dig example.com                # with PacketUi running: NOERROR with IPs, no "communications error" lines
 # Click Stop in PacketUi, then:
 ss -tulpn | grep 5300          # prints nothing
-dig example.com                # SERVFAIL: nothing else answers
+dig example.com                # times out: nothing else answers
 ```
 
-## 7. Browsers
+## 6. Browsers
 
 Firefox and Chrome can do their own DNS over HTTPS, which bypasses all of this. Turn it off:
 
@@ -106,49 +97,38 @@ Everything above is stored in files, so it survives reboots and reconnects:
 
 | What | File |
 |------|------|
-| All DNS to `127.0.0.1:5300`, no fallback | `/etc/systemd/resolved.conf.d/flowernet.conf` |
-| No DNS servers from DHCP/router | `/etc/NetworkManager/conf.d/flowernet-dns.conf` |
+| `127.0.0.1:53` / `[::1]:53` redirected to port `5300` | [`nf-iptables.sh`](nf-iptables.sh), see [run on startup.md](run%20on%20startup.md) |
+| NetworkManager leaves DNS alone | `/etc/NetworkManager/conf.d/flowernet-dns.conf` |
 
-After a reboot, run the checks in [step 6](#6-verify) once to confirm.
+After a reboot, run the checks in [step 5](#5-verify) once to confirm.
 
-Two things don't persist on their own:
-
-- **PacketUi itself.** Until it's started and you click **Start**, DNS fails, including right after boot.
-- **`resolvectl` commands** (`revert`, `default-route`, `dns`) only last until the next restart. Use them for one-off
-  fixes, not as configuration.
-  - Keep in mind that our DNS is PacketUI, so we want to ignore any DHCP-supplied DNS.
-  - One way to fix that DHCP override permanently is:
-    - `sudo nmcli con mod "$c" ipv4.ignore-auto-dns yes ipv6.ignore-auto-dns yes`
-      - e.g. `sudo nmcli con mod "Wired connection 1" ipv4.ignore-auto-dns yes ipv6.ignore-auto-dns yes`
+PacketUi itself doesn't persist: until it's started and you click **Start**, DNS fails, including right after boot.
 
 ## Troubleshooting
 
 | Symptom | Cause / fix |
 |---------|-------------|
-| `dig example.com` still answers with PacketUi stopped | Something else answers. Check `resolvectl status`: a link with `DNS Servers` → `sudo resolvectl revert <link>`, and make sure step 4 is in place. Check `ss -tulpn \| grep 5300` for a leftover process. |
-| `dig` shows `SERVER: 127.0.0.53` | Expected: that's systemd-resolved, which forwards to `127.0.0.1:5300`. |
-| Everything fails with PacketUi running | `dig @127.0.0.1 -p 5300 example.com`. If that fails too, PacketUi can't reach its upstream: its packet rules must allow `1.1.1.1` port `853`. |
+| `dig example.com` still answers with PacketUi stopped | Something else answers on `:5300`: `ss -tulpn \| grep 5300` for a leftover process. Or the redirect isn't loaded: `sudo nft list table ip nfbridge_dns` and `ip6 nfbridge_dns`. |
+| `/etc/resolv.conf` gets a `nameserver` line again | Something else manages it: check step 3 is in place, and that no other resolver package (`resolvconf`, `openresolv`) is installed. |
+| Everything fails with PacketUi running | `dig @127.0.0.1 -p 5300 example.com`. If that fails, PacketUi can't reach its upstream: its packet rules must allow `1.1.1.1` port `853`. If it works but `dig example.com` doesn't, packet rules must allow `127.0.0.1:5300` on `lo`, or the redirect isn't loaded. |
 | Rules match IPs, not host names | The program resolved the name some other way (browser DNS over HTTPS, hard-coded IPs, or a lookup made before this setup). |
 
 ## Undo
 
 ```bash
-sudo rm /etc/systemd/resolved.conf.d/flowernet.conf /etc/NetworkManager/conf.d/flowernet-dns.conf
-sudo systemctl restart NetworkManager systemd-resolved
+sudo rm /etc/NetworkManager/conf.d/flowernet-dns.conf
+sudo apt install systemd-resolved     # recreates the /etc/resolv.conf symlink to its stub
+sudo ln -sf ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf   # in case it didn't
+sudo systemctl enable --now systemd-resolved
+sudo systemctl restart NetworkManager
 ```
 
-If you also ran `nmcli con mod ... ipv4.ignore-auto-dns yes` earlier, turn it back off for each connection:
-
-```bash
-nmcli -g NAME con show | while read -r c; do
-  sudo nmcli con mod "$c" ipv4.ignore-auto-dns no ipv6.ignore-auto-dns no
-done
-sudo nmcli con up "Wired connection 1"     # or reconnect your Wi-Fi
-```
+Then remove the `DNS` section from [`nf-iptables.sh`](nf-iptables.sh) and rerun it (or `sudo nft delete table ip nfbridge_dns; sudo nft delete table ip6 nfbridge_dns`
+for the current boot only).
 
 ## Useful commands for debian
 
-`apt install dnsutils systemd-resolved git`
+`apt install dnsutils git`
 
 `apt remove gstreamer* avahi* cups* *office* *cron* *wpa* *modem* *speech* *speak* *task*`
 

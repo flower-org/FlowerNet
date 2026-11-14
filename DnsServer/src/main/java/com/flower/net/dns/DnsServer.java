@@ -18,6 +18,13 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
+import java.net.BindException;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class DnsServer implements AutoCloseable {
     final static Logger LOGGER = LoggerFactory.getLogger(DnsServer.class);
@@ -31,7 +38,7 @@ public class DnsServer implements AutoCloseable {
     private static final int DNS_SERVER_PORT = 5300;
     private static final boolean DONT_USE_CACHE = false;
 
-    public static void main(String[] args) throws SSLException, InterruptedException {
+    public static void main(String[] args) throws SSLException, InterruptedException, BindException {
         // TODO: config / command line parameters
         int port = DNS_SERVER_PORT;
         if (args.length > 0) {
@@ -71,7 +78,7 @@ public class DnsServer implements AutoCloseable {
 
         DnsServer server = start(port, client);
         try {
-            server.udpChannel.closeFuture().sync();
+            server.channels.get(0).closeFuture().sync();
         } finally {
             server.close();
         }
@@ -79,31 +86,31 @@ public class DnsServer implements AutoCloseable {
 
     private final DnsOverTlsClient client;
     private final NioEventLoopGroup group;
-    private final Channel udpChannel;
-    private final Channel tcpChannel;
+    /** UDP and TCP channels, for every bind address. */
+    private final List<Channel> channels;
 
-    private DnsServer(DnsOverTlsClient client, NioEventLoopGroup group, Channel udpChannel, Channel tcpChannel) {
+    private DnsServer(DnsOverTlsClient client, NioEventLoopGroup group, List<Channel> channels) {
         this.client = client;
         this.group = group;
-        this.udpChannel = udpChannel;
-        this.tcpChannel = tcpChannel;
+        this.channels = channels;
     }
 
-    /** By default the server only listens on, and answers, the local machine. */
-    public static final String DEFAULT_BIND_ADDRESS = "127.0.0.1";
+    /** By default the server only listens on, and answers, the local machine: IPv4 and IPv6 loopback. */
+    public static final List<String> DEFAULT_BIND_ADDRESSES = List.of("127.0.0.1", "::1");
 
     /**
-     * Starts a server on {@value #DEFAULT_BIND_ADDRESS}:{@code port} (UDP and TCP) that forwards to 1.1.1.1 over TLS,
+     * Starts a server on {@link #DEFAULT_BIND_ADDRESSES}:{@code port} (UDP and TCP) that forwards to 1.1.1.1 over TLS,
      * with {@link ClientAccess#defaults()}. Returns once it's listening.
      */
-    public static DnsServer start(int port, boolean useCache) throws SSLException, InterruptedException {
+    public static DnsServer start(int port, boolean useCache)
+            throws SSLException, InterruptedException, BindException {
         return start(port, new DnsOverTlsClient(OTHER_DNS_TLS_SERVER_ADDRESS, OTHER_DNS_TLS_SERVER_PORT,
                 TRUST_MANAGER, useCache, null));
     }
 
-    /** Like {@link #start(String, int, DnsOverTlsClient, ClientAccess)} on {@value #DEFAULT_BIND_ADDRESS} with the default access. */
-    public static DnsServer start(int port, DnsOverTlsClient client) throws InterruptedException {
-        return start(DEFAULT_BIND_ADDRESS, port, client, ClientAccess.defaults());
+    /** Like {@link #start(List, int, DnsOverTlsClient, ClientAccess)} on {@link #DEFAULT_BIND_ADDRESSES} with the default access. */
+    public static DnsServer start(int port, DnsOverTlsClient client) throws InterruptedException, BindException {
+        return start(DEFAULT_BIND_ADDRESSES, port, client, ClientAccess.defaults());
     }
 
     /**
@@ -112,7 +119,20 @@ public class DnsServer implements AutoCloseable {
      * Returns once it's listening. The server takes ownership of the client and shuts it down on {@link #close()}.
      */
     public static DnsServer start(String bindAddress, int port, DnsOverTlsClient client, ClientAccess access)
-            throws InterruptedException {
+            throws InterruptedException, BindException {
+        return start(List.of(bindAddress), port, client, access);
+    }
+
+    /**
+     * Like {@link #start(String, int, DnsOverTlsClient, ClientAccess)}, listening on each of {@code bindAddresses}.
+     * Addresses that aren't on any interface (such as {@code ::1} with IPv6 disabled) are skipped with a warning;
+     * fails if none are left, or if binding one that is there fails (such as the port being in use).
+     */
+    public static DnsServer start(List<String> bindAddresses, int port, DnsOverTlsClient client, ClientAccess access)
+            throws InterruptedException, BindException {
+        if (bindAddresses.isEmpty()) {
+            throw new IllegalArgumentException("No bind addresses");
+        }
         NioEventLoopGroup group = new NioEventLoopGroup();
         try {
             Bootstrap bootstrap = new Bootstrap();
@@ -137,14 +157,36 @@ public class DnsServer implements AutoCloseable {
                         }
                     });
 
-            Channel udpChannel = bootstrap.bind(bindAddress, port).sync().channel();
-            Channel tcpChannel = tcpBootstrap.bind(bindAddress, port).sync().channel();
-            LOGGER.info("DNS Server Started at {} port {} (UDP and TCP)", bindAddress, port);
-            return new DnsServer(client, group, udpChannel, tcpChannel);
+            List<Channel> channels = new ArrayList<>();
+            List<String> bound = new ArrayList<>();
+            for (String bindAddress : bindAddresses) {
+                if (!isAvailable(bindAddress)) {
+                    LOGGER.warn("DNS Server: {} isn't on any interface, not listening on it", bindAddress);
+                    continue;
+                }
+                channels.add(bootstrap.bind(bindAddress, port).sync().channel());
+                channels.add(tcpBootstrap.bind(bindAddress, port).sync().channel());
+                bound.add(bindAddress);
+            }
+            if (bound.isEmpty()) {
+                throw new BindException("None of " + bindAddresses + " is on any interface");
+            }
+            LOGGER.info("DNS Server Started at {} port {} (UDP and TCP)", bound, port);
+            return new DnsServer(client, group, List.copyOf(channels));
         } catch (Throwable e) {
             group.shutdownGracefully();
             client.shutdown();
             throw e;
+        }
+    }
+
+    /** Whether {@code address} can be bound: a wildcard, or an address on one of this machine's interfaces. */
+    static boolean isAvailable(String address) {
+        try {
+            InetAddress inetAddress = InetAddress.getByName(address);
+            return inetAddress.isAnyLocalAddress() || NetworkInterface.getByInetAddress(inetAddress) != null;
+        } catch (UnknownHostException | SocketException e) {
+            return false;
         }
     }
 
@@ -156,8 +198,9 @@ public class DnsServer implements AutoCloseable {
     /** Stops listening and shuts down the upstream client. */
     @Override
     public void close() {
-        udpChannel.close().syncUninterruptibly();
-        tcpChannel.close().syncUninterruptibly();
+        for (Channel channel : channels) {
+            channel.close().syncUninterruptibly();
+        }
         group.shutdownGracefully().syncUninterruptibly();
         client.shutdown();
     }

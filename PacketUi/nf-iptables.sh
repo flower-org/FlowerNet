@@ -50,6 +50,22 @@ nft add rule inet nfbridge in  queue num 0
 nft add rule inet nfbridge out queue num 0
 nft add rule inet nfbridge forward_chain queue num 0
 
+# ================ DNS (replaces systemd-resolved, see DNS-SETUP.md) ================
+# DNS to 127.0.0.1:53 and [::1]:53, UDP and TCP, goes to PacketUi's DNS server on 127.0.0.1:5300 / [::1]:5300.
+# (Without a nameserver in /etc/resolv.conf, resolvers try ::1 and 127.0.0.1.) nft can't redirect across IPv4/IPv6,
+# so PacketUi DNS listens on both. conntrack rewrites the replies back to port 53, so no reverse rule.
+# Runs before filtering: PacketUi sees these as going to port 5300.
+nft add table ip nfbridge_dns
+nft add chain ip nfbridge_dns output '{ type nat hook output priority dstnat; policy accept; }'
+nft add rule ip nfbridge_dns output ip daddr 127.0.0.1 udp dport 53 redirect to :5300
+nft add rule ip nfbridge_dns output ip daddr 127.0.0.1 tcp dport 53 redirect to :5300
+nft add table ip6 nfbridge_dns
+nft add chain ip6 nfbridge_dns output '{ type nat hook output priority dstnat; policy accept; }'
+nft add rule ip6 nfbridge_dns output ip6 daddr ::1 udp dport 53 redirect to :5300
+nft add rule ip6 nfbridge_dns output ip6 daddr ::1 tcp dport 53 redirect to :5300
+
+# ============== END DNS ==============
+
 # ================ Router (NetworkManager "share internet", LAN 10.42.0.0/24) ================
 # Address translation only, no filtering: PacketUi still decides every packet.
 # Matches the LAN subnet, not an interface, so on a machine that isn't sharing internet these rules match nothing.
@@ -61,7 +77,9 @@ nft add table ip nfbridge_nat
 nft add chain ip nfbridge_nat postrouting '{ type nat hook postrouting priority srcnat; policy accept; }'
 nft add rule ip nfbridge_nat postrouting ip saddr 10.42.0.0/24 ip daddr != 10.42.0.0/24 masquerade
 
-# All LAN DNS goes to the router's dnsmasq (-> systemd-resolved -> PacketUi DNS), whichever server a device asked:
+# All LAN DNS goes to the router's dnsmasq, whichever server a device asked. dnsmasq forwards to 127.0.0.1:53
+# (/etc/resolv.conf), which the DNS rules above send to PacketUi DNS. It can't go to :5300 directly: that would be
+# 10.42.0.1:5300, and PacketUi DNS only listens on 127.0.0.1.
 # PacketUi only knows host names for IPs its DNS resolved. Shows up in PacketUi as IN to 10.42.0.1:53.
 nft add chain ip nfbridge_nat prerouting '{ type nat hook prerouting priority dstnat; policy accept; }'
 nft add rule ip nfbridge_nat prerouting ip saddr 10.42.0.0/24 udp dport 53 redirect to :53

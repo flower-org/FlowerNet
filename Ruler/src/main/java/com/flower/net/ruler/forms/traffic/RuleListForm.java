@@ -27,7 +27,10 @@ import javafx.collections.ObservableList;
 import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
@@ -182,6 +185,16 @@ public class RuleListForm extends AnchorPane implements Refreshable {
         sortedRules.comparatorProperty().bind(table.comparatorProperty());
         table.itemsProperty().set(sortedRules);
         AccessRowStyle.install(table, TrafficRule::getFilterType);
+        table.addEventHandler(MouseEvent.MOUSE_CLICKED, event -> {
+            if (event.getButton() == MouseButton.SECONDARY && event.isStillSincePress()) {
+                TableRow<?> row = findRow(event.getPickResult().getIntersectedNode());
+                if (row != null && !row.isEmpty()) {
+                    table.getSelectionModel().clearAndSelect(row.getIndex());
+                    flipRule();
+                    event.consume();
+                }
+            }
+        });
 
         CheckBox checkBox = checkNotNull(activeCheckBox);
         checkBox.selectedProperty().bindBidirectional(active);
@@ -193,6 +206,13 @@ public class RuleListForm extends AnchorPane implements Refreshable {
 
         markSaved();
         refreshContent();
+    }
+
+    private static @Nullable TableRow<?> findRow(@Nullable Node node) {
+        while (node != null && !(node instanceof TableRow<?>)) {
+            node = node.getParent();
+        }
+        return (TableRow<?>) node;
     }
 
     /** Thread-safe: may be called from connection-handling threads. */

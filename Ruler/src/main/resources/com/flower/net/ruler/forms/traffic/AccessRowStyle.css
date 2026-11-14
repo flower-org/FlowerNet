@@ -12,14 +12,20 @@
     -fx-background: #f0c8c8;
 }
 
-/* Author styles override Modena regardless of specificity, so restore the selection colors */
-.table-row-cell:allow:selected,
-.table-row-cell:deny:selected {
-    -fx-background: -fx-selection-bar-non-focused;
-    -fx-table-cell-border-color: derive(-fx-selection-bar-non-focused, 20%);
+/* Selected rows: dark green for Allow, dark red for Deny; a bit lighter when the table isn't focused */
+.table-row-cell:allow:selected {
+    -fx-background: #2e7d32;
+    -fx-table-cell-border-color: derive(#2e7d32, 20%);
 }
-.table-view:focused .table-row-cell:allow:selected,
+.table-row-cell:deny:selected {
+    -fx-background: #b23434;
+    -fx-table-cell-border-color: derive(#b23434, 20%);
+}
+.table-view:focused .table-row-cell:allow:selected {
+    -fx-background: #1b5e20;
+    -fx-table-cell-border-color: derive(#1b5e20, 20%);
+}
 .table-view:focused .table-row-cell:deny:selected {
-    -fx-background: -fx-selection-bar;
-    -fx-table-cell-border-color: derive(-fx-selection-bar, 20%);
+    -fx-background: #8b1a1a;
+    -fx-table-cell-border-color: derive(#8b1a1a, 20%);
 }

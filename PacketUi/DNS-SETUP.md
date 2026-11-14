@@ -135,3 +135,5 @@ for the current boot only).
 `apt autoremove`
 
 `xset dpms 0 0 0 && xset s off`
+
+`sudo nmcli con mod "Wired connection 1" ipv4.ignore-auto-dns yes ipv6.ignore-auto-dns yes`

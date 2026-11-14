@@ -38,7 +38,11 @@ public class RawCaptureForm extends AnchorPane implements CaptureForm {
     /** Mirrors the capture checkbox so connection threads can skip work without touching the UI */
     volatile boolean captureEnabled;
 
-    public RawCaptureForm() {
+    final Preferences preferences;
+
+    /** @param preferences the app's node to keep the capture flag in */
+    public RawCaptureForm(Preferences preferences) {
+        this.preferences = preferences;
         FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("RawCaptureForm.fxml"));
         fxmlLoader.setRoot(this);
         fxmlLoader.setController(this);
@@ -57,11 +61,11 @@ public class RawCaptureForm extends AnchorPane implements CaptureForm {
                 change -> change.getControlNewText().matches("\\d*") ? change : null));
 
         CheckBox captureCheckBox = checkNotNull(captureRequestsCheckBox);
-        captureCheckBox.setSelected(Preferences.userRoot().getBoolean(CAPTURE_FLAG_PREF, false));
+        captureCheckBox.setSelected(preferences.getBoolean(CAPTURE_FLAG_PREF, false));
         captureEnabled = captureCheckBox.isSelected();
         captureCheckBox.selectedProperty().addListener((obs, oldValue, newValue) -> {
             captureEnabled = newValue;
-            Preferences.userRoot().putBoolean(CAPTURE_FLAG_PREF, newValue);
+            preferences.putBoolean(CAPTURE_FLAG_PREF, newValue);
         });
 
         captureFilterChange();

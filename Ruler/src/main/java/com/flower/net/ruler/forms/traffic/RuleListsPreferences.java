@@ -19,7 +19,7 @@ import static com.flower.net.ruler.forms.traffic.RuleListForm.YAML_MAPPER;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * Persists rule list tabs across restarts in a dedicated preferences node:
+ * Persists rule list tabs across restarts in a dedicated child node ({@value #NODE_NAME}) of the app's preferences node:
  * <ul>
  *   <li>{@value #INDEX_KEY} - all lists in tab order: file reference for file-based lists, key reference for untitled ones;</li>
  *   <li>{@value #UNTITLED_KEY_PREFIX}N - rules of an untitled list (one value each, as values are limited to
@@ -32,7 +32,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 class RuleListsPreferences {
     final static Logger LOGGER = LoggerFactory.getLogger(RuleListsPreferences.class);
 
-    static final String NODE_PATH = "com/flower/net/ruler/trafficControl/ruleLists";
+    static final String NODE_NAME = "ruleLists";
     static final String INDEX_KEY = "index";
     static final String UNTITLED_KEY_PREFIX = "untitled.";
 
@@ -43,15 +43,12 @@ class RuleListsPreferences {
 
     record Index(List<Entry> lists) {}
 
-    static Preferences node() {
-        return Preferences.userRoot().node(NODE_PATH);
+    /** @param appPreferences the app's own node, so apps sharing a machine keep separate rule lists */
+    static Preferences node(Preferences appPreferences) {
+        return appPreferences.node(NODE_NAME);
     }
 
     /** Restore lists in saved order. Never fails: unreadable files become placeholders, unreadable untitled lists - empty. */
-    static List<RuleListForm> load() {
-        return load(node());
-    }
-
     static List<RuleListForm> load(Preferences node) {
         String indexYaml = node.get(INDEX_KEY, null);
         if (indexYaml == null) {
@@ -116,10 +113,6 @@ class RuleListsPreferences {
      * UI thread only.
      * @return error messages for anything that couldn't be saved; empty on success
      */
-    static List<String> save(List<RuleListForm> ruleLists) {
-        return save(node(), ruleLists);
-    }
-
     static List<String> save(Preferences node, List<RuleListForm> ruleLists) {
         List<String> errors = new ArrayList<>();
         try {

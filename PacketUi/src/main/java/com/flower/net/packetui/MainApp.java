@@ -12,10 +12,14 @@ import javafx.scene.control.TabPane;
 import javafx.stage.Stage;
 
 import javax.annotation.Nullable;
+import java.util.prefs.Preferences;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class MainApp implements ConnectionsTextSetter {
+    /** Own node, so Traffic Control settings don't collide with other apps on the same machine */
+    static final String TRAFFIC_CONTROL_PREFS_PATH = "com/flower/net/packetui/trafficControl";
+
     @Nullable Stage mainStage;
 
     @FXML @Nullable Label connectionsLabel;
@@ -93,7 +97,7 @@ public class MainApp implements ConnectionsTextSetter {
     }
 
     public void openTrafficControlTab() {
-        trafficControlForm = new TrafficControlForm(this);
+        trafficControlForm = new TrafficControlForm(this, Preferences.userRoot().node(TRAFFIC_CONTROL_PREFS_PATH));
         trafficControlForm.setStage(checkNotNull(mainStage));
         final Tab tab = new Tab("Traffic Control", trafficControlForm);
         tab.setClosable(false);

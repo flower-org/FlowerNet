@@ -89,6 +89,8 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     final AtomicLong allowedConnections;
     final AtomicLong prohibitedConnections;
     final ConnectionsTextSetter mainForm;
+    /** The app's own node, so apps sharing a machine (e.g. SocksUi and PacketUi) don't overwrite each other's settings */
+    final Preferences preferences;
 
     @Nullable DeniedHostsListener connectionMonitorForm;
 
@@ -127,7 +129,9 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         this.connectionMonitorForm = connectionMonitorForm;
     }
 
-    public TrafficControlForm(ConnectionsTextSetter mainForm) {
+    /** @param preferences node for all of this form's settings and rule lists; must be unique per app */
+    public TrafficControlForm(ConnectionsTextSetter mainForm, Preferences preferences) {
+        this.preferences = preferences;
         FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("TrafficControlForm.fxml"));
         fxmlLoader.setRoot(this);
         fxmlLoader.setController(this);
@@ -146,8 +150,8 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
         TabPane captureTabs = checkNotNull(captureTabPane);
         captureTabs.getTabs().addListener((ListChangeListener<Tab>) change ->
                 captureForms = captureTabs.getTabs().stream().map(tab -> (CaptureForm) tab.getContent()).toList());
-        addCaptureForm("Capture Stats", new CaptureStatsForm());
-        addCaptureForm("Raw Capture", new RawCaptureForm());
+        addCaptureForm("Capture Stats", new CaptureStatsForm(preferences));
+        addCaptureForm("Raw Capture", new RawCaptureForm(preferences));
         captureTabs.getSelectionModel().selectFirst();
 
         ComboBox<String> autoAddCombo = checkNotNull(autoAddComboBox);
@@ -189,7 +193,6 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
     /** Restores the filtering mode from preferences and keeps it saved */
     void initFilteringMode() {
-        Preferences preferences = Preferences.userRoot();
         ComboBox<String> comboBox = checkNotNull(filteringModeComboBox);
         String savedMode = preferences.get(FILTERING_MODE_PREF, null);
         if (savedMode != null && comboBox.getItems().contains(savedMode)) {
@@ -205,7 +208,6 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
     /** Restores the direct IP access checkbox from preferences and keeps it saved */
     void initDirectIpAccess() {
-        Preferences preferences = Preferences.userRoot();
         CheckBox checkBox = checkNotNull(allowDirectIpAccessCheckBox);
         checkBox.setSelected(preferences.getBoolean(ALLOW_DIRECT_IP_ACCESS_PREF, checkBox.isSelected()));
         checkBox.selectedProperty().addListener((obs, oldValue, newValue) -> {
@@ -216,7 +218,6 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
     /** Restores the direction default controls from preferences and keeps them saved */
     void initDirectionDefault() {
-        Preferences preferences = Preferences.userRoot();
         CheckBox enabledCheckBox = checkNotNull(directionDefaultCheckBox);
         enabledCheckBox.setSelected(preferences.getBoolean(DIRECTION_DEFAULT_FLAG_PREF, false));
         checkNotNull(directionDefaultInMenuItem).setSelected(preferences.getBoolean(DIRECTION_DEFAULT_ALLOW_IN_PREF, true));
@@ -232,7 +233,6 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
     void directionDefaultChanged() {
         updateDirectionDefault();
-        Preferences preferences = Preferences.userRoot();
         preferences.putBoolean(DIRECTION_DEFAULT_FLAG_PREF, directionDefaultEnabled);
         preferences.putBoolean(DIRECTION_DEFAULT_ALLOW_IN_PREF, checkNotNull(directionDefaultInMenuItem).isSelected());
         preferences.putBoolean(DIRECTION_DEFAULT_ALLOW_OUT_PREF, checkNotNull(directionDefaultOutMenuItem).isSelected());
@@ -289,7 +289,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     // ------------ Persistence across restarts ------------
 
     void restoreRuleLists() {
-        for (RuleListForm ruleList : RuleListsPreferences.load()) {
+        for (RuleListForm ruleList : RuleListsPreferences.load(RuleListsPreferences.node(preferences))) {
             addRuleList(ruleList);
             Matcher matcher = UNTITLED_NUMBER.matcher(ruleList.getListName());
             if (ruleList.getFile() == null && matcher.matches()) {
@@ -310,7 +310,7 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
     /** @return errors for anything that couldn't be persisted; also logged */
     List<String> persistRuleLists() {
         persistDelay.stop();
-        return RuleListsPreferences.save(ruleLists);
+        return RuleListsPreferences.save(RuleListsPreferences.node(preferences), ruleLists);
     }
 
     /**

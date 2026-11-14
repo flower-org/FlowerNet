@@ -25,11 +25,15 @@ import javax.annotation.Nullable;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.prefs.Preferences;
 
 import static com.flower.fxutils.JavaFxUtils.YesNo.NO;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class MainApp implements ConnectionsTextSetter {
+    /** Own node, so Traffic Control settings don't collide with other apps on the same machine */
+    static final String TRAFFIC_CONTROL_PREFS_PATH = "com/flower/net/socksui/trafficControl";
+
     @Nullable Stage mainStage;
 
     @FXML @Nullable Label connectionsLabel;
@@ -155,7 +159,7 @@ public class MainApp implements ConnectionsTextSetter {
     }
 
     public void openTrafficControlTab() {
-        trafficControlForm = new TrafficControlForm(this);
+        trafficControlForm = new TrafficControlForm(this, Preferences.userRoot().node(TRAFFIC_CONTROL_PREFS_PATH));
         trafficControlForm.setStage(checkNotNull(mainStage));
         final Tab tab = new Tab("Traffic Control", trafficControlForm);
         tab.setClosable(false);

@@ -49,6 +49,11 @@ public class MainApp implements ConnectionsTextSetter {
         checkNotNull(connectionsLabel).setText(text);
     }
 
+    @Override
+    public String countersTitle() {
+        return "Packets";
+    }
+
     public void showAboutDialog() {
         Alert alert = new Alert(Alert.AlertType.NONE, "Packet UI v 1.5.4", ButtonType.OK);
         alert.showAndWait();

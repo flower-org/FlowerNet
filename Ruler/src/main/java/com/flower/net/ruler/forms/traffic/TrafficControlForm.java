@@ -662,8 +662,8 @@ public class TrafficControlForm extends AnchorPane implements Refreshable, Conne
 
     public void updateConnectionStats() {
         mainForm.setConnectionsText(
-                String.format("Connections: total: %d allowed: %d prohibited: %d",
-                        totalConnections.get(), allowedConnections.get(), prohibitedConnections.get())
+                String.format("%s: total: %d allowed: %d prohibited: %d",
+                        mainForm.countersTitle(), totalConnections.get(), allowedConnections.get(), prohibitedConnections.get())
         );
     }
 

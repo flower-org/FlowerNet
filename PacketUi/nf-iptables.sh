@@ -77,13 +77,13 @@ nft add table ip nfbridge_nat
 nft add chain ip nfbridge_nat postrouting '{ type nat hook postrouting priority srcnat; policy accept; }'
 nft add rule ip nfbridge_nat postrouting ip saddr 10.42.0.0/24 ip daddr != 10.42.0.0/24 masquerade
 
-# All LAN DNS goes to the router's dnsmasq, whichever server a device asked. dnsmasq forwards to 127.0.0.1:53
-# (/etc/resolv.conf), which the DNS rules above send to PacketUi DNS. It can't go to :5300 directly: that would be
-# 10.42.0.1:5300, and PacketUi DNS only listens on 127.0.0.1.
-# PacketUi only knows host names for IPs its DNS resolved. Shows up in PacketUi as IN to 10.42.0.1:53.
+# All LAN DNS goes straight to PacketUi DNS on 127.0.0.1:5300, whichever server a device asked (dnsmasq is skipped).
+# Rewriting to loopback needs route_localnet, otherwise the kernel drops packets from the network addressed to 127.0.0.1.
+# PacketUi only knows host names for IPs its DNS resolved. Shows up in PacketUi as IN from the device's IP to 127.0.0.1:5300.
+sysctl -qw net.ipv4.conf.all.route_localnet=1
 nft add chain ip nfbridge_nat prerouting '{ type nat hook prerouting priority dstnat; policy accept; }'
-nft add rule ip nfbridge_nat prerouting ip saddr 10.42.0.0/24 udp dport 53 redirect to :53
-nft add rule ip nfbridge_nat prerouting ip saddr 10.42.0.0/24 tcp dport 53 redirect to :53
+nft add rule ip nfbridge_nat prerouting ip saddr 10.42.0.0/24 udp dport 53 dnat to 127.0.0.1:5300
+nft add rule ip nfbridge_nat prerouting ip saddr 10.42.0.0/24 tcp dport 53 dnat to 127.0.0.1:5300
 
 # ============== END Router ==============
 

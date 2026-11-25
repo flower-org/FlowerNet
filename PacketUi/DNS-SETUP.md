@@ -130,7 +130,10 @@ for the current boot only).
 
 `apt install dnsutils git`
 
-`apt remove gstreamer* avahi* cups* *office* *cron* *wpa* *modem* *speech* *speak* *task*`
+`apt remove gstreamer* avahi* cups* *office* *cron* *wpa* *modem* *speech* *speak* *task* *sane-airscan*`
+
+NetworkManager depends on those:
+`apt remove *wpa* *modem*`
 
 `apt autoremove`
 

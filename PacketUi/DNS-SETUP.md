@@ -37,6 +37,8 @@ dig @::1 -p 5300 example.com +short          # prints IPs
 
 ## 3. Stop NetworkManager managing DNS
 
+Skip this step if NetworkManager is purged (see [PURGE-NETWORKMANAGER.md](PURGE-NETWORKMANAGER.md)).
+
 ```bash
 sudo tee /etc/NetworkManager/conf.d/flowernet-dns.conf <<'EOF'
 [main]
@@ -72,7 +74,7 @@ Whatever is left in `/etc/resolv.conf` (nothing, or a copy with only `search .`)
 ```bash
 grep nameserver /etc/resolv.conf     # nothing (or only 127.0.0.1 / ::1)
 systemctl status systemd-resolved    # "could not be found"
-ss -tulpn | grep ':53 '              # nothing on 127.0.0.53 (dnsmasq on 10.42.0.1 is fine when sharing internet)
+ss -tulpn | grep ':53 '              # nothing on 127.0.0.53 (NetworkManager's dnsmasq on 10.42.0.1 is fine when sharing internet)
 ```
 
 Then check that there's no bypass:

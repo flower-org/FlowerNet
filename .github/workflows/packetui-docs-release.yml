@@ -20,6 +20,8 @@ jobs:
         run: |
           zip -j PacketUI-install-doc.zip \
             PacketUi/DNS-SETUP.md \
+            PacketUi/PURGE-NETWORKMANAGER.md \
+            "PacketUi/Incomplete Stealth Socket info.md" \
             PacketUi/nf-iptables.sh \
             "PacketUi/run on startup.md"
           unzip -l PacketUI-install-doc.zip

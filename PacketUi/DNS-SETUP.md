@@ -141,4 +141,8 @@ NetworkManager depends on those:
 
 `xset dpms 0 0 0 && xset s off`
 
+`sudo apt install ntpsec-ntpdate`
+`sudo ntpdate -u pool.ntp.org`
+
+
 `sudo nmcli con mod "Wired connection 1" ipv4.ignore-auto-dns yes ipv6.ignore-auto-dns yes`
